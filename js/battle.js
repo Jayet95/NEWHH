@@ -28,7 +28,13 @@ const Battle = (() => {
 
   const alive = (side) => B.stacks.filter(s => !s.dead && (side === undefined || s.side === side));
   const stackAt = (c, r) => B.stacks.find(s => !s.dead && s.c === c && s.r === r);
-  const speedOf = (s) => C[s.t].s + (s.haste ? 3 : 0);
+  const perk = (id) => (B.hero && B.hero.perks && B.hero.perks[id]) || 0;
+  const speedOf = (s) => Math.max(1, C[s.t].s + (s.haste ? 3 : 0) - (s.slow ? 3 : 0) + (s.side === 0 ? Math.min(3, perk('leadership')) : 0));
+  const HERO_POS = [{ x: 38, y: 310 }, { x: 922, y: 310 }];
+  const STRUCT = { wall: { hp: 120, n: 'Wall', i: '🧱' }, gate: { hp: 160, n: 'Gate', i: '🚪' }, tower: { hp: 200, n: 'Arrow Tower', i: '🗼' } };
+  const blockedGround = (c, r) => B.obs.has(key(c, r)) || (B.siege && (B.walls.has(key(c, r)) || B.moat.has(key(c, r))));
+  const structAt = (c, r) => B.siege ? B.walls.get(key(c, r)) : undefined;
+  const isAttacker = (s) => B.siege && s.side !== B.siege.dside;
   const bonus = (s) => s.side === 0 ? B.hero : B.eStats;
   const attackOf = (s) => C[s.t].a + bonus(s).att;
   const defenceOf = (s) => C[s.t].d + bonus(s).def + (s.stone ? 4 : 0) + (s.defb ? 3 : 0);
@@ -36,15 +42,22 @@ const Battle = (() => {
   const adjEnemy = (s) => nbrs(s.c, s.r).some(([c, r]) => { const o = stackAt(c, r); return o && o.side !== s.side; });
   const canShoot = (s) => C[s.t].shoot && s.ammo > 0 && !adjEnemy(s);
 
+  function baseDmg(a, avg) {
+    const c = C[a.t];
+    if (a.bless) return a.n * c.hi;
+    if (a.curse) return a.n * c.lo;
+    if (avg) return a.n * (c.lo + c.hi) / 2;
+    const k = Math.min(a.n, 12); let sum = 0;
+    for (let i = 0; i < k; i++) sum += c.lo + Math.floor(Math.random() * (c.hi - c.lo + 1));
+    return sum * a.n / k;
+  }
   function calcDmg(a, d, melee, avg) {
     const c = C[a.t];
-    let base;
-    if (a.bless) base = a.n * c.hi;
-    else if (avg) base = a.n * (c.lo + c.hi) / 2;
-    else { const k = Math.min(a.n, 12); let sum = 0; for (let i = 0; i < k; i++) sum += c.lo + Math.floor(Math.random() * (c.hi - c.lo + 1)); base = sum * a.n / k; }
+    const base = baseDmg(a, avg);
     const A = attackOf(a), D = defenceOf(d);
     let m = A >= D ? 1 + 0.05 * Math.min(A - D, 60) : 1 - 0.025 * Math.min(D - A, 28);
     if (melee && c.shoot) m *= 0.5;
+    if (a.side === 0) m *= 1 + 0.1 * perk(melee ? 'offense' : 'archery');
     return Math.max(1, Math.floor(base * m));
   }
   function applyDmg(s, dmg) {
@@ -54,7 +67,21 @@ const Battle = (() => {
     s.n = Math.ceil(total / c.hp); s.hp = total - (s.n - 1) * c.hp;
     return before - s.n;
   }
+  function healStack(s, amt, cap) {
+    const c = C[s.t], before = totalHp(s), total = Math.min(before + amt, cap * c.hp);
+    s.n = Math.ceil(total / c.hp); s.hp = total - (s.n - 1) * c.hp;
+    return total - before;
+  }
+  function hitStruct(st, dmg, label) {
+    st.hp -= dmg;
+    const p = hexPx(st.c, st.r);
+    B.fx.push({ x: p.x, y: p.y - 20, txt: '-' + dmg, col: '#ffd24a', t0: performance.now() });
+    st.flash = performance.now();
+    log(`${label} the ${STRUCT[st.k].n}: ${dmg} dmg (${Math.max(0, st.hp)}/${st.max}).`);
+    if (st.hp <= 0) { B.walls.delete(key(st.c, st.r)); log(`💥 The ${STRUCT[st.k].n} is destroyed!`); }
+  }
   function hit(target, dmg, label) {
+    if (target.side === 0) dmg = Math.max(1, Math.floor(dmg * (1 - 0.07 * perk('armorer'))));
     const killed = applyDmg(target, dmg);
     target.flash = performance.now();
     if (target.side === 1) B.xp += killed * C[target.t].hp;
@@ -70,7 +97,7 @@ const Battle = (() => {
 
   function computeReach(s) {
     const res = new Map(), spd = speedOf(s);
-    const free = (c, r) => !B.obs.has(key(c, r)) && !stackAt(c, r);
+    const free = (c, r) => !blockedGround(c, r) && !stackAt(c, r);
     res.set(key(s.c, s.r), { c: s.c, r: s.r, d: 0, prev: null });
     if (C[s.t].fly) {
       for (let r = 0; r < BH; r++) for (let c = 0; c < BW; c++) {
@@ -129,6 +156,32 @@ const Battle = (() => {
       await sleep(260);
     }
   }
+  function spotNear(s, c, r, reach) {
+    let best = null;
+    for (const [nc, nr] of nbrs(c, r)) { const h = reach.get(key(nc, nr)); if (h && (!best || h.d < best.d)) best = h; }
+    return best;
+  }
+  const structDmg = (a, ranged) => Math.max(1, Math.floor(baseDmg(a, true) * (ranged ? 0.5 : 0.8) * (a.side === 0 ? 1 + 0.5 * perk('ballistics') : 1)));
+  async function doStructMelee(s, st, spot) {
+    if (spot.c !== s.c || spot.r !== s.r) await doMove(s, spot);
+    hitStruct(st, structDmg(s, false), `${C[s.t].n} batters`);
+    await sleep(300);
+  }
+  async function doStructShoot(s, st) {
+    s.ammo--;
+    B.shot = { a: { c: s.c, r: s.r }, b: { c: st.c, r: st.r }, t0: performance.now() };
+    await sleep(240);
+    hitStruct(st, structDmg(s, true), `${C[s.t].n} shoots`);
+    await sleep(240);
+  }
+  function setupSiege(dside) {
+    B.siege = { dside };
+    const cw = dside === 1 ? 9 : 5, mc = dside === 1 ? 8 : 6;
+    ['wall', 'wall', 'tower', 'wall', 'wall', 'gate', 'wall', 'wall', 'tower', 'wall', 'wall'].forEach((k, r) =>
+      B.walls.set(key(cw, r), { k, hp: STRUCT[k].hp, max: STRUCT[k].hp, c: cw, r }));
+    for (let r = 0; r < BH; r++) if (r < 4 || r > 6) B.moat.add(key(mc, r));
+    B.cw = cw;
+  }
   async function doShoot(s, e) {
     s.ammo--;
     B.shot = { a: { c: s.c, r: s.r }, b: { c: e.c, r: e.r }, t0: performance.now() };
@@ -148,8 +201,23 @@ const Battle = (() => {
     B.round++;
     for (const s of alive()) { s.ret = true; s.waited = false; }
     B.queue = alive().sort((a, b) => speedOf(b) - speedOf(a) || a.side - b.side);
-    B.waitQ = [];
+    B.waitQ = []; B.strikeUsed = false;
     log(`— Round ${B.round} —`);
+    if (B.siege) {
+      for (let i = 0; i < 2; i++) {
+        const sts = [...B.walls.values()]; if (!sts.length) break;
+        const gate = sts.find(w => w.k === 'gate');
+        const cat = Math.floor(60 * (B.siege.dside === 1 ? 1 + 0.5 * perk('ballistics') : 1));
+        hitStruct(gate && Math.random() < 0.5 ? gate : sts[Math.floor(Math.random() * sts.length)], cat, '🎯 Catapult hits');
+      }
+      if (B.round > 1) {
+        const atk = alive(1 - B.siege.dside);
+        for (const st of [...B.walls.values()]) if (st.k === 'tower' && atk.length) {
+          const tg = atk.filter(a => !a.dead)[Math.floor(Math.random() * atk.length)];
+          if (tg) hit(tg, 25 + Math.floor(Math.random() * 20), '🗼 Arrow Tower hits');
+        }
+      }
+    }
   }
   async function nextTurn() {
     if (B.over) return;
@@ -157,16 +225,17 @@ const Battle = (() => {
     while (!s) {
       if (!B.queue.length) {
         if (B.waitQ.length) { B.queue = B.waitQ.sort((a, b) => speedOf(a) - speedOf(b)); B.waitQ = []; }
-        else { newRound(); B.castUsed = false; }
+        else { newRound(); B.castUsed = false; if (checkEnd()) return; }
       }
       const c = B.queue.shift();
       if (c && !c.dead) s = c;
     }
     B.cur = s; s.defb = false; B.spell = null;
     B.reach = computeReach(s);
+    const ai = s.side === 1 || B.auto;
+    B.input = !ai;
     refreshButtons();
-    if (s.side === 1 || B.auto) { B.input = false; await runAI(s); }
-    else B.input = true;
+    if (ai) await runAI(s);
   }
   async function runAI(s) {
     B.busy = true; B.input = false;
@@ -179,6 +248,8 @@ const Battle = (() => {
     const foes = alive(1 - s.side);
     if (!foes.length) return;
     const value = (e, dmg) => Math.min(dmg, totalHp(e)) / C[e.t].hp * C[e.t].v;
+    const gate = B.siege && [...B.walls.values()].find(w => w.k === 'gate');
+    if (isAttacker(s) && gate && C[s.t].shoot && s.ammo > 0 && Math.random() < 0.5) { await doStructShoot(s, gate); return; }
     if (canShoot(s)) {
       let best = null;
       for (const e of foes) { const v = value(e, calcDmg(s, e, false, true)); if (!best || v > best.v) best = { e, v }; }
@@ -192,6 +263,22 @@ const Battle = (() => {
       if (!best || v > best.v) best = { e, spot, v };
     }
     if (best) { await doMelee(s, best.e, best.spot); return; }
+    if (B.siege) {
+      if (!isAttacker(s)) return;
+      const sts = [...B.walls.values()];
+      if (sts.length) {
+        if (C[s.t].shoot && s.ammo > 0) { await doStructShoot(s, sts.find(w => w.k === 'gate') || sts[Math.floor(Math.random() * sts.length)]); return; }
+        const opts = sts.map(st => ({ st, spot: spotNear(s, st.c, st.r, B.reach) })).filter(o => o.spot);
+        if (opts.length) { const o = opts.find(x => x.st.k === 'gate') || opts[0]; await doStructMelee(s, o.st, o.spot); return; }
+        const gt = sts.find(w => w.k === 'gate');
+        if (gt) {
+          let dest = null;
+          for (const h of B.reach.values()) { const dd = hexDist(h, gt); if (!dest || dd < dest.dd) dest = { h, dd }; }
+          if (dest && (dest.h.c !== s.c || dest.h.r !== s.r)) await doMove(s, dest.h);
+          return;
+        }
+      }
+    }
     let near = foes[0];
     for (const e of foes) if (hexDist(s, e) < hexDist(s, near)) near = e;
     let dest = null;
@@ -214,7 +301,15 @@ const Battle = (() => {
     if (!B || B.over || !B.input || B.busy) return;
     const h = mouseHex(ev); if (!h) return;
     const s = B.cur, t = stackAt(h.c, h.r);
+    if (B.spell === '__strike') { heroStrike(t); return; }
     if (B.spell) { castSpell(B.spell, t); return; }
+    const st = structAt(h.c, h.r);
+    if (st && isAttacker(s)) {
+      if (C[s.t].shoot && s.ammo > 0) return playerAct(() => doStructShoot(s, st));
+      const spot = spotNear(s, h.c, h.r, B.reach);
+      if (spot) return playerAct(() => doStructMelee(s, st, spot));
+      return toast('Cannot reach that structure — the moat blocks the way.');
+    }
     if (t && t.side !== s.side) {
       if (canShoot(s)) return playerAct(() => doShoot(s, t));
       const spot = meleeSpot(s, t, B.reach);
@@ -234,17 +329,45 @@ const Battle = (() => {
     if (!t || (sp.tgt === 'enemy') !== (t.side === 1)) return toast('Invalid target.');
     if (B.hero.mana < sp.cost) return toast('Not enough mana.');
     B.hero.mana -= sp.cost; B.castUsed = true; B.spell = null;
-    const p = hexPx(t.c, t.r);
-    if (k === 'arrow') hit(t, 10 * B.hero.sp + 10, 'Magic Arrow hits');
-    else if (k === 'lightning') hit(t, 25 * B.hero.sp, 'Lightning Bolt hits');
-    else {
-      if (k === 'haste') t.haste = true; if (k === 'bless') t.bless = true; if (k === 'stone') t.stone = true;
-      B.fx.push({ x: p.x, y: p.y - 20, txt: sp.i, col: '#fff', t0: performance.now() });
-      log(`${sp.n} cast on ${C[t.t].n}.`);
+    const p = hexPx(t.c, t.r), P = B.hero.sp, sd = (x) => Math.floor(x * (1 + 0.15 * perk('sorcery')));
+    B.shot = { ax: HERO_POS[0].x, ay: HERO_POS[0].y, b: { c: t.c, r: t.r }, t0: performance.now(), col: sp.tgt === 'enemy' ? '#ff9a4a' : '#8affb0' };
+    B.heroFlash = [performance.now(), 0];
+    const mark = (txt) => { B.fx.push({ x: p.x, y: p.y - 20, txt, col: '#fff', t0: performance.now() }); log(`${sp.n} cast on ${C[t.t].n}.`); };
+    switch (k) {
+      case 'arrow': hit(t, sd(10 * P + 10), 'Magic Arrow hits'); break;
+      case 'lightning': hit(t, sd(25 * P), 'Lightning Bolt hits'); break;
+      case 'implosion': hit(t, sd(75 * P), 'Implosion crushes'); break;
+      case 'fireball': for (const e of alive(1)) if (e === t || hexDist(e, t) <= 1) hit(e, sd(15 * P + 10), 'Fireball burns'); break;
+      case 'chain': {
+        const seen = new Set(); let cur = t, dmg = sd(40 * P);
+        for (let i = 0; i < 3 && cur; i++) {
+          hit(cur, Math.floor(dmg), 'Chain Lightning arcs to'); seen.add(cur); dmg /= 2;
+          const from = cur;
+          cur = alive(1).filter(e => !seen.has(e)).sort((a, b) => hexDist(a, from) - hexDist(b, from))[0];
+        }
+        break;
+      }
+      case 'slow': t.slow = true; mark('🐌'); break;
+      case 'curse': t.curse = true; mark('☠️'); break;
+      case 'haste': t.haste = true; mark(sp.i); break;
+      case 'bless': t.bless = true; mark(sp.i); break;
+      case 'stone': t.stone = true; mark(sp.i); break;
+      case 'heal': { const g = healStack(t, 6 * P, t.n); mark('+' + Math.round(g)); break; }
+      case 'resurrect': { const g = healStack(t, 40 * P, t.maxN); mark('+' + Math.round(g)); break; }
     }
-    if (k === 'haste') B.reach = computeReach(B.cur);
+    B.reach = computeReach(B.cur);
     refreshButtons();
     if (!checkEnd()) { /* spell does not end the turn */ }
+  }
+  function heroStrike(t) {
+    if (!t || t.side !== 1) return toast('Pick an enemy stack.');
+    if (B.strikeUsed) return toast('The hero already struck this round.');
+    B.strikeUsed = true; B.spell = null;
+    const dmg = Math.floor((8 + 4 * B.hero.att) * (1 + 0.1 * perk('offense')));
+    B.shot = { ax: HERO_POS[0].x, ay: HERO_POS[0].y, b: { c: t.c, r: t.r }, t0: performance.now(), col: '#ffe9a0' };
+    B.heroFlash = [performance.now(), 0];
+    hit(t, dmg, `${B.hero.name} strikes`);
+    refreshButtons();
   }
   function toast(t) { if (window.toast) window.toast(t); }
 
@@ -252,7 +375,8 @@ const Battle = (() => {
     const mine = B.cur && B.cur.side === 0 && B.input;
     $('bWait').disabled = !mine || B.cur.waited;
     $('bDef').disabled = !mine;
-    $('bSpell').disabled = !mine || B.castUsed || B.hero.mana < 5;
+    $('bSpell').disabled = !mine || B.castUsed || !B.hero.spells.length || B.hero.mana < 5;
+    $('bHero').disabled = !mine || B.strikeUsed;
     $('bFlee').disabled = !B.canRetreat;
     $('bAuto').textContent = B.auto ? '⏸ Manual' : '⏩ Auto';
     $('bManaB').textContent = `🔷 ${B.hero.mana}${B.castUsed ? ' (cast used)' : ''}`;
@@ -261,7 +385,7 @@ const Battle = (() => {
   function openSpells() {
     const list = $('spells');
     list.innerHTML = '';
-    for (const k in SPELLS) {
+    for (const k of B.hero.spells) {
       const sp = SPELLS[k], b = document.createElement('button');
       b.textContent = `${sp.i} ${sp.n} (${sp.cost})`; b.title = sp.desc; b.disabled = B.hero.mana < sp.cost;
       b.onclick = () => { B.spell = k; list.classList.add('hide'); toast(sp.n + ': pick a ' + (sp.tgt === 'enemy' ? 'enemy' : 'friendly') + ' stack'); };
@@ -277,6 +401,7 @@ const Battle = (() => {
     $('bWait').onclick = () => B && B.cur && !B.cur.waited && playerAct(async () => { B.cur.waited = true; B.waitQ.push(B.cur); log(`${C[B.cur.t].n} waits.`); });
     $('bDef').onclick = () => B && playerAct(async () => { B.cur.defb = true; log(`${C[B.cur.t].n} defends.`); });
     $('bSpell').onclick = () => B && B.input && openSpells();
+    $('bHero').onclick = () => { if (B && B.input && !B.strikeUsed) { B.spell = '__strike'; toast('Hero Strike: pick an enemy stack'); } };
     $('bAuto').onclick = () => {
       if (!B) return; B.auto = !B.auto; refreshButtons();
       if (B.auto && B.input && !B.busy) runAI(B.cur);
@@ -307,9 +432,24 @@ const Battle = (() => {
       const p = hexPx(c, r), k = key(c, r);
       hexPath(p.x, p.y, HR - 1);
       ctx.fillStyle = (c + r) % 2 ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.08)'; ctx.fill();
+      if (B.siege) {
+        const inside = B.siege.dside === 1 ? c > B.cw : c < B.cw;
+        if (inside) { ctx.fillStyle = 'rgba(170,130,80,.30)'; ctx.fill(); }
+        if (B.moat.has(k)) { ctx.fillStyle = 'rgba(40,120,200,.65)'; ctx.fill(); }
+      }
       if (input && B.reach.has(k) && !B.spell) { ctx.fillStyle = 'rgba(120,255,120,.22)'; ctx.fill(); }
       ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1; ctx.stroke();
       if (B.obs.has(k)) { ctx.fillStyle = '#fff'; emoji(B.obs.get(k), p.x, p.y, 30); }
+      if (B.siege && B.moat.has(k)) { ctx.fillStyle = 'rgba(255,255,255,.5)'; emoji('≈', p.x, p.y, 20); }
+      const st = structAt(c, r);
+      if (st) {
+        hexPath(p.x, p.y, HR - 1);
+        ctx.fillStyle = now - (st.flash || 0) < 220 ? '#ffcf7a' : '#8b8478'; ctx.fill();
+        ctx.strokeStyle = '#2a2520'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = '#fff'; emoji(STRUCT[st.k].i, p.x, p.y - 2, st.k === 'wall' ? 24 : 28);
+        ctx.fillStyle = '#300'; ctx.fillRect(p.x - 16, p.y + 15, 32, 5);
+        ctx.fillStyle = st.hp / st.max > 0.5 ? '#5c5' : st.hp / st.max > 0.25 ? '#ec4' : '#e55'; ctx.fillRect(p.x - 16, p.y + 15, 32 * Math.max(0, st.hp) / st.max, 5);
+      }
     }
     if (B.cur && !B.cur.dead) {
       const p = hexPx(B.cur.c, B.cur.r);
@@ -320,6 +460,19 @@ const Battle = (() => {
       hexPath(p.x, p.y, HR - 2);
       ctx.strokeStyle = t && t.side === 1 ? '#ff5a4a' : '#fff'; ctx.lineWidth = 2; ctx.stroke();
     }
+    const heroes = [B.hero, B.eHero];
+    heroes.forEach((hh, i) => {
+      if (!hh || !hh.icon) return;
+      const hp = HERO_POS[i], isPlayer = i === 0, flash = isPlayer && B.heroFlash && now - B.heroFlash[0] < 500;
+      ctx.beginPath(); ctx.arc(hp.x, hp.y, 27, 0, 7);
+      ctx.fillStyle = isPlayer ? '#2a4f8a' : '#8a2a2a'; ctx.fill();
+      ctx.lineWidth = flash ? 5 : 3; ctx.strokeStyle = flash ? '#fff' : '#ffd24a'; ctx.stroke();
+      ctx.fillStyle = '#fff'; emoji(hh.icon, hp.x, hp.y + 2, 34);
+      ctx.fillStyle = '#000b'; ctx.fillRect(hp.x - 36, hp.y + 31, 72, 28);
+      ctx.fillStyle = '#f3e7bd'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(hh.name, hp.x, hp.y + 40);
+      if (isPlayer) { ctx.font = '10px sans-serif'; ctx.fillText(`⚔${hh.att} 🛡${hh.def} 🔷${hh.mana}`, hp.x, hp.y + 53); }
+    });
     const stacks = alive().sort((a, b) => a.py - b.py);
     for (const s of stacks) {
       const p = { x: s.px, y: s.py }, flash = now - (s.flash || 0) < 220;
@@ -330,12 +483,12 @@ const Battle = (() => {
       const lab = String(s.n), w = Math.max(24, lab.length * 9 + 8);
       ctx.fillStyle = '#000c'; ctx.fillRect(p.x + 4, p.y + 14, w, 16);
       ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(lab, p.x + 4 + w / 2, p.y + 23);
-      let tags = ''; if (s.haste) tags += '💨'; if (s.bless) tags += '✨'; if (s.stone) tags += '🪨'; if (s.defb) tags += '🛡';
+      let tags = ''; if (s.haste) tags += '💨'; if (s.bless) tags += '✨'; if (s.stone) tags += '🪨'; if (s.defb) tags += '🛡'; if (s.slow) tags += '🐌'; if (s.curse) tags += '☠️';
       if (tags) { ctx.font = '12px ' + FONT; ctx.fillText(tags, p.x, p.y - HR * 0.78); }
     }
     if (B.shot && now - B.shot.t0 < 260) {
-      const a = hexPx(B.shot.a.c, B.shot.a.r), b = hexPx(B.shot.b.c, B.shot.b.r), k = (now - B.shot.t0) / 260;
-      ctx.strokeStyle = '#ffe9a0'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k); ctx.stroke();
+      const a = B.shot.ax !== undefined ? { x: B.shot.ax, y: B.shot.ay } : hexPx(B.shot.a.c, B.shot.a.r), b = hexPx(B.shot.b.c, B.shot.b.r), k = (now - B.shot.t0) / 260;
+      ctx.strokeStyle = B.shot.col || '#ffe9a0'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k); ctx.stroke();
     }
     B.fx = B.fx.filter(f => now - f.t0 < 1000);
     for (const f of B.fx) {
@@ -366,10 +519,16 @@ const Battle = (() => {
   function drawInfo(h) {
     const s = h && stackAt(h.c, h.r) || B.cur;
     ctx.fillStyle = '#000b'; ctx.fillRect(0, 596, 960, 44);
+    const hs = h && structAt(h.c, h.r);
+    if (hs) {
+      ctx.fillStyle = '#f3e7bd'; ctx.font = '14px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(`${STRUCT[hs.k].i} ${STRUCT[hs.k].n}  HP ${Math.max(0, hs.hp)}/${hs.max}${hs.k === 'tower' ? '  — shoots attackers every round' : hs.k === 'gate' ? '  — break it to storm the castle' : ''}`, 14, 612);
+      return;
+    }
     if (!s || s.dead) return;
     const c = C[s.t];
     ctx.fillStyle = '#f3e7bd'; ctx.font = '14px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText(`${c.i} ${s.n} ${c.n}   Att ${attackOf(s)}  Def ${defenceOf(s)}  Dmg ${c.lo}-${c.hi}  HP ${s.hp}/${c.hp}  Spd ${speedOf(s)}${c.shoot ? `  Ammo ${s.ammo}` : ''}${c.fly ? '  Flying' : ''}`, 14, 612);
+    ctx.fillText(`${c.i} ${s.n} ${c.n}${'★'.repeat((c.lv || 1) - 1)}   Att ${attackOf(s)}  Def ${defenceOf(s)}  Dmg ${c.lo}-${c.hi}  HP ${s.hp}/${c.hp}  Spd ${speedOf(s)}${c.shoot ? `  Ammo ${s.ammo}` : ''}${c.fly ? '  Flying' : ''}`, 14, 612);
     if (B.cur && B.cur.side === 0 && h && stackAt(h.c, h.r) && stackAt(h.c, h.r).side === 1 && B.input) {
       const e = stackAt(h.c, h.r), a = B.cur;
       const d = calcDmg(a, e, !canShoot(a), true), kills = Math.floor(Math.min(d, totalHp(e)) / C[e.t].hp);
@@ -399,8 +558,9 @@ const Battle = (() => {
   function run(opts) {
     cv = $('bat'); ctx = cv.getContext('2d'); bind();
     return new Promise(resolve => {
-      const hero = { att: opts.hero.att, def: opts.hero.def, sp: opts.hero.sp, mana: opts.hero.mana };
-      B = { stacks: [], obs: new Map(), queue: [], waitQ: [], cur: null, round: 0, reach: new Map(), busy: false, input: false, auto: false, over: false,
+      const hero = { att: opts.hero.att, def: opts.hero.def, sp: opts.hero.sp, mana: opts.hero.mana, spells: opts.hero.spells || [],
+        perks: opts.hero.perks || {}, name: opts.hero.name || 'Hero', icon: opts.hero.icon || '🛡️' };
+      B = { eHero: opts.eHero || null, heroFlash: null, strikeUsed: false, siege: null, walls: new Map(), moat: new Set(), cw: 0, stacks: [], obs: new Map(), queue: [], waitQ: [], cur: null, round: 0, reach: new Map(), busy: false, input: false, auto: false, over: false,
         spell: null, castUsed: false, hover: null, fx: [], shot: null, xp: 0, hero, eStats: opts.eStats || { att: 0, def: 0 },
         armyIn: opts.army.map(a => a && { ...a }), canRetreat: opts.canRetreat !== false, resolve };
       const mk = (side, list, col) => {
@@ -408,19 +568,21 @@ const Battle = (() => {
         items.forEach((it, k) => {
           const r = Math.round((k + 0.5) * BH / items.length - 0.5), c = side === 0 ? 0 : BW - 1;
           const p = hexPx(c, r);
-          B.stacks.push({ t: it.a.t, n: it.a.n, hp: C[it.a.t].hp, side, c, r, slot: it.slot, ammo: C[it.a.t].shoot || 0, px: p.x, py: p.y, ret: true });
+          B.stacks.push({ t: it.a.t, n: it.a.n, hp: C[it.a.t].hp, side, c, r, slot: it.slot, ammo: C[it.a.t].shoot || 0, px: p.x, py: p.y, ret: true, maxN: it.a.n });
         });
       };
       mk(0, opts.army); mk(1, opts.enemy);
+      if (opts.siege) setupSiege(opts.siege.dside);
       const icons = ['🪨', '🌲', '🪵'];
-      for (let i = 0, tries = 0; i < 11 && tries < 100; tries++) {
-        const c = 3 + Math.floor(Math.random() * 9), r = Math.floor(Math.random() * BH);
+      const lo = !opts.siege ? 3 : opts.siege.dside === 1 ? 2 : 8, span = !opts.siege ? 9 : 5, want = opts.siege ? 5 : 11;
+      for (let i = 0, tries = 0; i < want && tries < 100; tries++) {
+        const c = lo + Math.floor(Math.random() * span), r = Math.floor(Math.random() * BH);
         if (B.obs.has(key(c, r)) || stackAt(c, r)) continue;
         B.obs.set(key(c, r), icons[i % 3]); i++;
       }
       $('blog').innerHTML = ''; $('btitle').textContent = opts.title || 'Battle';
       document.body.classList.add('inbattle');
-      log('Battle begins!');
+      log(opts.siege ? (opts.siege.dside === 1 ? '🏰 Siege! Break the gate, cross the drawbridge, beware the towers.' : '🏰 The castle is under siege — hold the walls!') : 'Battle begins!');
       refreshButtons();
       requestAnimationFrame(draw);
       nextTurn();

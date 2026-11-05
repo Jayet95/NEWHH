@@ -28,7 +28,7 @@ function noise(R, W, H, sc) {
 
 const NEUTRAL_BY_DEPTH = [['goblin', 'wolf'], ['orc', 'golem'], ['ogre', 'wolf'], ['troll', 'naga'], ['naga', 'dragon'], ['dragon', 'troll']];
 
-function genMap(seed) {
+function genMap(seed, ef = 'necropolis') {
   const R = rng(seed), W = 40, H = 28;
   const n1 = noise(R, W, H, 6), n2 = noise(R, W, H, 3);
   const tiles = [];
@@ -91,8 +91,9 @@ function genMap(seed) {
 
   const objs = [];
   objs.push({ t: 'town', owner: 0, x: P.x, y: P.y, name: 'Castle Dawnwatch' });
-  objs.push({ t: 'town', owner: 1, x: E.x, y: E.y, name: 'Necropolis Blackspire',
-    guard: [{ t: 'zombie', n: 40 }, { t: 'wraith', n: 14 }, { t: 'vampire', n: 12 }, { t: 'lich', n: 9 }, { t: 'skeleton', n: 60 }] });
+  const eti = factionTiers(ef), budgets = [3000, 3500, 4000, 5000, 5500, 6000];
+  const eGuard = budgets.map((b, i) => { const t = i < 3 ? eti[i] : lineType(eti[i], 2); return { t, n: Math.max(2, Math.round(b / C[t].v)) }; });
+  objs.push({ t: 'town', owner: 1, x: E.x, y: E.y, name: FACTIONS[ef].enemyTown, guard: eGuard });
 
   objs[0].zone = 0; objs[1].zone = 1;
   const seeds = [{ x: P.x, y: P.y, id: 0 }, { x: E.x, y: E.y, id: 1 }];
@@ -118,9 +119,10 @@ function genMap(seed) {
     }
   }
 
-  const mineKinds = ['gold', 'gold', 'gold', 'wood', 'wood', 'ore', 'ore', 'gems'];
+  const mineKinds = ['gold', 'gold', 'gold', 'wood', 'wood', 'ore', 'ore', 'mercury', 'sulfur', 'crystal', 'gems'];
   for (const k of mineKinds) { const c = pick(); if (!c) break; objs.push({ t: 'mine', kind: k, owner: null, x: c.x, y: c.y, guard: [guard(c, 0.8)] }); }
-  for (let i = 0; i < 16; i++) { const c = pick(); if (!c) break; const k = RES[Math.floor(R() * 4)]; objs.push({ t: 'pile', kind: k, amt: k === 'gold' ? 500 + 250 * Math.floor(R() * 5) : 3 + Math.floor(R() * 6), x: c.x, y: c.y }); }
+  for (let i = 0; i < 3; i++) { const c = pick(); if (!c) break; objs.push({ t: 'merchant', x: c.x, y: c.y }); }
+  for (let i = 0; i < 20; i++) { const c = pick(); if (!c) break; const k = RES[Math.floor(R() * RES.length)]; objs.push({ t: 'pile', kind: k, amt: k === 'gold' ? 500 + 250 * Math.floor(R() * 5) : 3 + Math.floor(R() * 6), x: c.x, y: c.y }); }
   for (let i = 0; i < 5; i++) { const c = pick(); if (!c) break; objs.push({ t: 'chest', x: c.x, y: c.y, gold: 1000 + 500 * Math.floor(R() * 4) }); }
   ARTIFACTS.forEach((a, i) => { const c = pick(); if (c) objs.push({ t: 'art', art: i, x: c.x, y: c.y, guard: [guard(c, 1.1)] }); });
   for (let i = 0; i < 28; i++) { const c = pick(); if (!c) break; objs.push({ t: 'monster', x: c.x, y: c.y, guard: [guard(c)] }); }

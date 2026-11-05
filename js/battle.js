@@ -140,6 +140,7 @@ const Battle = (() => {
   }
 
   async function tweenTo(s, x, y, ms) {
+    if (typeof document !== 'undefined' && document.hidden) { s.px = x; s.py = y; return; }
     const x0 = s.px, y0 = s.py, t0 = performance.now();
     for (;;) {
       const k = Math.min(1, (performance.now() - t0) / ms);

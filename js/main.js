@@ -5,7 +5,7 @@
   const TS = 32, FONT = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
   const COARSE = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   let VW = 960, VH = 640, Z = (COARSE || window.innerWidth < 700) ? 1.5 : 1;
-  const SAVE = 'h3js_save_v4';
+  const SAVE = 'h3js_save_v5';
   const MOVE_PER_DAY = 1700;
   const FLEE_RATIO = 3;
   const cmap = $('map'), cx = cmap.getContext('2d'), mini = $('mini'), mx = mini.getContext('2d');
@@ -26,8 +26,17 @@
     $('modal').classList.remove('hide');
   });
   const perk = (h, id) => (h.perks && h.perks[id]) || 0;
-  const town = () => G.objs.find(o => o.t === 'town' && o.owner === 0);
-  const eTown = () => G.objs.find(o => o.t === 'town' && o.owner === 1);
+  const myTowns = () => G.objs.filter(o => o.t === 'town' && o.owner === 0);
+  const town = () => myTowns()[0] || null;
+  const townAt = (x, y) => { const o = objAt(G, x, y); return o && o.t === 'town' && o.owner === 0 ? o : null; };
+  const nearestTown = (x, y) => myTowns().sort((a, b) => Math.max(Math.abs(a.x - x), Math.abs(a.y - y)) - Math.max(Math.abs(b.x - x), Math.abs(b.y - y)))[0] || null;
+  const tiersOf = (t) => factionTiers(t.fac || G.faction);
+  const aiById = (id) => G.ais.find(a => a.id === id);
+  const allAiHeroes = () => G.ais.flatMap(a => a.heroes);
+  const aiHeroAt = (x, y) => allAiHeroes().find(h => h.x === x && h.y === y);
+  const AICOL = ['#e03a3a', '#e0a030', '#a050e0', '#30b0a0'];
+  const ownCol = (o) => (o === null || o === undefined) ? '#999' : o === 0 ? '#3a8aff' : AICOL[(o - 1) % 4];
+  const ownFill = (o, a) => { const c = ownCol(o); return `rgba(${parseInt(c.slice(1, 3), 16)},${parseInt(c.slice(3, 5), 16)},${parseInt(c.slice(5, 7), 16)},${a})`; };
   const armyCount = (h) => h.army.reduce((s, a) => s + (a ? a.n : 0), 0);
   const maxMana = (h) => h.kn * 10 + 15 * perk(h, 'wisdom');
   const heroMorale = (h) => {
@@ -35,15 +44,16 @@
     return Math.max(-3, Math.min(3, perk(h, 'leadership') - Math.max(0, facs.size - 1)));
   };
   const heroLuck = (h) => Math.min(3, perk(h, 'fortune'));
+  const capsOf = (h) => ({ forest: perk(h, 'forester'), mount: perk(h, 'mountaineer'), water: perk(h, 'waterwalk') });
   const sgn = (n) => (n > 0 ? '+' : '') + n;
   const sizeMv = () => (G && SIZES[G.size] && SIZES[G.size].mv) || 1;
   const maxMove = (h) => Math.round(MOVE_PER_DAY * sizeMv() * (1 + 0.1 * perk(h, 'logistics')));
   const need = (l) => 150 * l * l;
   const heroesAt = (x, y) => G.heroes.filter(h => h.x === x && h.y === y);
-  const heroAtTown = (h) => h.x === town().x && h.y === town().y;
+  const heroAtTown = (h) => !!townAt(h.x, h.y);
   const dist = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
   const setActive = (i) => { G.sel = i; G.hero = G.heroes[i]; };
-  const townHero = () => { const at = heroesAt(town().x, town().y); return at.includes(G.hero) ? G.hero : at[0] || null; };
+  const townHero = (t) => { const at = heroesAt(t.x, t.y); return at.includes(G.hero) ? G.hero : at[0] || null; };
   const emptyArmy = () => [null, null, null, null, null, null, null];
   const sfx = (n) => { if (typeof Sfx !== 'undefined') Sfx.play(n); };
   const fmtN = (n) => n >= 100000 ? Math.round(n / 1000) + 'k' : n >= 10000 ? (n / 1000).toFixed(1) + 'k' : String(n);
@@ -88,32 +98,42 @@
     let h = 7; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) | 0;
     return Math.abs(h);
   }
-  function newGame(faction, heroId, diff = 'normal', map = {}) {
-    const others = Object.keys(FACTIONS).filter(f => f !== faction);
-    const ef = others[Math.floor(Math.random() * others.length)];
-    const D = DIFFICULTY[diff], r = (n) => Math.max(1, Math.round(n * D.res));
-    const preset = map.preset || 'plains', size = map.size || 'medium', seed = seedFrom(map.seed), m = genMap(seed, ef, diff, { preset, size });
-    setFaction(faction);
-    G = { seed, preset, size, W: m.W, H: m.H, tiles: m.tiles, zone: m.zone, objs: m.objs, dock: m.dock, boats: [], nextBoat: 1, day: 1, over: false, path: null, faction, efaction: ef, diff,
-      res: { gold: D.gold, wood: r(20), ore: r(20), mercury: r(5), sulfur: r(5), crystal: r(5), gems: r(5) }, spells: [...START_SPELLS],
-      wk: {}, heroes: [], sel: 0, hero: null, eh: null, ehTimer: 0, ehWave: 0, tavern: [] };
-    const t = town(); t.name = FACTIONS[faction].town;
-    t.b = { 1: 1, 2: 1, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, hall: 0, guild: 0, market: 0, ship: 0 };
+  function initTown(t, level) {
+    t.b = { 1: 1, 2: 1, 3: level ? 1 : 0, 4: 0, 5: 0, 6: 0, 7: 0, hall: level ? 1 : 0, guild: 0, market: 0, ship: 0 };
     t.up = { 1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1 };
     t.avail = { 1: GROWTH[0], 2: GROWTH[1] };
+    if (level) t.avail[3] = GROWTH[2];
+    if (!t.garrison) t.garrison = emptyArmy();
+  }
+  function newGame(faction, heroId, diff = 'normal', map = {}) {
+    const D = DIFFICULTY[diff], r = (n) => Math.max(1, Math.round(n * D.res));
+    const preset = map.preset || 'plains', size = map.size || 'medium', seed = seedFrom(map.seed);
+    const nAI = Math.max(1, Math.min(4, map.ais || { small: 1, medium: 1, large: 2, huge: 3, giant: 4 }[size] || 1));
+    const aiFacs = shuffle(Object.keys(FACTIONS).filter(f => f !== faction)).slice(0, nAI);
+    const m = genMap(seed, aiFacs, diff, { preset, size });
+    setFaction(faction);
+    G = { seed, preset, size, W: m.W, H: m.H, tiles: m.tiles, zone: m.zone, objs: m.objs, dock: m.dock, boats: [], nextBoat: 1, day: 1, over: false, path: null, faction, diff,
+      res: { gold: D.gold, wood: r(20), ore: r(20), mercury: r(5), sulfur: r(5), crystal: r(5), gems: r(5) }, spells: [...START_SPELLS],
+      wk: {}, heroes: [], sel: 0, hero: null, tavern: [], noTown: 0,
+      ais: aiFacs.map((f, i) => ({ id: i + 1, fac: f, name: FACTIONS[f].name, gold: Math.round(3000 * D.aiInc), heroes: [], alive: true, spawnWait: 0 })) };
+    for (const o of G.objs) if (o.t === 'town') {
+      if (o.owner === 0) { o.fac = faction; o.name = FACTIONS[faction].town; initTown(o, 0); }
+      else initTown(o, o.owner ? 1 : 0);
+    }
+    for (const ai of G.ais) spawnAiHero(ai, G.objs.find(o => o.t === 'town' && o.owner === ai.id));
     const def = HEROES[heroId], h = makeHero(def, m.P.x, m.P.y), ti = factionTiers(faction);
     h.army = [{ t: ti[0], n: 20 }, { t: ti[1], n: 10 }, { t: ti[2], n: 5 }, null, null, null, null];
     h.move = maxMove(h);
     G.heroes.push(h); setActive(0); learn(def.spells); rollTavern();
     reindex(G); buildTerrain(); sizeMini(); centerOn(h.x, h.y); renderAll();
-    toast(`${MAPS[preset].name} (${SIZES[size].name}, seed ${seed}) · ${D.name}: capture the ${FACTIONS[ef].name} stronghold in the NE to win. Good luck, ${h.name}!`);
+    toast(`${MAPS[preset].name} (${SIZES[size].name}, seed ${seed}) · ${D.name}: defeat ${nAI > 1 ? 'all ' + nAI + ' rivals by capturing their towns' : 'the rival by capturing their towns'}. Good luck, ${h.name}!`);
   }
   const saveJSON = () => JSON.stringify(G, (k, v) => (k === 'omap' || k === 'hero') ? undefined : v);
   function save() { try { localStorage.setItem(SAVE, saveJSON()); toast('Game saved.'); } catch (e) { toast('Save failed.'); } }
   function load() {
     try {
       const s = localStorage.getItem(SAVE); if (!s) return false;
-      G = JSON.parse(s); if (!G.zone || !G.heroes) return false;
+      G = JSON.parse(s); if (!G.zone || !G.heroes || !G.ais) return false;
       G.path = null; G.boats = G.boats || []; setFaction(G.faction); setActive(Math.min(G.sel, G.heroes.length - 1));
       reindex(G); buildTerrain(); sizeMini(); centerOn(G.hero.x, G.hero.y); renderAll(); return true;
     } catch (e) { return false; }
@@ -181,12 +201,11 @@
     cx.drawImage(terrain, cam.x, cam.y, VW, VH, 0, 0, VW, VH);
     const x0 = Math.floor(cam.x / TS), y0 = Math.floor(cam.y / TS), vx = Math.ceil(VW / TS) + 2, vy = Math.ceil(VH / TS) + 2;
     cx.textAlign = 'center'; cx.textBaseline = 'middle';
-    const ZC = { 0: 'rgba(60,130,255,.20)', 1: 'rgba(230,60,60,.20)' };
     cx.lineWidth = 2; cx.strokeStyle = 'rgba(255,255,255,.45)';
     const zo = {}; for (const o of G.objs) if (o.t === 'fort' || o.t === 'town') zo[o.zone] = o.owner;
     for (let y = Math.max(0, y0); y < Math.min(G.H, y0 + vy); y++) for (let x = Math.max(0, x0); x < Math.min(G.W, x0 + vx); x++) {
       const z = G.zone[y][x], ow = zo[z], px = x * TS - cam.x, py = y * TS - cam.y;
-      if (ow !== null && ow !== undefined && G.tiles[y][x] !== T.WATER) { cx.fillStyle = ZC[ow]; cx.fillRect(px, py, TS, TS); }
+      if (ow !== null && ow !== undefined && G.tiles[y][x] !== T.WATER) { cx.fillStyle = ownFill(ow, 0.2); cx.fillRect(px, py, TS, TS); }
       if (x + 1 < G.W && G.zone[y][x + 1] !== z) { cx.beginPath(); cx.moveTo(px + TS, py); cx.lineTo(px + TS, py + TS); cx.stroke(); }
       if (y + 1 < G.H && G.zone[y + 1][x] !== z) { cx.beginPath(); cx.moveTo(px, py + TS); cx.lineTo(px + TS, py + TS); cx.stroke(); }
     }
@@ -214,14 +233,14 @@
       cx.font = `${o.t === 'town' ? 40 : o.t === 'fort' ? 34 : 26}px ${FONT}`; cx.fillStyle = '#fff';
       cx.fillText(objIcon(o), px, py + 1);
       if (o.t === 'fort') {
-        cx.beginPath(); cx.arc(px + 14, py - 16, 6, 0, 7); cx.fillStyle = o.owner === 0 ? '#3a8aff' : o.owner === 1 ? '#e03a3a' : '#999'; cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke();
+        cx.beginPath(); cx.arc(px + 14, py - 16, 6, 0, 7); cx.fillStyle = ownCol(o.owner); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke();
         const gn = o.garrison.reduce((s, a) => s + (a ? a.n : 0), 0);
         if (o.owner === 0 && gn) { cx.font = 'bold 11px sans-serif'; cx.fillStyle = '#000b'; cx.fillRect(px - 14, py + 10, 28, 13); cx.fillStyle = '#fff'; cx.fillText(gn, px, py + 17); }
       }
-      if (o.t === 'mine') { cx.beginPath(); cx.arc(px + 12, py - 12, 5, 0, 7); cx.fillStyle = o.owner === 0 ? '#3a8aff' : '#999'; cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke(); }
-      if (o.t === 'town') { cx.beginPath(); cx.arc(px + 16, py - 18, 6, 0, 7); cx.fillStyle = o.owner === 0 ? '#3a8aff' : '#e03a3a'; cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke(); }
+      if (o.t === 'mine') { cx.beginPath(); cx.arc(px + 12, py - 12, 5, 0, 7); cx.fillStyle = ownCol(o.owner); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke(); }
+      if (o.t === 'town') { cx.beginPath(); cx.arc(px + 16, py - 18, 6, 0, 7); cx.fillStyle = ownCol(o.owner); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke(); }
       if (o.t === 'town' || o.t === 'fort') {
-        cx.font = 'bold 11px sans-serif'; cx.lineWidth = 3; cx.strokeStyle = '#000'; cx.fillStyle = o.owner === 0 ? '#bcd8ff' : o.owner === 1 ? '#ffb3a8' : '#f3e7bd';
+        cx.font = 'bold 11px sans-serif'; cx.lineWidth = 3; cx.strokeStyle = '#000'; cx.fillStyle = o.owner === 0 ? '#bcd8ff' : o.owner ? '#ffb3a8' : '#f3e7bd';
         cx.strokeText(o.name, px, py - 27); cx.fillText(o.name, px, py - 27);
       }
     }
@@ -229,10 +248,10 @@
       const px = b.x * TS - cam.x + TS / 2, py = b.y * TS - cam.y + TS / 2;
       cx.font = `30px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText('⛵', px, py + 2);
     }
-    if (G.eh) {
-      const px = G.eh.x * TS - cam.x + TS / 2, py = G.eh.y * TS - cam.y + TS / 2;
-      cx.beginPath(); cx.arc(px, py, 15, 0, 7); cx.fillStyle = '#a02020'; cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 2; cx.stroke();
-      cx.font = `22px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(G.eh.icon, px, py + 1);
+    for (const ai of G.ais) for (const eh of ai.heroes) {
+      const px = eh.x * TS - cam.x + TS / 2, py = eh.y * TS - cam.y + TS / 2;
+      cx.beginPath(); cx.arc(px, py, 15, 0, 7); cx.fillStyle = ownCol(ai.id); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 2; cx.stroke();
+      cx.font = `22px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(eh.icon, px, py + 1);
     }
     G.heroes.forEach((h, i) => {
       const px = h.x * TS - cam.x + TS / 2 + (G.heroes.filter((o, j) => j < i && o.x === h.x && o.y === h.y).length * 6), py = h.y * TS - cam.y + TS / 2;
@@ -254,16 +273,16 @@
       const c = miniCache.getContext('2d'); c.drawImage(miniTerr, 0, 0);
       for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) {
         const ow = zo[G.zone[y][x]];
-        if (ow !== null && ow !== undefined) { c.fillStyle = ow === 0 ? 'rgba(60,130,255,.35)' : 'rgba(230,60,60,.35)'; c.fillRect(x * k, y * k, k, k); }
+        if (ow !== null && ow !== undefined) { c.fillStyle = ownFill(ow, 0.4); c.fillRect(x * k, y * k, k, k); }
       }
     }
     mx.drawImage(miniCache, 0, 0);
     for (const o of G.objs) {
-      mx.fillStyle = o.t === 'fort' ? (o.owner === 0 ? '#9cf' : o.owner === 1 ? '#f88' : '#ffa') : o.t === 'town' ? (o.owner === 0 ? '#4af' : '#f44') : o.t === 'monster' ? '#a33' : o.t === 'mine' ? (o.owner === 0 ? '#4af' : '#ddd') : o.t === 'merchant' ? '#fa0' : '#ee6';
-      mx.fillRect(o.x * k, o.y * k, k, k);
+      mx.fillStyle = (o.t === 'fort' || o.t === 'town') ? ownCol(o.owner) : o.t === 'monster' ? '#a33' : o.t === 'mine' ? (o.owner !== null ? ownCol(o.owner) : '#ddd') : o.t === 'merchant' ? '#fa0' : '#ee6';
+      mx.fillRect(o.x * k - (o.t === 'town' ? 1 : 0), o.y * k - (o.t === 'town' ? 1 : 0), k + (o.t === 'town' ? 2 : 0), k + (o.t === 'town' ? 2 : 0));
     }
     mx.fillStyle = '#8df'; for (const b of G.boats) mx.fillRect(b.x * k, b.y * k, k, k);
-    if (G.eh) { mx.fillStyle = '#f0f'; mx.fillRect(G.eh.x * k - 1, G.eh.y * k - 1, k + 2, k + 2); }
+    for (const ai of G.ais) for (const eh of ai.heroes) { mx.fillStyle = ownCol(ai.id); mx.fillRect(eh.x * k - 1, eh.y * k - 1, k + 2, k + 2); mx.strokeStyle = '#000'; mx.strokeRect(eh.x * k - 1, eh.y * k - 1, k + 2, k + 2); }
     mx.fillStyle = '#fff'; for (const h of G.heroes) mx.fillRect(h.x * k - 1, h.y * k - 1, k + 2, k + 2);
     mx.strokeStyle = '#fff'; mx.lineWidth = 1; mx.strokeRect(cam.x / TS * k, cam.y / TS * k, VW / TS * k, VH / TS * k);
   }
@@ -300,10 +319,13 @@
     $('bPortal').onclick = townPortal;
     const zs = G.objs.filter(o => o.t === 'fort' || o.t === 'town').sort((a, b) => a.zone - b.zone);
     const mineIncome = G.objs.filter(o => o.t === 'mine' && o.owner === 0 && zoneOwner(G, G.zone[o.y][o.x]) === 0).length;
-    $('terr').innerHTML = `<h3>🗺 Territory — ${zs.filter(z => z.owner === 0).length}/${zs.length} zones</h3>` +
-      zs.map(z => { const gn = z.garrison ? z.garrison.reduce((s, a) => s + (a ? a.n : 0), 0) : 0;
-        return `<div class="zrow"><span class="zdot z${z.owner === 0 ? 'p' : z.owner === 1 ? 'e' : 'n'}"></span>${z.name}${z.t === 'fort' && z.owner === 0 ? ` <span class="small">garrison ${gn}</span>` : ''}</div>`; }).join('') +
-      `<div class="small">Paying mines: ${mineIncome}</div>`;
+    const mine = zs.filter(z => z.owner === 0), rest = zs.length - mine.length;
+    $('terr').innerHTML = `<h3>🗺 Territory — ${mine.length}/${zs.length} zones</h3>` +
+      mine.map(z => { const gn = z.garrison ? z.garrison.reduce((s, a) => s + (a ? a.n : 0), 0) : 0;
+        return `<div class="zrow"><span class="zdot" style="background:${ownCol(0)};color:${ownCol(0)}"></span>${z.t === 'town' ? '🏰' : '🏯'} ${z.name} <span class="small">garrison ${gn}</span></div>`; }).join('') +
+      `<div class="small">Paying mines: ${mineIncome} · other zones: ${rest}</div>` +
+      G.ais.map(ai => { const tw = G.objs.filter(o => o.t === 'town' && o.owner === ai.id).length, fr = G.objs.filter(o => o.t === 'fort' && o.owner === ai.id).length;
+        return `<div class="zrow" title="Rival: ${FACTIONS[ai.fac].name}"><span class="zdot" style="background:${ownCol(ai.id)};color:${ownCol(ai.id)}"></span>${FACTIONS[ai.fac].icon} ${ai.alive ? `${tw} towns, ${fr} forts, ${ai.heroes.length} heroes` : '<s>eliminated</s>'}</div>`; }).join('');
     const el = $('army'); el.innerHTML = '';
     h.army.forEach((a, i) => {
       const b = document.createElement('button');
@@ -330,9 +352,10 @@
   function townPortal() {
     const h = G.hero;
     if (busy) return;
-    if (heroAtTown(h)) return toast('Already in your castle.');
+    if (heroAtTown(h)) return toast('Already in a town.');
     if (h.mana < PORTAL_COST) return toast(`Town Portal needs ${PORTAL_COST} mana.`);
-    h.mana -= PORTAL_COST; h.x = town().x; h.y = town().y; h.boat = null; h.move = Math.min(h.move, 400); G.path = null;
+    const tw = nearestTown(h.x, h.y); if (!tw) return toast('You own no town to teleport to.');
+    h.mana -= PORTAL_COST; h.x = tw.x; h.y = tw.y; h.boat = null; h.move = Math.min(h.move, 400); G.path = null;
     centerOn(h.x, h.y); renderAll(); toast(`${h.name} teleports home.`);
   }
 
@@ -345,24 +368,29 @@
   }
   function armyList(arr, vague) { return arr.filter(Boolean).map(a => vague ? `${groupLabel(a.n)} ${C[a.t].n}s` : `${a.n} ${C[a.t].n}`).join(', '); }
   function describe(x, y) {
-    if (G.eh && G.eh.x === x && G.eh.y === y) return `<b>${G.eh.name}</b> (enemy hero)<br>${armyList(G.eh.army, true)}`;
+    const ah = aiHeroAt(x, y); if (ah) return `<b>${ah.name}</b> (rival ${FACTIONS[aiById(ah.ai).fac].name} hero, L${ah.lvl})<br>${armyList(ah.army, true)}`;
     const hs = heroesAt(x, y); if (hs.length) return hs.map(h => `<b>${h.name}</b> (${h.cls} L${h.lvl})${h.boat != null ? ' ⛵ sailing' : ''}`).join('<br>');
     if (G.boats.some(b => b.x === x && b.y === y)) return '<b>⛵ Your boat</b><br>Walk onto it from the shore to set sail.';
     const o = objAt(G, x, y);
-    if (!o) return ['Grass', 'Forest (impassable)', 'Mountains (impassable)', 'Water (needs a boat)', 'Road (fast)', 'Sand (slow)'][G.tiles[y][x]];
+    if (!o) return ['Grass', 'Forest (needs Forester)', 'Mountains (needs Mountaineer)', 'Water (needs a boat or Water Walk)', 'Road (fast)', 'Sand (slow)'][G.tiles[y][x]];
     const g = o.guard && o.guard.length ? `<br>Guarded by: ${armyList(o.guard, true)}` : '';
     switch (o.t) {
-      case 'town': return o.owner === 0 ? `<b>${o.name}</b> — your castle` : `<b>${o.name}</b> — enemy stronghold${g}<br>Assaulting it is a siege battle.`;
+      case 'town': {
+        const fn = FACTIONS[o.fac || G.faction].name, gn = (o.garrison || []).reduce((s, a) => s + (a ? a.n : 0), 0);
+        return o.owner === 0 ? `<b>${o.name}</b> — your ${fn} town (garrison ${gn})`
+          : o.owner ? `<b>${o.name}</b> — rival ${fn} town${gn ? ' — garrison: ' + armyList(o.garrison, true) : ''}<br>Assaulting it is a siege battle.`
+            : `<b>${o.name}</b> — neutral ${fn} town${g}<br>Capture it for a new castle (siege battle).`;
+      }
       case 'merchant': return '<b>Wandering Merchant</b><br>Buy missing resources';
       case 'wreck': return `<b>Shipwreck</b><br>Salvage: ${RES_ICON.gold}${o.gold} + ${RES_ICON[o.res]}${g}`;
       case 'mine': {
         const supplied = o.owner === 0 && zoneOwner(G, G.zone[o.y][o.x]) === 0;
-        return `<b>${o.kind[0].toUpperCase() + o.kind.slice(1)} mine</b> (${o.owner === 0 ? 'yours' : 'unclaimed'}) +${MINE_YIELD[o.kind]}/day` +
+        return `<b>${o.kind[0].toUpperCase() + o.kind.slice(1)} mine</b> (${o.owner === 0 ? 'yours' : o.owner ? 'held by a rival' : 'unclaimed'}) +${MINE_YIELD[o.kind]}/day` +
           (o.owner === 0 && !supplied ? '<br>⚠ Pays nothing: you do not hold this zone' : o.owner !== 0 ? '<br>Pays only if you also hold its zone' : '') + g;
       }
       case 'fort': {
         const gn = o.garrison.reduce((s, a) => s + (a ? a.n : 0), 0);
-        return `<b>${o.name}</b> — ${o.owner === 0 ? `your fort (garrison ${gn})` : o.owner === 1 ? `held by the enemy${gn ? ' — garrison: ' + armyList(o.garrison, true) : ''}` : 'neutral zone stronghold'}<br>Holding it: +${FORT_INCOME} 🪙/day and zone mine income${o.owner === null ? g : ''}<br>Assault = siege battle`;
+        return `<b>${o.name}</b> — ${o.owner === 0 ? `your fort (garrison ${gn})` : o.owner ? `held by a rival${gn ? ' — garrison: ' + armyList(o.garrison, true) : ''}` : 'neutral zone stronghold'}<br>Holding it: +${FORT_INCOME} 🪙/day and zone mine income${o.owner === null ? g : ''}<br>Assault = siege battle`;
       }
       case 'pile': return `${RES_ICON[o.kind]} ${o.amt} ${o.kind}`;
       case 'chest': return 'Treasure chest';
@@ -376,8 +404,9 @@
     if (!hover) cmap.style.cursor = 'default';
     else {
       const o = objAt(G, hover.x, hover.y), tt = G.tiles[hover.y][hover.x];
-      const blocked = tt === T.FOREST || tt === T.MOUNT || (tt === T.WATER && G.hero.boat == null && !G.boats.some(b => b.x === hover.x && b.y === hover.y));
-      cmap.style.cursor = (o || heroesAt(hover.x, hover.y).length || (G.eh && G.eh.x === hover.x && G.eh.y === hover.y)) ? 'pointer' : blocked ? 'not-allowed' : 'crosshair';
+      const cp = capsOf(G.hero);
+      const blocked = (tt === T.FOREST && !cp.forest) || (tt === T.MOUNT && !cp.mount) || (tt === T.WATER && !cp.water && G.hero.boat == null && !G.boats.some(b => b.x === hover.x && b.y === hover.y));
+      cmap.style.cursor = (o || heroesAt(hover.x, hover.y).length || aiHeroAt(hover.x, hover.y)) ? 'pointer' : blocked ? 'not-allowed' : 'crosshair';
     }
     const tip = $('tip');
     if (hover) {
@@ -434,12 +463,12 @@
     if (here.length) {
       if (!here.includes(G.hero)) { setActive(G.heroes.indexOf(here[0])); G.path = null; renderAll(); return; }
       const o = objAt(G, t.x, t.y);
-      if (heroAtTown(G.hero)) openTown(); else if (o && o.t === 'fort' && o.owner === 0) openFort(o, G.hero);
+      if (heroAtTown(G.hero)) openTown(townAt(G.hero.x, G.hero.y)); else if (o && o.t === 'fort' && o.owner === 0) openFort(o, G.hero);
       return;
     }
     const last = G.path && G.path[G.path.length - 1];
     if (last && last.x === t.x && last.y === t.y) return moveHero();
-    const p = findPath(G, G.hero.x, G.hero.y, t.x, t.y, false, G.hero.boat != null);
+    const p = findPath(G, G.hero.x, G.hero.y, t.x, t.y, false, G.hero.boat != null, capsOf(G.hero));
     if (!p || !p.length) { G.path = null; return toast(G.hero.boat != null ? 'Cannot sail there — disembark on a shore tile.' : "Can't reach there. (Water needs a boat.)"); }
     G.path = p;
   });
@@ -483,7 +512,12 @@
       h.x = s.x; h.y = s.y; centerOn(h.x, h.y); renderAll(); sfx('step');
       await sleep(70);
       const last = i === path.length - 1, o = objAt(G, s.x, s.y);
-      if (G.eh && G.eh.x === s.x && G.eh.y === s.y) { await fightEnemyHero(h, true); break; }
+      const eh = aiHeroAt(s.x, s.y);
+      if (eh) {
+        if (o && (o.t === 'town' || o.t === 'fort') && o.owner === eh.ai) await interact(o, h, eh);
+        else await fightAiHero(h, eh, true);
+        break;
+      }
       if (o && (o.t === 'pile' || o.t === 'chest')) { collect(o); continue; }
       if (o && last) { await interact(o, h); break; }
     }
@@ -495,7 +529,15 @@
     else { G.res.gold += o.gold; toast(`The chest holds ${o.gold} 🪙 gold!`); }
     G.objs.splice(G.objs.indexOf(o), 1); reindex(G);
   }
-  async function interact(o, h) {
+  // defenders of a town/fort: its garrison (or neutral guard), plus a rival hero standing inside
+  function defendersOf(o, eh) {
+    const base = o.owner ? o.garrison.filter(Boolean) : (o.guard || []);
+    if (!eh) return base;
+    const tmp = emptyArmy();
+    [...eh.army, ...o.garrison].forEach(s => { if (s) addToArmy({ army: tmp }, s.t, s.n); });
+    return tmp.filter(Boolean);
+  }
+  async function interact(o, h, eh) {
     if (o.t === 'wreck') {
       if (o.guard && o.guard.length) { if (!(await fight(h, o.guard, { att: 0, def: 0 }, 'Shipwreck guardians'))) return; o.guard = []; }
       const n = 3 + Math.floor(Math.random() * 4);
@@ -504,15 +546,14 @@
     }
     if (o.t === 'merchant') return openMarket(MERCHANT_RATE + ((G.wk && G.wk.rateBonus) || 0), 'Wandering Merchant', false);
     if (o.t === 'town') {
-      if (o.owner === 0) { for (const x of heroesAt(o.x, o.y)) x.mana = maxMana(x); return openTown(); }
-      const win = await fight(h, o.guard, { att: 6, def: 6 }, `Siege of ${o.name}`, { dside: 1 }, { name: FACTIONS[G.efaction].heroes[0][0], icon: CLASSES[FACTIONS[G.efaction].heroes[0][1]].i });
-      if (win) return endGame(true);
-      return;
+      if (o.owner === 0) { for (const x of heroesAt(o.x, o.y)) x.mana = maxMana(x); return openTown(o); }
+      return conquerTown(h, o, eh);
     }
     if (o.t === 'fort') {
       if (o.owner === 0) return openFort(o, h);
-      const army = o.owner === 1 ? o.garrison.filter(Boolean) : o.guard;
-      if (army.length && !(await fight(h, army, { att: o.owner === 1 ? 4 : 0, def: o.owner === 1 ? 4 : 0 }, `Siege of ${o.name}`, { dside: 1 }))) return;
+      const army = defendersOf(o, eh);
+      if (army.length && !(await fight(h, army, { att: eh ? eh.att : o.owner ? 4 : 0, def: eh ? eh.def : o.owner ? 4 : 0 }, `Siege of ${o.name}`, { dside: 1 }, eh))) { if (eh) shrinkArmy(eh.army, 0.5); return; }
+      if (eh) removeAiHero(eh);
       o.owner = 0; o.guard = []; o.garrison = emptyArmy();
       renderAll();
       await showModal(`<h2>🏯 ${o.name} captured!</h2><p>The zone is yours: +${FORT_INCOME} 🪙/day, mine income in the zone, and +${MILITIA} militia per week. Station troops here to defend it from the enemy hero.</p>`);
@@ -556,14 +597,37 @@
     }
   }
   function retreat(h) {
-    h.army = emptyArmy(); h.x = town().x; h.y = town().y; h.boat = null; G.path = null;
+    h.army = emptyArmy(); h.boat = null; G.path = null;
+    const tw = nearestTown(h.x, h.y);
+    if (tw) { h.x = tw.x; h.y = tw.y; }
     if (h === G.hero) centerOn(h.x, h.y);
-    toast(`${h.name} returns to the castle with no army. Recruit new troops!`);
+    toast(tw ? `${h.name} returns to ${tw.name} with no army. Recruit new troops!` : `${h.name} has lost the army and has no town to return to!`);
+  }
+  async function conquerTown(h, o, hero) {
+    const defenders = defendersOf(o, hero);
+    const cmd = hero ? { name: hero.name, icon: hero.icon, att: hero.att, def: hero.def } : { name: 'Garrison commander', icon: '🏰', att: 4, def: 4 };
+    if (defenders.length && !(await fight(h, defenders, { att: cmd.att, def: cmd.def }, `Siege of ${o.name}`, { dside: 1 }, cmd))) { if (hero) shrinkArmy(hero.army, 0.5); return; }
+    if (hero) removeAiHero(hero);
+    takeTown(o, 0);
+    await showModal(`<h2>🏰 ${o.name} captured!</h2><p>A new ${FACTIONS[o.fac].name} town joins your realm. Recruit its creatures, build up its Town Hall, and garrison it against the rivals.</p>`);
+    if (!checkVictory()) openTown(o);
+  }
+  function takeTown(o, newOwner) {
+    o.owner = newOwner; o.guard = []; o.garrison = emptyArmy(); o.avail = {};
+    for (let i = 1; i <= 7; i++) if (o.b[i]) o.avail[i] = GROWTH[i - 1];
+    if (newOwner === 0) G.noTown = 0;
+    reindex(G); renderAll();
+  }
+  // victory: every rival has lost all of its towns
+  function checkVictory() {
+    for (const ai of G.ais) if (ai.alive && !G.objs.some(o => o.t === 'town' && o.owner === ai.id)) { ai.alive = false; ai.heroes = []; toast(`${FACTIONS[ai.fac].name} rival is eliminated!`); }
+    if (!G.over && G.ais.every(a => !a.alive)) { endGame(true); return true; }
+    return false;
   }
   async function fight(h, guard, eStats, title, siege, eHero) {
     if (!armyCount(h)) { toast(`${h.name} has no army! Recruit in town first.`); return false; }
     const res = await Battle.run({ hero: { att: h.att, def: h.def, sp: h.sp, mana: h.mana, spells: G.spells, perks: h.perks, name: h.name, icon: h.icon, morale: heroMorale(h), luck: heroLuck(h) },
-      army: h.army, enemy: guard.map(a => ({ ...a })), eStats, eHero, title, siege, canRetreat: true });
+      army: h.army, enemy: guard.filter(Boolean).map(a => ({ ...a })), eStats, eHero, title, siege, canRetreat: true });
     h.mana = res.mana;
     if (res.win) {
       res.survivors.forEach((n, i) => { if (h.army[i]) { if (n > 0) h.army[i].n = n; else h.army[i] = null; } });
@@ -579,26 +643,24 @@
       const r = Math.random(), st = r < .3 ? 'att' : r < .6 ? 'def' : r < .8 ? 'sp' : 'kn';
       h[st]++;
       const statName = { att: 'Attack', def: 'Defense', sp: 'Spell Power', kn: 'Knowledge' }[st];
-      const opts = shuffle(Object.keys(PERKS).filter(k => perk(h, k) < MAX_PERK)).slice(0, 2);
+      const opts = shuffle(Object.keys(PERKS).filter(k => perk(h, k) < MAX_PERK && (!PERKS[k].minLvl || h.lvl >= PERKS[k].minLvl))).slice(0, 2);
       const head = `<h2>⭐ ${h.name} reaches level ${h.lvl}!</h2><p>+1 ${statName}</p>`;
       if (!opts.length) { await showModal(head); continue; }
       const i = await showModal(`${head}<p>Choose a perk:</p><div class="small">${opts.map(k => `${PERKS[k].i} <b>${PERKS[k].n}</b> (rank ${perk(h, k) + 1}) — ${PERKS[k].d}`).join('<br>')}</div>`, opts.map(k => `${PERKS[k].i} ${PERKS[k].n}`));
       h.perks[opts[i]] = perk(h, opts[i]) + 1;
     }
   }
-  async function fightEnemyHero(h, playerAttacks) {
-    const e = G.eh;
+  // a player hero fights a rival hero (open field, or a siege when the rival attacks a town/fort the hero stands in)
+  async function fightAiHero(h, e, playerAttacks) {
     const atTown = heroAtTown(h), fo = objAt(G, h.x, h.y), atFort = fo && fo.t === 'fort' && fo.owner === 0;
-    if (!armyCount(h)) {
-      if (atTown) { await endGame(false, 'Your castle had no army to defend it.'); return false; }
-      retreat(h); return false;
-    }
+    if (!armyCount(h)) { retreat(h); return false; }
     const siege = !playerAttacks && (atTown || atFort) ? { dside: 0 } : null;
     const win = await fight(h, e.army, { att: e.att, def: e.def }, `${e.name}'s army`, siege, e);
-    if (win) { G.eh = null; G.ehTimer = 5; toast('Enemy hero defeated! He will return in time...'); return true; }
-    if (atTown && !heroesAt(town().x, town().y).some(x => armyCount(x) > 0)) await endGame(false, 'Your castle has fallen to the enemy hero.');
+    if (win) { removeAiHero(e); toast(`${e.name} is defeated!`); return true; }
+    shrinkArmy(e.army, 0.5);
     return false;
   }
+  function removeAiHero(e) { const ai = aiById(e.ai); if (ai) { ai.heroes = ai.heroes.filter(x => x !== e); ai.spawnWait = 3; } }
 
   // ---------- generic army exchange ----------
   function openExchange(title, note, A, nameA, B, nameB, back) {
@@ -634,7 +696,9 @@
   const SLOTS = 11;
   const TIER_HALL = [null, 0, 0, 1, 2, 3, 4, 5];
   const UP_HALL = { 2: 1, 3: 2, 4: 3, 5: 4 };
-  const tierType = (t, tier) => lineType(CASTLE_TIERS[tier - 1], (t.up && t.up[tier]) || 1);
+  let curTown = null;
+  const defaultTown = () => townAt(G.hero.x, G.hero.y) || nearestTown(G.hero.x, G.hero.y);
+  const tierType = (t, tier) => lineType(tiersOf(t)[tier - 1], (t.up && t.up[tier]) || 1);
   const starStr = (lv, max = MAX_LV) => '★'.repeat(lv) + '☆'.repeat(max - lv);
   function startTownAnim(kind, slot) { townAnim = { kind, slot, t0: performance.now() }; sfx(kind === 'upgrade' ? 'level' : 'build'); }
   function slotInfo(t, i) {
@@ -647,7 +711,8 @@
   function drawTown() {
     const cv = $('tcv');
     if (!cv || $('modal').classList.contains('hide')) { townLoop = false; return; }
-    const g = cv.getContext('2d'), now = performance.now(), t = town(), W = cv.width, H = cv.height;
+    const g = cv.getContext('2d'), now = performance.now(), t = curTown, W = cv.width, H = cv.height;
+    if (!t) return;
     const sky = g.createLinearGradient(0, 0, 0, H);
     sky.addColorStop(0, '#2a3f6a'); sky.addColorStop(0.7, '#c98f5a'); sky.addColorStop(1, '#4a6a3a');
     g.fillStyle = sky; g.fillRect(0, 0, W, H);
@@ -710,7 +775,7 @@
     };
     ['mGet', 'mGive', 'mQty'].forEach(id => { $(id).oninput = upd; $(id).onchange = upd; });
     $('mBuy').onclick = () => { upd(); const c = cost(); if (st.get === st.give || G.res[st.give] < c) return; G.res[st.give] -= c; G.res[st.get] += st.qty; toast(`Bought ${st.qty} ${RES_ICON[st.get]} for ${c} ${RES_ICON[st.give]}.`); renderAll(); openMarket(rate, title, back); };
-    $('mClose').onclick = () => { if (back) openTown(); else { $('modal').classList.add('hide'); renderAll(); } };
+    $('mClose').onclick = () => { if (back) openTown(curTown); else { $('modal').classList.add('hide'); renderAll(); } };
     upd(); $('modal').classList.remove('hide');
   }
 
@@ -723,11 +788,11 @@
         <div class="acts"><button data-hire="${id}">Hire ${RES_ICON.gold}${price}</button></div></div>`; }).join('');
     $('mbox').innerHTML = `<h2>🍺 Tavern</h2><p class="small">Heroes: ${G.heroes.length}/${MAX_HEROES}. New heroes arrive at the castle without an army — recruit troops and use the exchange to equip them. Heroes level up independently. The tavern offers new heroes every week.</p>${premium ? `<p>No heroes are waiting at the tavern right now — mercenary captains from across the realm will serve for <b>double</b> the price (${RES_ICON.gold}${price}).</p>` : ''}${cards}
       <div class="mb"><button class="primary" id="hBack">Back to town</button></div>`;
-    $('hBack').onclick = openTown;
+    $('hBack').onclick = () => openTown(curTown);
     $('mbox').querySelectorAll('[data-hire]').forEach(b => b.onclick = () => {
       if (G.heroes.length >= MAX_HEROES) return toast(`You can command at most ${MAX_HEROES} heroes.`);
       if (G.res.gold < price) return toast('Not enough gold.');
-      const d = HEROES[b.dataset.hire], t = town();
+      const d = HEROES[b.dataset.hire], t = curTown;
       G.res.gold -= price; G.heroes.push(makeHero(d, t.x, t.y)); learn(d.spells); setActive(G.heroes.length - 1);
       G.tavern = G.tavern.filter(x => x !== d.id); toast(`${d.name} joins your cause!`); renderAll(); openTavern();
     });
@@ -748,11 +813,15 @@
     return null;
   }
 
-  function openTown() {
-    const t = town(), th = townHero(), here = !!th;
-    let html = `<h2>🏰 ${t.name} <span class="small">${t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Settlement'}</span></h2><canvas id="tcv" width="780" height="150" style="width:100%;border-radius:6px;border:1px solid #6b4f24"></canvas>
-      <div class="small">${here ? `${th.name} is in town — recruits join the army.` : '⚠ No hero in the castle; return a hero to recruit or upgrade troops.'} Higher Town Hall levels unlock new dwellings and creature upgrades.</div>`;
-    CASTLE_TIERS.forEach((id, i) => {
+  function openTown(t) {
+    t = t || (curTown && curTown.owner === 0 ? curTown : defaultTown());
+    if (!t) return toast('You do not own a town.');
+    curTown = t;
+    const th = townHero(t), here = !!th, mt = myTowns(), coastal = !!G.dock && t === mt[0];
+    const tabs = mt.length > 1 ? `<div class="hlist">${mt.map((x, i) => `<button class="hbtn${x === t ? ' on' : ''}" data-tab="${i}" title="${x.name}">${FACTIONS[x.fac].icon}</button>`).join('')}</div>` : '';
+    let html = `${tabs}<h2>🏰 ${t.name} <span class="small">${FACTIONS[t.fac].name} · ${t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Settlement'}</span></h2><canvas id="tcv" width="780" height="150" style="width:100%;border-radius:6px;border:1px solid #6b4f24"></canvas>
+      <div class="small">${here ? `${th.name} is in town — recruits join the army.` : '⚠ No hero in this town; bring a hero to recruit or upgrade troops (or garrison it).'} Higher Town Hall levels unlock new dwellings and creature upgrades.</div>`;
+    tiersOf(t).forEach((id, i) => {
       const tier = i + 1, lv = t.up[tier], c = C[lineType(id, lv)], built = t.b[tier], av = t.avail[tier] || 0;
       const needHall = TIER_HALL[tier], locked = t.b.hall < needHall;
       const nextLv = lv + 1, upC = lv < MAX_LV ? upgradeCost(tier, nextLv) : null, upLocked = lv < MAX_LV && t.b.hall < UP_HALL[nextLv];
@@ -781,8 +850,10 @@
         <div class="acts">${gNext ? `<button data-guild="1" title="${fmtCost(gNext)}">${gl ? 'Upgrade' : 'Build'} ${fmtCost(gNext)}</button>` : '<span class="small">MAX</span>'}</div></div>
       <div class="trow"><div class="ic">⚖️</div><div><b>Marketplace</b><br><span class="small">${t.b.market ? `Buy missing resources at ${Math.round(MARKET_RATE * 100)}% rate.` : `Trade resources — ${fmtCost(MARKET_COST)}`}</span></div>
         <div class="acts">${t.b.market ? '<button data-trade="1">Trade</button>' : '<button data-build="market">Build</button>'}</div></div>
-      <div class="trow"><div class="ic">⚓</div><div><b>Shipyard</b><br><span class="small">${t.b.ship ? `Boats ${G.boats.length}/${MAX_BOATS}. A new boat appears at the port by the bay (${fmtCost(BOAT_COST)} each). Walk a hero onto a boat to sail; collect treasures at sea.` : G.dock ? `Build boats to sail the sea and collect its treasures — ${fmtCost(SHIPYARD_COST)}` : 'There is no coast near this castle.'}</span></div>
-        <div class="acts">${!G.dock ? '' : t.b.ship ? `<button data-boat="1" ${G.boats.length >= MAX_BOATS ? 'disabled' : ''}>⛵ Build boat</button>` : '<button data-build="ship">Build</button>'}</div></div>
+      <div class="trow"><div class="ic">⚓</div><div><b>Shipyard</b><br><span class="small">${t.b.ship ? `Boats ${G.boats.length}/${MAX_BOATS}. A new boat appears at the port by the bay (${fmtCost(BOAT_COST)} each). Walk a hero onto a boat to sail; collect treasures at sea.` : coastal ? `Build boats to sail the sea and collect its treasures — ${fmtCost(SHIPYARD_COST)}` : 'There is no coast near this town.'}</span></div>
+        <div class="acts">${!coastal ? '' : t.b.ship ? `<button data-boat="1" ${G.boats.length >= MAX_BOATS ? 'disabled' : ''}>⛵ Build boat</button>` : '<button data-build="ship">Build</button>'}</div></div>
+      <div class="trow"><div class="ic">🛡️</div><div><b>Garrison</b><br><span class="small">${armyList(t.garrison, false) || 'No troops stationed.'} The garrison defends the town when no hero is inside${here ? '' : ' (bring a hero to move troops)'}.</span></div>
+        <div class="acts"><button data-garr="1">Manage garrison</button></div></div>
       <div class="trow"><div class="ic">🍺</div><div><b>Tavern</b><br><span class="small">Heroes ${G.heroes.length}/${MAX_HEROES}. Hire more heroes and exchange troops between heroes in town.</span></div>
         <div class="acts"><button data-tavern="1">Hire heroes</button>${heroesAt(t.x, t.y).length > 1 ? '<button data-xhero="1">Exchange troops</button>' : ''}</div></div>
       <div class="small" style="margin-top:8px">${RES.map(k => RES_ICON[k] + ' ' + G.res[k]).join('  ')}</div>
@@ -790,8 +861,13 @@
     $('mbox').innerHTML = html; $('modal').classList.remove('hide');
     if (!townLoop) { townLoop = true; requestAnimationFrame(drawTown); }
     $('tClose').onclick = () => { $('modal').classList.add('hide'); renderAll(); };
-    const again = () => { openTown(); renderAll(); };
+    const again = () => { openTown(t); renderAll(); };
     const q = (sel, fn) => $('mbox').querySelectorAll(sel).forEach(fn);
+    q('[data-tab]', b => b.onclick = () => openTown(mt[+b.dataset.tab]));
+    q('[data-garr]', b => b.onclick = () => {
+      if (!th) { toast('A hero must be in the town to move troops.'); return; }
+      openExchange(`🛡️ ${t.name} garrison`, 'The garrison defends the town when no hero is inside.', t.garrison, 'Garrison', th.army, th.name, () => openTown(t));
+    });
     q('[data-build]', b => b.onclick = () => {
       const k = b.dataset.build, cost = k === 'market' ? MARKET_COST : k === 'ship' ? SHIPYARD_COST : DWELL_COST[+k];
       if (!canAfford(G.res, cost)) return toast('Not enough resources.');
@@ -819,11 +895,11 @@
       const tier = +b.dataset.up, cost = upgradeCost(tier, t.up[tier] + 1);
       if (!canAfford(G.res, cost)) return toast('Not enough resources.');
       pay(G.res, cost); t.up[tier]++;
-      toast(`${C[lineType(CASTLE_TIERS[tier - 1], t.up[tier])].n} unlocked!`);
+      toast(`${C[lineType(tiersOf(t)[tier - 1], t.up[tier])].n} unlocked!`);
       startTownAnim('upgrade', tier - 1); again();
     });
     q('[data-uparmy]', b => b.onclick = () => {
-      const tier = +b.dataset.uparmy, id = CASTLE_TIERS[tier - 1], to = lineType(id, t.up[tier]);
+      const tier = +b.dataset.uparmy, id = tiersOf(t)[tier - 1], to = lineType(id, t.up[tier]);
       let cost = 0;
       for (const s of th.army) if (s && C[s.t].line === id && C[s.t].lv < t.up[tier]) cost += (C[to].cost.gold - C[s.t].cost.gold) * s.n;
       if (G.res.gold < cost) return toast('Not enough gold.');
@@ -853,7 +929,7 @@
     q('[data-tavern]', b => b.onclick = openTavern);
     q('[data-xhero]', b => b.onclick = () => {
       const hs = heroesAt(t.x, t.y), a = hs[0], c2 = hs[1];
-      openExchange('🤝 Exchange troops', 'Heroes in the castle can share their armies.', a.army, a.name, c2.army, c2.name, openTown);
+      openExchange('🤝 Exchange troops', 'Heroes in the town can share their armies.', a.army, a.name, c2.army, c2.name, () => openTown(t));
     });
   }
 
@@ -867,64 +943,187 @@
     }
     openExchange(`🏯 ${f.name}`, note, f.garrison, 'Garrison', hero.army, hero.name);
   }
-  async function defendFort(f) {
-    const e = G.eh, gar = f.garrison;
-    const res = await Battle.run({ hero: { att: 0, def: 3, sp: 0, mana: 0, spells: [], perks: {}, name: 'Garrison', icon: '🏯' }, army: gar, enemy: e.army.map(a => ({ ...a })),
-      eStats: { att: e.att, def: e.def }, eHero: e, title: `Defending ${f.name}`, siege: { dside: 0 }, canRetreat: false });
+  // a rival hero attacks a player-owned fort or town: the garrison defends in a real siege battle, an empty one falls at once
+  async function defendStructure(o, ah) {
+    const gar = o.garrison;
+    if (!gar.some(Boolean)) { await aiCapture(o, ah); return false; }
+    centerOn(o.x, o.y); toast(`${ah.name} assaults ${o.name}!`);
+    const res = await Battle.run({ hero: { att: 0, def: 3, sp: 0, mana: 0, spells: [], perks: {}, name: 'Garrison', icon: '🛡️' }, army: gar, enemy: ah.army.map(a => a && ({ ...a })),
+      eStats: { att: ah.att, def: ah.def }, eHero: ah, title: `Defending ${o.name}`, siege: { dside: 0 }, canRetreat: false });
     res.survivors.forEach((n, i) => { if (gar[i]) { if (n > 0) gar[i].n = n; else gar[i] = null; } });
-    if (res.win) { G.eh = null; G.ehTimer = 4; toast(`${f.name} held! The enemy hero is slain.`); return true; }
-    f.owner = 1; f.garrison = [{ t: factionTiers(G.efaction)[0], n: 10 }, null, null, null, null, null, null];
-    await showModal(`<h2>🏯 ${f.name} has fallen!</h2><p>The enemy now holds this zone. Retake it by defeating its garrison.</p>`);
+    if (res.win) { removeAiHero(ah); toast(`${o.name} held! ${ah.name} is slain.`); return true; }
+    shrinkArmy(ah.army, 0.5);
+    await aiCapture(o, ah);
     return false;
   }
-
-  // ---------- turn / day ----------
-  function spawnEnemyHero() {
-    const e = eTown(); G.ehWave++;
-    const w = G.ehWave, ti = factionTiers(G.efaction), hd = FACTIONS[G.efaction].heroes[0];
-    G.eh = { name: hd[0], icon: CLASSES[hd[1]].i, x: e.x - 2, y: e.y + 2, att: 4 + w, def: 4 + w, sp: 2, kn: 2,
-      army: [{ t: ti[0], n: 10 + w * 10 }, { t: ti[1], n: 5 + w * 4 }, { t: ti[2], n: 2 + w * 3 }, w > 1 ? { t: ti[3], n: w * 2 } : null, w > 2 ? { t: ti[4], n: w * 2 } : null].filter(Boolean)
-        .map(a => ({ ...a, n: Math.max(1, Math.round(a.n * DF().ehMul)) })) };
-    toast(`${G.eh.name} emerges from the enemy stronghold!`);
+  async function aiCapture(o, ah) {
+    const ai = aiById(ah.ai), wasMine = o.owner === 0;
+    if (o.t === 'town') takeTown(o, ai.id);
+    else { o.owner = ai.id; o.garrison = [{ t: factionTiers(ai.fac)[0], n: 10 }, null, null, null, null, null, null]; }
+    reindex(G); renderAll();
+    if (wasMine) {
+      centerOn(o.x, o.y);
+      await showModal(`<h2>${o.t === 'town' ? '🏰' : '🏯'} ${o.name} has fallen!</h2><p>${ai.name} ${FACTIONS[ai.fac].icon} now holds it. Retake it by defeating its garrison.${myTowns().length ? '' : ' <b>You own no towns — retake one within 7 days or the realm is lost!</b>'}</p>`);
+    }
   }
-  async function enemyTurn() {
-    const eForts = G.objs.filter(o => o.t === 'fort' && o.owner === 1).length;
-    if (G.day >= DF().ehDay && !G.eh) { G.ehTimer = Math.max(0, G.ehTimer - 1 - eForts); if (G.ehTimer <= 0) spawnEnemyHero(); return; }
-    if (!G.eh) return;
-    const eh = G.eh, tw = town();
-    const mine = G.objs.filter(o => o.t === 'fort' && o.owner === 0).sort((a, b) => dist(eh, a) - dist(eh, b));
-    const near = G.heroes.reduce((a, b) => dist(eh, a) <= dist(eh, b) ? a : b);
-    const cands = [];
-    if (dist(eh, near) < 12) cands.push(near);
-    cands.push(...mine, tw);
-    let target = null, path = null;
-    for (const c of cands) { const p = findPath(G, eh.x, eh.y, c.x, c.y, true); if (p) { target = c; path = p; break; } }
-    if (!path) return;
-    let left = Math.round(DF().ehMove * sizeMv());
-    for (const s of path) {
-      if (s.cost > left) break;
-      left -= s.cost; eh.x = s.x; eh.y = s.y; await sleep(45);
-      const hs = heroesAt(s.x, s.y);
-      if (hs.length) {
-        const h = hs.reduce((a, b) => armyCount(a) >= armyCount(b) ? a : b);
-        centerOn(s.x, s.y); toast('The enemy hero attacks!'); await fightEnemyHero(h, false); return;
+  const shrinkArmy = (arr, frac) => { for (let i = 0; i < arr.length; i++) { const s = arr[i]; if (!s) continue; s.n = Math.floor(s.n * (1 - frac)); if (s.n <= 0) arr[i] = null; } };
+
+  // ---------- rival AI players ----------
+  const armyPower = (arr) => arr.reduce((s, a) => s + (a ? C[a.t].v * a.n : 0), 0);
+  const goldEq = (c) => Object.keys(c).reduce((s, k) => s + c[k] * RES_VALUE[k], 0);
+  // fast auto-resolve for fights the player is not part of; mutates both armies, returns true if the attacker wins
+  function quickBattle(att, def, defBonus = 1) {
+    const A = armyPower(att) * (0.85 + Math.random() * 0.3), D = armyPower(def) * defBonus * (0.85 + Math.random() * 0.3);
+    if (A > D) { shrinkArmy(att, Math.min(0.95, Math.pow(D / A, 1.3))); shrinkArmy(def, 1); return true; }
+    shrinkArmy(att, 1); shrinkArmy(def, Math.min(0.95, Math.pow(A / D, 1.3))); return false;
+  }
+  function spawnAiHero(ai, t) {
+    if (!t) return null;
+    const names = FACTIONS[ai.fac].heroes, pick = names[ai.heroes.length % names.length], D = DIFFICULTY[G.diff || 'normal'];
+    const h = makeHero(HEROES[pick[0]], t.x, t.y);
+    h.ai = ai.id; if (ai.heroes.some(x => x.name === h.name)) h.name += ' II';
+    const ti = factionTiers(ai.fac), m = D.ehMul * (ai.heroes.length ? 0.6 : 1);
+    h.army = [{ t: ti[0], n: Math.max(2, Math.round(14 * m)) }, { t: ti[1], n: Math.max(1, Math.round(7 * m)) }, { t: ti[2], n: Math.max(1, Math.round(4 * m)) }, null, null, null, null];
+    const bonus = Math.max(0, Math.floor((D.ehMul - 0.7) * 3)); h.att += bonus; h.def += bonus;
+    h.move = Math.round(D.ehMove * sizeMv());
+    ai.heroes.push(h); return h;
+  }
+  function aiIncome(ai) {
+    let g = 0;
+    for (const o of G.objs) {
+      if (o.owner !== ai.id) continue;
+      if (o.t === 'town') g += 500 + (o.b && o.b.hall ? HALL_LEVELS[o.b.hall].inc : 0);
+      else if (o.t === 'fort') g += FORT_INCOME;
+      else if (o.t === 'mine' && zoneOwner(G, G.zone[o.y][o.x]) === ai.id) g += MINE_YIELD[o.kind] * RES_VALUE[o.kind];
+    }
+    return Math.round(g * DF().aiInc);
+  }
+  function aiBuild(ai, t) {
+    const hall = t.b.hall, afford = (c) => goldEq(c) <= ai.gold * 0.7;
+    if (hall < 5 && afford(HALL_LEVELS[hall + 1].cost) && (hall < 2 || G.day > 10 * hall)) { ai.gold -= goldEq(HALL_LEVELS[hall + 1].cost); t.b.hall++; return true; }
+    for (let tier = 1; tier <= 7; tier++) if (!t.b[tier] && hall >= TIER_HALL[tier] && afford(DWELL_COST[tier])) { ai.gold -= goldEq(DWELL_COST[tier]); t.b[tier] = 1; t.avail[tier] = GROWTH[tier - 1]; return true; }
+    for (let tier = 1; tier <= 7; tier++) {
+      const lv = t.up[tier];
+      if (t.b[tier] && lv < MAX_LV && hall >= UP_HALL[lv + 1] && afford(upgradeCost(tier, lv + 1))) { ai.gold -= goldEq(upgradeCost(tier, lv + 1)); t.up[tier]++; return true; }
+    }
+    return false;
+  }
+  function aiRecruit(ai, t) {
+    const hero = ai.heroes.find(h => h.x === t.x && h.y === t.y), army = hero ? hero.army : t.garrison;
+    for (let tier = 7; tier >= 1; tier--) {
+      if (!t.b[tier]) continue;
+      const type = tierType(t, tier), price = goldEq(C[type].cost);
+      const n = Math.min(t.avail[tier] || 0, Math.floor(ai.gold * 0.5 / price));
+      if (n > 0 && addToArmy({ army }, type, n)) { ai.gold -= n * price; t.avail[tier] -= n; }
+    }
+  }
+  function aiEconomy(ai) {
+    ai.gold += aiIncome(ai);
+    const towns = G.objs.filter(o => o.t === 'town' && o.owner === ai.id);
+    if (!towns.length) return;
+    if (ai.spawnWait > 0) ai.spawnWait--;
+    // a rival without any hero hires one first (cheaply), before spending on buildings and troops
+    if (!ai.heroes.length && ai.spawnWait <= 0 && ai.gold >= HIRE_COST * 0.5) { ai.gold -= HIRE_COST * 0.5; spawnAiHero(ai, towns[0]); }
+    for (const t of towns) { let k = 0; while (k < 2 && aiBuild(ai, t)) k++; aiRecruit(ai, t); }
+    const maxH = Math.min(4, 1 + Math.ceil(towns.length / 2) + (G.day > 25 ? 1 : 0));
+    if (ai.heroes.length && ai.heroes.length < maxH && ai.spawnWait <= 0 && ai.gold >= HIRE_COST * 1.2) {
+      ai.gold -= HIRE_COST; const t = towns[0]; spawnAiHero(ai, t); aiRecruit(ai, t);
+    }
+  }
+  function aiTargets(ai, h, power) {
+    const R = 22 * sizeMv(), list = [];
+    for (const o of G.objs) {
+      if (o.owner === ai.id) continue;
+      const d = dist(o, h); if (d > R) continue;
+      let sc = 0;
+      switch (o.t) {
+        case 'monster': { const gp = armyPower(o.guard); if (power >= gp * 1.25) sc = (gp * 0.3 + 200) / (d + 6); break; }
+        case 'pile': sc = 350 / (d + 4); break;
+        case 'chest': sc = 500 / (d + 4); break;
+        case 'mine': { const gp = armyPower(o.guard || []); if (power >= gp * 1.2) sc = 900 / (d + 6); break; }
+        case 'fort': { const dp = o.owner ? armyPower(o.garrison) : armyPower(o.guard); if (power >= dp * 1.3 + 1) sc = 1600 / (d + 8); break; }
+        case 'town': { const dp = o.owner ? armyPower(o.garrison) : armyPower(o.guard || []); if (power >= dp * 1.4 + 1) sc = 4000 / (d + 10); break; }
       }
-      if (s.x === tw.x && s.y === tw.y) { await endGame(false, 'The enemy hero captured your castle while it stood undefended.'); return; }
+      if (sc > 0) list.push({ x: o.x, y: o.y, score: sc });
+    }
+    for (const ph of G.heroes) { const d = dist(ph, h); if (d > R) continue; if (power >= armyPower(ph.army) * 1.25) list.push({ x: ph.x, y: ph.y, score: 2400 / (d + 6) }); }
+    return list.sort((a, b) => b.score - a.score);
+  }
+  function aiKill(ai, h) { ai.heroes = ai.heroes.filter(x => x !== h); ai.spawnWait = 3; }
+  async function aiHeroTurn(ai, h) {
+    const D = DF();
+    h.move = Math.round(D.ehMove * sizeMv());
+    const towns = G.objs.filter(o => o.t === 'town' && o.owner === ai.id);
+    const here = towns.find(t => t.x === h.x && t.y === h.y);
+    if (here) { here.garrison.forEach((s, i) => { if (s && addToArmy(h, s.t, s.n)) here.garrison[i] = null; }); mergeArmy(h); }
+    if (G.day < D.ehDay + (ai.id - 1) * 2) return;
+    const power = armyPower(h.army), nearest = () => towns.slice().sort((a, b) => dist(a, h) - dist(b, h))[0];
+    if (power < 1200 && towns.length) { if (!here) await aiWalk(ai, h, nearest()); return; }
+    for (const tg of aiTargets(ai, h, power).slice(0, 5)) { if (await aiWalk(ai, h, tg)) return; }
+    if (towns.length && !here) await aiWalk(ai, h, nearest());
+  }
+  // walk toward a target tile; returns false if there is no path
+  async function aiWalk(ai, h, tg) {
+    const path = findPath(G, h.x, h.y, tg.x, tg.y, false, false);
+    if (!path || !path.length) return false;
+    for (let i = 0; i < path.length; i++) {
+      const s = path[i];
+      if (s.cost > h.move) return true;
+      h.move -= s.cost; h.x = s.x; h.y = s.y;
+      const ph = heroesAt(s.x, s.y);
+      if (ph.length) {
+        const d = ph.reduce((a, b) => armyCount(a) >= armyCount(b) ? a : b);
+        centerOn(s.x, s.y); renderAll(); toast(`${h.name} of the ${FACTIONS[ai.fac].name} attacks ${d.name}!`); await sleep(350);
+        await fightAiHero(d, h, false);
+        if (!ai.heroes.includes(h)) return true;
+        const so = objAt(G, h.x, h.y);
+        if (so && so.owner === 0 && (so.t === 'fort' || so.t === 'town')) await defendStructure(so, h);
+        return true;
+      }
+      const other = G.ais.flatMap(a => a.heroes).find(x => x !== h && x.x === s.x && x.y === s.y);
+      if (other) { if (quickBattle(h.army, other.army, 1)) aiKill(aiById(other.ai), other); else { aiKill(ai, h); return true; } }
       const o = objAt(G, s.x, s.y);
-      if (o && o.t === 'fort' && o.owner === 0) {
-        centerOn(o.x, o.y);
-        if (!o.garrison.some(Boolean)) {
-          o.owner = 1; o.garrison = [{ t: factionTiers(G.efaction)[0], n: 10 }, null, null, null, null, null, null];
-          await showModal(`<h2>🏯 ${o.name} has fallen!</h2><p>The enemy hero seized the undefended fort. Garrison your forts to hold your zones.</p>`);
-        } else { toast(`The enemy hero assaults ${o.name}!`); await defendFort(o); }
-        return;
+      if (o && await aiInteract(ai, h, o, i === path.length - 1)) return true;
+    }
+    return true;
+  }
+  // returns true when the interaction ends the hero's day
+  async function aiInteract(ai, h, o, last) {
+    if (o.t === 'pile') { ai.gold += o.kind === 'gold' ? o.amt : o.amt * RES_VALUE[o.kind]; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return false; }
+    if (o.t === 'chest') { ai.gold += o.gold; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return false; }
+    if (!last || o.owner === ai.id) return false;
+    const win = (def, bonus = 1) => { const d = def.map(a => a && ({ ...a })); return quickBattle(h.army, d, bonus); };
+    const lose = () => { aiKill(ai, h); return true; };
+    switch (o.t) {
+      case 'monster': if (!win(o.guard)) return lose(); G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return true;
+      case 'art': if (o.guard && o.guard.length && !win(o.guard)) return lose(); h[ARTIFACTS[o.art].stat] += ARTIFACTS[o.art].v; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return true;
+      case 'mine': if (o.guard && o.guard.length && !win(o.guard)) return lose(); o.guard = []; o.owner = ai.id; return true;
+      case 'fort': case 'town': {
+        if (o.owner === 0) { await defendStructure(o, h); return true; }
+        const defenders = o.owner ? o.garrison : o.guard;
+        if (defenders && defenders.some(Boolean) && !win(defenders, 1.3)) return lose();
+        if (o.t === 'town') takeTown(o, ai.id); else { o.owner = ai.id; o.guard = []; o.garrison = [{ t: factionTiers(ai.fac)[0], n: 8 }, null, null, null, null, null, null]; }
+        reindex(G); return true;
       }
     }
-    toast(`Enemy hero is ${dist(eh, target)} tiles from ${target.cls ? target.name : target.name || 'your castle'}.`);
+    return false;
   }
+  async function aiPhase() {
+    for (const ai of G.ais) {
+      if (!ai.alive) continue;
+      aiEconomy(ai);
+      for (const h of [...ai.heroes]) {
+        if (!ai.heroes.includes(h)) continue;
+        await aiHeroTurn(ai, h);
+        if (G.over) return;
+      }
+    }
+    checkVictory();
+  }
+
   function computeGain() {
-    const t = town(), gain = Object.fromEntries(RES.map(k => [k, 0]));
-    if (t.b.hall) gain.gold += HALL_LEVELS[t.b.hall].inc;
+    const gain = Object.fromEntries(RES.map(k => [k, 0]));
+    for (const t of myTowns()) if (t.b.hall) gain.gold += HALL_LEVELS[t.b.hall].inc;
     for (const h of G.heroes) gain.gold += 300 * perk(h, 'estates');
     for (const o of G.objs) {
       if (o.t === 'mine' && o.owner === 0 && zoneOwner(G, G.zone[o.y][o.x]) === 0) gain[o.kind] += MINE_YIELD[o.kind] * ((G.wk && G.wk.mineMul) || 1);
@@ -936,19 +1135,19 @@
 
   // ---------- events ----------
   function rollWeekEvent() {
-    const t = town();
+    const t = town() || G.objs.find(o => o.t === 'town');
     const builtTiers = [1, 2, 3, 4, 5, 6, 7].filter(k => t.b[k]);
     const list = [
       () => {
         const tier = builtTiers[Math.floor(Math.random() * builtTiers.length)], c = C[tierType(t, tier)];
         return { icon: c.i, title: `Week of the ${c.n}`, text: `Recruitment is booming: ${c.n} dwellings produce double this week.`, apply() { t.avail[tier] = (t.avail[tier] || 0) + GROWTH[tier - 1]; renderAll(); } };
       },
-      () => ({ icon: '☠️', title: 'Week of the Plague', text: 'Disease sweeps the land: all available recruits are halved.', apply() { for (const k in t.avail) t.avail[k] = Math.floor(t.avail[k] / 2); } }),
+      () => ({ icon: '☠️', title: 'Week of the Plague', text: 'Disease sweeps the land: all available recruits are halved.', apply() { for (const tw of G.objs) if (tw.t === 'town') for (const k in tw.avail) tw.avail[k] = Math.floor(tw.avail[k] / 2); } }),
       () => { G.wk.mineMul = 2; return { icon: '⛏️', title: 'Bountiful Harvest', text: 'Your mines yield double this week.', apply() {} }; },
       () => { G.wk.rateBonus = 0.15; return { icon: '🐪', title: 'Merchant Caravans', text: 'Trade flourishes: the marketplace and wandering merchants give 15% better rates this week.', apply() {} }; },
       () => ({ icon: '🏋️', title: 'Heroic Training', text: 'Veterans drill your heroes: each gains 150 XP per level.', async apply() { for (const h of G.heroes) await gainXp(h, 150 * h.lvl); renderAll(); } }),
       () => ({ icon: '🐺', title: 'Hungry Beasts', text: 'Wild monsters multiply: all neutral stacks grow by 20%.', apply() { for (const o of G.objs) if (o.t === 'monster') o.guard.forEach(g => { g.n = Math.ceil(g.n * 1.2); }); } }),
-      () => ({ icon: '🦠', title: 'Plague on the Enemy', text: 'Sickness strikes your foe: the enemy hero loses a quarter of his troops.', apply() { if (G.eh) G.eh.army.forEach(a => { a.n = Math.max(1, Math.floor(a.n * 0.75)); }); } }),
+      () => ({ icon: '🦠', title: 'Plague on the Rivals', text: 'Sickness strikes your foes: every rival hero loses a quarter of their troops.', apply() { for (const ah of allAiHeroes()) shrinkArmy(ah.army, 0.25); } }),
     ];
     return list[Math.floor(Math.random() * list.length)]();
   }
@@ -961,7 +1160,7 @@
       () => { const h = rh(), ty = CASTLE_TIERS[0], n = 5 + Math.floor(Math.random() * 8); const ok = addToArmy(h, ty, n); return ['🛡️', 'Wandering Mercenaries', ok ? `${n} ${C[ty].n}s volunteer to serve ${h.name}.` : `Mercenaries offer their swords, but ${h.name} has no free slot.`]; },
       () => { hs.forEach(h => { h.mana = maxMana(h); }); return ['🔷', 'Mana Spring', "A surge of magic restores every hero's mana."]; },
       () => { hs.forEach(h => { h.move = Math.floor(h.move * 0.7); }); return ['⛈️', 'Storm', 'Heavy storms slow your heroes: -30% movement today.']; },
-      () => ['📜', 'Rumors', G.eh ? `Scouts report ${G.eh.name} ${dist(G.eh, town())} tiles from your castle.` : 'Scouts see no enemy army on the roads.'],
+      () => { const ah = allAiHeroes().sort((a, b) => dist(a, G.hero) - dist(b, G.hero))[0]; return ['📜', 'Rumors', ah ? `Scouts report ${ah.name} of the ${FACTIONS[aiById(ah.ai).fac].name} ${dist(ah, G.hero)} tiles from ${G.hero.name}.` : 'Scouts see no rival army on the roads.']; },
       () => { const h = rh(); h.kn++; return ['📖', 'Visiting Scholar', `A wandering scholar tutors ${h.name}: +1 Knowledge.`]; },
       () => { const h = rh(), a = h.army.find(Boolean); if (!a || a.n < 8) return ['🍀', 'Quiet Day', 'Nothing of note happens.']; const lost = Math.max(1, Math.floor(a.n * 0.06)); a.n -= lost; return ['🤒', 'Camp Fever', `Sickness spreads in ${h.name}'s camp: ${lost} ${C[a.t].n}s fall ill and leave.`]; },
     ];
@@ -971,10 +1170,9 @@
   async function endTurn() {
     if (!G || busy || G.over) return;
     busy = true; G.path = null; selSlot = -1;
-    await enemyTurn();
+    await aiPhase();
     if (G.over) { busy = false; return; }
     G.day++;
-    const t = town();
     const newWeek = (G.day - 1) % 7 === 0;
     let wev = null;
     if (newWeek) { G.wk = {}; wev = rollWeekEvent(); }
@@ -983,7 +1181,7 @@
     RES.forEach(k => { G.res[k] += gain[k]; });
     const parts = RES.filter(k => gain[k]).map(k => `+${gain[k]}${RES_ICON[k]}`);
     if ((G.day - 1) % 7 === 0) {
-      CASTLE_TIERS.forEach((id, i) => { if (t.b[i + 1]) t.avail[i + 1] = (t.avail[i + 1] || 0) + GROWTH[i]; });
+      for (const tw of G.objs) if (tw.t === 'town') for (let i = 1; i <= 7; i++) if (tw.b[i]) tw.avail[i] = (tw.avail[i] || 0) + GROWTH[i - 1];
       for (const o of G.objs) if (o.t === 'fort' && o.owner === 0) {
         const mil = CASTLE_TIERS[0];
         const s = o.garrison.find(a => a && a.t === mil);
@@ -991,8 +1189,13 @@
       }
       rollTavern();
       toast('A new week begins — dwellings replenish, forts raise militia, new heroes arrive at the tavern!');
-      if (G.eh) { const m = DF().ehGrow + 0.1 * G.objs.filter(o => o.t === 'fort' && o.owner === 1).length; G.eh.army.forEach(a => a.n = Math.ceil(a.n * m)); }
     }
+    if (!myTowns().length) {
+      G.noTown++;
+      if (G.noTown >= 7) { busy = false; await endGame(false, 'You held no town for a whole week — the realm is lost.'); return; }
+      toast(`⚠ You own no towns! ${7 - G.noTown} days left to retake one.`);
+    }
+    if (checkVictory()) { busy = false; return; }
     banner(newWeek ? `Week ${Math.floor((G.day - 1) % 28 / 7) + 1} begins` : `Day ${(G.day - 1) % 7 + 1}`, parts.join(' '));
     sfx('day');
     renderAll();
@@ -1009,12 +1212,13 @@
   async function endGame(win, why) {
     G.over = true; sfx(win ? 'win' : 'lose');
     try { localStorage.removeItem(SAVE); } catch (e) { /* ignore */ }
-    await showModal(win ? `<h2>🏆 Victory!</h2><p>You conquered the enemy stronghold on day ${G.day} on ${DF().name} difficulty. The realm is saved!</p>` : `<h2>💀 Defeat</h2><p>${why || 'Your hero has fallen.'}</p>`, ['Main menu']);
+    await showModal(win ? `<h2>🏆 Victory!</h2><p>Every rival has lost its towns: you rule the realm on day ${G.day} (${DF().name}). Well fought!</p>` : `<h2>💀 Defeat</h2><p>${why || 'Your hero has fallen.'}</p>`, ['Main menu']);
     $('title').classList.remove('hide'); refreshTitle();
   }
 
   // ---------- title / selection / help ----------
-  const HELP = `<h2>How to Play</h2><p><b>Goal:</b> defeat the enemy stronghold in the north-east and capture it. Don't let the enemy hero take your castle.</p>
+  const HELP = `<h2>How to Play</h2><p><b>Goal:</b> eliminate every rival by capturing all of their towns. Rival AI players build, recruit, hire several heroes and expand across the map — and they will attack your forts and towns. If you hold no town for 7 days you lose.</p>
+    <p><b>Towns:</b> capture neutral and rival towns for more castles (each keeps its own faction, creatures and buildings). Use the tabs in the town screen to switch towns, and station a garrison so a town defends itself when no hero is inside.</p>
     <p><b>Map:</b> click a tile to preview the path (green = reachable today, red = next turn), click again to walk. Click another hero to select it (Tab cycles). Monsters facing an army ${FLEE_RATIO}× stronger offer to flee; with the Charisma perk they can join you instead. Walk onto resources to grab them; mines give daily income; monsters, mines and artifacts are guarded. Merchants ⛺ sell missing resources.<br>
     Keys: arrows/WASD scroll · +/- zoom · H center hero · Space go · E end turn · T town · Tab next hero. Drag the map to pan, mouse wheel / pinch to zoom.<br>
     <b>On a phone:</b> drag to pan, pinch to zoom, tap a tile to preview the path and tap it again to go; in battle, tap a hex twice to confirm. Use the bottom bar for End Turn, Town and heroes.</p>
@@ -1026,7 +1230,7 @@
   function refreshTitle() { $('tCont').disabled = !localStorage.getItem(SAVE); }
   function showDifficultySelect() {
     const cards = Object.entries(DIFFICULTY).map(([k, d]) => `<div class="card" data-d="${k}"><div class="big">${d.icon}</div><b>${d.name}</b><div class="small">${d.desc}</div>
-      <div class="small">Start: ${RES_ICON.gold}${d.gold} · guards ×${d.neutral} · income ×${d.income}<br>Enemy hero: day ${d.ehDay}, army ×${d.ehMul}</div></div>`).join('');
+      <div class="small">Start: ${RES_ICON.gold}${d.gold} · guards ×${d.neutral} · income ×${d.income}<br>Rivals march from day ${d.ehDay} · armies ×${d.ehMul} · rival income ×${d.aiInc}</div></div>`).join('');
     $('mbox').innerHTML = `<h2>Choose difficulty</h2><div class="grid two">${cards}</div><div class="mb"><button id="sBack">Back</button></div>`;
     $('sBack').onclick = () => $('modal').classList.add('hide');
     $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => showMapSelect(c.dataset.d));
@@ -1036,11 +1240,13 @@
     const cards = Object.entries(MAPS).map(([k, m]) => `<div class="card${st.preset === k ? ' on' : ''}" data-m="${k}"><div class="big">${m.icon}</div><b>${m.name}</b><div class="small">${m.desc}</div></div>`).join('');
     const sizes = Object.entries(SIZES).map(([k, s]) => `<button class="${st.size === k ? 'primary' : ''}" data-s="${k}">${s.name} (${s.w}×${s.h})</button>`).join(' ');
     $('mbox').innerHTML = `<h2>Choose your map <span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid two">${cards}</div>
-      <p>Size: ${sizes}</p><p>Seed: <input id="mSeed" placeholder="empty = random map" value="${st.seed}" style="width:230px;background:#120d08;color:#f1e6c4;border:1px solid #6b4f24;padding:4px"> <span class="small">Share a seed to replay the same map.</span></p>
+      <p>Size: ${sizes}</p>
+      <p>Rivals: ${[0, 1, 2, 3, 4].map(n => `<button class="${(st.ais || 0) === n ? 'primary' : ''}" data-a="${n}">${n ? n : 'Auto'}</button>`).join(' ')} <span class="small">AI players that expand and fight you.</span></p><p>Seed: <input id="mSeed" placeholder="empty = random map" value="${st.seed}" style="width:230px;background:#120d08;color:#f1e6c4;border:1px solid #6b4f24;padding:4px"> <span class="small">Share a seed to replay the same map.</span></p>
       <div class="mb"><button id="sBack">Back</button><button class="primary" id="sNext">Next: castle</button></div>`;
     const keep = () => { st.seed = $('mSeed').value; };
     $('mbox').querySelectorAll('[data-m]').forEach(c => c.onclick = () => { keep(); st.preset = c.dataset.m; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-s]').forEach(b => b.onclick = () => { keep(); st.size = b.dataset.s; showMapSelect(diff, st); });
+    $('mbox').querySelectorAll('[data-a]').forEach(b => b.onclick = () => { keep(); st.ais = +b.dataset.a; showMapSelect(diff, st); });
     $('sBack').onclick = showDifficultySelect;
     $('sNext').onclick = () => { keep(); showFactionSelect(diff, { ...st }); };
     $('modal').classList.remove('hide');

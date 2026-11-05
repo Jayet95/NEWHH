@@ -10,10 +10,10 @@ const HIRE_COST = 2500, MAX_HEROES = 4;
 
 // gold/res: starting resources, neutral/garrison: guard strength, ehDay/ehMul/ehMove/ehGrow: enemy hero, income: your daily income
 const DIFFICULTY = {
-  easy:   { name: 'Easy',   icon: '🌱', desc: 'Generous start, weak guards, a late and gentle enemy hero.', gold: 15000, res: 1.5, neutral: 0.7, garrison: 0.7, ehDay: 11, ehMul: 0.7, ehMove: 800, ehGrow: 1.1, income: 1.25 },
-  normal: { name: 'Normal', icon: '⚔️', desc: 'The intended challenge.', gold: 10000, res: 1, neutral: 1, garrison: 1, ehDay: 8, ehMul: 1, ehMove: 1000, ehGrow: 1.15, income: 1 },
-  hard:   { name: 'Hard',   icon: '🔥', desc: 'Tougher guards, an earlier and stronger enemy hero, leaner income.', gold: 7500, res: 0.75, neutral: 1.3, garrison: 1.3, ehDay: 6, ehMul: 1.3, ehMove: 1200, ehGrow: 1.2, income: 0.85 },
-  expert: { name: 'Expert', icon: '💀', desc: 'Scarce resources, brutal guards, and the enemy hero marches almost at once.', gold: 5000, res: 0.5, neutral: 1.6, garrison: 1.6, ehDay: 4, ehMul: 1.7, ehMove: 1400, ehGrow: 1.3, income: 0.7 },
+  easy:   { name: 'Easy',   icon: '🌱', desc: 'Generous start, weak guards, a late and gentle enemy hero.', gold: 15000, res: 1.5, neutral: 0.7, garrison: 0.7, ehDay: 11, ehMul: 0.7, ehMove: 800, ehGrow: 1.1, income: 1.25, aiInc: 0.55 },
+  normal: { name: 'Normal', icon: '⚔️', desc: 'The intended challenge.', gold: 10000, res: 1, neutral: 1, garrison: 1, ehDay: 8, ehMul: 1, ehMove: 1000, ehGrow: 1.15, income: 1, aiInc: 0.85 },
+  hard:   { name: 'Hard',   icon: '🔥', desc: 'Tougher guards, an earlier and stronger enemy hero, leaner income.', gold: 7500, res: 0.75, neutral: 1.3, garrison: 1.3, ehDay: 6, ehMul: 1.3, ehMove: 1200, ehGrow: 1.2, income: 0.85, aiInc: 1.1 },
+  expert: { name: 'Expert', icon: '💀', desc: 'Scarce resources, brutal guards, and the enemy hero marches almost at once.', gold: 5000, res: 0.5, neutral: 1.6, garrison: 1.6, ehDay: 4, ehMul: 1.7, ehMove: 1400, ehGrow: 1.3, income: 0.7, aiInc: 1.5 },
 };
 
 // a=attack d=defense lo/hi=damage hp s=speed shoot=ammo fly=flyer v=AI value gr=weekly growth
@@ -253,6 +253,23 @@ const HALL_LEVELS = [
   { n: 'Capitol', inc: 2000, cost: { gold: 8000, mercury: 5, sulfur: 5, crystal: 5, gems: 5 } },
   { n: 'Grand Capitol', inc: 3500, cost: { gold: 12000, mercury: 10, sulfur: 10, crystal: 10, gems: 10 } },
 ];
+// Fortifications strengthen walls/gate/towers in sieges; Minefields give defenders hidden mines.
+const FORT_LEVELS = [
+  { n: 'No fortifications', hp: 1, tower: 1 },
+  { n: 'Citadel', hp: 1.5, tower: 1.25, cost: { gold: 1500, ore: 10 } },
+  { n: 'Castle', hp: 2, tower: 1.5, cost: { gold: 3000, ore: 20, wood: 10 } },
+  { n: 'Fortress', hp: 3, tower: 2, cost: { gold: 6000, ore: 30, crystal: 5 } },
+];
+const MINE_LEVELS = [
+  { n: 'No minefield', stock: 0 },
+  { n: 'Minefield I', stock: 3, cost: { gold: 1000, sulfur: 2 } },
+  { n: 'Minefield II', stock: 6, cost: { gold: 2000, sulfur: 4 } },
+  { n: 'Minefield III', stock: 9, cost: { gold: 3000, sulfur: 6, mercury: 3 } },
+];
+const FORT_MAX_FORT = 2, FORT_MAX_MINE = 1;   // map forts can reach Castle-level walls and one minefield
+const FORT_WALL_COST = [null, { gold: 800, ore: 5 }, { gold: 1800, ore: 10, wood: 5 }];
+const FORT_MINE_COST = [null, { gold: 600, sulfur: 1 }];
+const EMERGENCY_MINES = 2;                      // a defending player may always lay a couple of mines
 const FORT_INCOME = 400;
 const MILITIA = 6;
 const GUILD_COST = [null, { gold: 2000, wood: 5, ore: 5 }, { gold: 3000, mercury: 4, sulfur: 4 }, { gold: 4000, mercury: 6, sulfur: 6, crystal: 6, gems: 6 }];
@@ -288,6 +305,9 @@ const PERKS = {
   sorcery:    { n: 'Sorcery',    i: '🔮', d: '+15% spell damage per rank' },
   estates:    { n: 'Estates',    i: '💰', d: '+300 gold per day per rank' },
   ballistics: { n: 'Ballistics', i: '🎯', d: '+50% siege damage (catapult and walls) per rank' },
+  forester:   { n: 'Forester',   i: '🌲', d: 'Walk through forests (cost 200 / 150 / 100 per tile)', minLvl: 4 },
+  mountaineer: { n: 'Mountaineer', i: '🧗', d: 'Climb mountains (cost 300 / 250 / 200 per tile)', minLvl: 6 },
+  waterwalk:  { n: 'Water Walk', i: '🌊', d: 'Walk on water without a boat (cost 160 / 130 / 100 per tile)', minLvl: 8 },
   charisma:   { n: 'Charisma',   i: '🤝', d: 'Much weaker neutral stacks may join you: 50% / 75% / 100% of them, at a lower strength advantage per rank' },
 };
 

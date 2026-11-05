@@ -1,0 +1,12 @@
+{
+  "name": "heroes3-js",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Heroes-3 style strategy game in plain JavaScript (HTML5 canvas).",
+  "scripts": {
+    "dev": "python -m http.server 8791",
+    "build": "node tools/build.js",
+    "deploy": "node tools/build.js && npx wrangler pages deploy dist --project-name heroes3-js",
+    "sim": "node tools/sim.js"
+  }
+}

@@ -29,7 +29,7 @@ function noise(R, W, H, sc) {
 const NEUTRAL_BY_DEPTH = [['goblin', 'wolf'], ['orc', 'golem'], ['ogre', 'wolf'], ['troll', 'naga'], ['naga', 'dragon'], ['dragon', 'troll']];
 
 // mo = { preset: key of MAPS, size: key of SIZES }
-function genMap(seed, ef = 'necropolis', diff = 'normal', mo = {}) {
+function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
   const DM = DIFFICULTY[diff] || DIFFICULTY.normal;
   const MP = MAPS[mo.preset] || MAPS.plains, SZ = SIZES[mo.size] || SIZES.medium;
   const R = rng(seed), W = SZ.w, H = SZ.h, sc = (W * H) / 1120;
@@ -47,7 +47,10 @@ function genMap(seed, ef = 'necropolis', diff = 'normal', mo = {}) {
       tiles[y][x] = t;
     }
   }
-  const P = { x: 5, y: H - 6 }, E = { x: W - 6, y: 5 };
+  const P = { x: 5, y: H - 6 };
+  const AIPOS = [{ x: W - 6, y: 5 }, { x: 5, y: 5 }, { x: W - 6, y: H - 6 }, { x: Math.floor(W / 2), y: 4 }];
+  const aiStarts = aiFacs.map((f, i) => AIPOS[i]);
+  const E = aiStarts[0];
   // the bay along the southern edge, reachable by boat from the player's port
   const bayRows = Math.max(3, Math.min(5, Math.round(4 * MP.bay)));
   const bayTiles = [];
@@ -57,17 +60,20 @@ function genMap(seed, ef = 'necropolis', diff = 'normal', mo = {}) {
     if (top - 1 > 0 && tiles[top - 1][x] === T.GRASS) tiles[top - 1][x] = T.SAND;
   }
   const clear = (c, r) => { for (let y = c.y - r; y <= c.y + r; y++) for (let x = c.x - r; x <= c.x + r; x++) if (x >= 0 && y >= 0 && x < W && y < H) tiles[y][x] = T.GRASS; };
-  clear(P, 3); clear(E, 3);
-  // winding road
-  let x = P.x, y = P.y;
-  while (x !== E.x || y !== E.y) {
-    tiles[y][x] = T.ROAD; if (x + 1 < W) tiles[y][x + 1] = T.ROAD;
-    const dx = Math.sign(E.x - x), dy = Math.sign(E.y - y);
-    const r = R();
-    if (dx && (!dy || r < 0.55)) x += dx; else if (dy) y += dy; else x += dx;
-    if (R() < 0.12) { const j = R() < 0.5 ? -1 : 1; if (y + j > 1 && y + j < H - 1 && !dy) y += j; }
-  }
-  tiles[E.y][E.x] = T.ROAD;
+  clear(P, 3); aiStarts.forEach(a => clear(a, 3));
+  // winding roads from the player's castle to every rival capital
+  const carveRoad = (A, B) => {
+    let x = A.x, y = A.y;
+    while (x !== B.x || y !== B.y) {
+      tiles[y][x] = T.ROAD; if (x + 1 < W) tiles[y][x + 1] = T.ROAD;
+      const dx = Math.sign(B.x - x), dy = Math.sign(B.y - y);
+      const r = R();
+      if (dx && (!dy || r < 0.55)) x += dx; else if (dy) y += dy; else x += dx;
+      if (R() < 0.12) { const j = R() < 0.5 ? -1 : 1; if (y + j > 1 && y + j < H - 1 && !dy) y += j; }
+    }
+    tiles[B.y][B.x] = T.ROAD;
+  };
+  aiStarts.forEach(a => carveRoad(P, a));
   tiles[P.y][P.x] = T.ROAD;
 
   // port: the bay tile nearest to the castle that touches land; a footpath is carved so a hero can always reach it
@@ -113,7 +119,7 @@ function genMap(seed, ef = 'necropolis', diff = 'normal', mo = {}) {
   let cand = [];
   for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) {
     const t = tiles[yy][xx];
-    if ((t === T.GRASS || t === T.SAND) && seen.has(yy * W + xx) && !reserved.has(yy * W + xx) && dist({ x: xx, y: yy }, P) > 3 && dist({ x: xx, y: yy }, E) > 3) cand.push({ x: xx, y: yy });
+    if ((t === T.GRASS || t === T.SAND) && seen.has(yy * W + xx) && !reserved.has(yy * W + xx) && dist({ x: xx, y: yy }, P) > 3 && aiStarts.every(a => dist({ x: xx, y: yy }, a) > 3)) cand.push({ x: xx, y: yy });
   }
   const pick = () => {
     if (!cand.length) return null;
@@ -135,26 +141,44 @@ function genMap(seed, ef = 'necropolis', diff = 'normal', mo = {}) {
   };
 
   const objs = [];
-  objs.push({ t: 'town', owner: 0, x: P.x, y: P.y, name: 'Castle Dawnwatch' });
-  const eti = factionTiers(ef), budgets = [3000, 3500, 4000, 5000, 5500, 6000];
-  const eGuard = budgets.map((b, i) => { const t = i < 3 ? eti[i] : lineType(eti[i], 2); return { t, n: Math.max(2, Math.round(b * DM.garrison / C[t].v)) }; });
-  objs.push({ t: 'town', owner: 1, x: E.x, y: E.y, name: FACTIONS[ef].enemyTown, guard: eGuard });
-
-  objs[0].zone = 0; objs[1].zone = 1;
-  const seeds = [{ x: P.x, y: P.y, id: 0 }, { x: E.x, y: E.y, id: 1 }];
+  const emptyGar = () => [null, null, null, null, null, null, null];
+  const garrisonOf = (f, scale) => {
+    const ti = factionTiers(f), budgets = [3000, 3500, 4000, 5000, 5500, 6000];
+    return budgets.map((b, i) => { const t = i < 3 ? ti[i] : lineType(ti[i], 2); return { t, n: Math.max(2, Math.round(b * scale / C[t].v)) }; });
+  };
+  // town objects carry their own faction, buildings and garrison (filled in by the game)
+  objs.push({ t: 'town', owner: 0, x: P.x, y: P.y, name: 'Castle Dawnwatch', zone: 0, capital: true, garrison: emptyGar() });
+  aiFacs.forEach((f, i) => objs.push({ t: 'town', owner: i + 1, fac: f, x: aiStarts[i].x, y: aiStarts[i].y, name: FACTIONS[f].enemyTown, zone: i + 1, capital: true, garrison: garrisonOf(f, DM.garrison) }));
+  const seeds = [{ x: P.x, y: P.y, id: 0 }, ...aiStarts.map((a, i) => ({ x: a.x, y: a.y, id: i + 1 }))];
+  let nextZone = seeds.length;
+  // neutral towns (capturable for new castles)
+  const townNames = ['Oakhaven', 'Stonebridge', 'Redwater', 'Highmoor', 'Silverlake', 'Ashford', 'Wolfsden', 'Ironvale', 'Kingsmere'];
+  const facKeys = Object.keys(FACTIONS);
+  const nTowns = Math.min(9, Math.max(1, Math.round(sc * 0.9)));
   const fortNames = ['Mistvale Keep', 'Ironhold Bastion', 'Sunspire Outpost', 'Grimwatch Tower', 'Stormhaven', 'Ravenmoor Hold', 'Dawnspire Fort', 'Blackfen Redoubt', 'Emberwatch', 'Frostgate', 'Goldcrest Bastion', 'Shadowvale Keep'];
   const spacing = Math.max(7, Math.round(9 * Math.pow(sc, 0.35)));
   const nForts = Math.min(12, Math.max(4, Math.round(4 * Math.sqrt(sc))));
-  for (let i = 0; i < nForts; i++) {
+  const placeSeed = () => {
     let c = null;
-    for (let tries = 0; tries < 400 && !c; tries++) {
+    for (let tries = 0; tries < 500 && !c; tries++) {
       const t = cand[Math.floor(R() * cand.length)];
       if (t && seeds.every(s => dist(s, t) >= spacing)) c = t;
     }
-    if (!c) break;
+    if (!c) return null;
     cand = cand.filter(o => dist(o, c) > 1);
-    seeds.push({ x: c.x, y: c.y, id: 2 + i });
-    objs.push({ t: 'fort', zone: 2 + i, name: fortNames[i], owner: null, x: c.x, y: c.y, guard: [guard(c, 1.4)], garrison: [null, null, null, null, null, null, null] });
+    return c;
+  };
+  for (let i = 0; i < nTowns; i++) {
+    const c = placeSeed(); if (!c) break;
+    const f = facKeys[Math.floor(R() * facKeys.length)], zid = nextZone++, d = depthOf(c);
+    seeds.push({ x: c.x, y: c.y, id: zid });
+    objs.push({ t: 'town', owner: null, fac: f, x: c.x, y: c.y, name: `${townNames[i % townNames.length]} (${FACTIONS[f].name})`, zone: zid, guard: garrisonOf(f, (0.35 + d * 0.9) * DM.neutral).slice(0, 5), garrison: emptyGar() });
+  }
+  for (let i = 0; i < nForts; i++) {
+    const c = placeSeed(); if (!c) break;
+    const zid = nextZone++;
+    seeds.push({ x: c.x, y: c.y, id: zid });
+    objs.push({ t: 'fort', zone: zid, name: fortNames[i % fortNames.length], owner: null, x: c.x, y: c.y, guard: [guard(c, 1.4)], garrison: emptyGar() });
   }
   const zone = [];
   for (let yy = 0; yy < H; yy++) {
@@ -197,7 +221,7 @@ function genMap(seed, ef = 'necropolis', diff = 'normal', mo = {}) {
     for (let i = 0; i < Math.min(4, 1 + nSea); i++) { const c = spick(); if (c) objs.push({ t: 'art', sea: true, art: LAND_ARTS + (i % (ARTIFACTS.length - LAND_ARTS)), x: c.x, y: c.y, guard: [seaGuard(c, 1.3)] }); }
   }
 
-  return { W, H, tiles, objs, P, E, zone, dock };
+  return { W, H, tiles, objs, P, E, aiStarts, zone, dock };
 }
 
 function zoneOwner(G, z) {
@@ -211,15 +235,23 @@ function reindex(G) {
 }
 function objAt(G, x, y) { return G.omap.get(y * G.W + x); }
 
+// perk-based terrain costs per rank (index = rank): forests, mountains, walking on water
+const FOREST_COST = [0, 200, 150, 100], MOUNT_COST = [0, 300, 250, 200], WATERWALK_COST = [0, 160, 130, 100];
 // sail: the hero travels by boat (water tiles; a land tile only as the final step to disembark)
-function findPath(G, sx, sy, tx, ty, ignoreObjs, sail) {
+// caps: { forest, mount, water } perk ranks letting the hero cross otherwise blocked terrain
+function findPath(G, sx, sy, tx, ty, ignoreObjs, sail, caps) {
   const W = G.W, H = G.H, N = W * H, k = (x, y) => y * W + x;
   if (tx < 0 || ty < 0 || tx >= W || ty >= H) return null;
   const target = k(tx, ty);
   const tcost = (nx, ny, nk) => {
     const t = G.tiles[ny][nx], c = TCOST[t];
     if (sail) return t === T.WATER ? 100 : (c && nk === target ? c : 0);
-    if (t === T.WATER) return (!ignoreObjs && nk === target && G.boats && G.boats.some(b => b.x === nx && b.y === ny)) ? 100 : 0;
+    if (t === T.WATER) {
+      if (!ignoreObjs && nk === target && G.boats && G.boats.some(b => b.x === nx && b.y === ny)) return 100;
+      return caps && caps.water ? WATERWALK_COST[caps.water] : 0;
+    }
+    if (t === T.FOREST) return caps && caps.forest ? FOREST_COST[caps.forest] : 0;
+    if (t === T.MOUNT) return caps && caps.mount ? MOUNT_COST[caps.mount] : 0;
     return c || 0;
   };
   if (!tcost(tx, ty, target)) return null;

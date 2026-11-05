@@ -1,0 +1,21 @@
+'use strict';
+// Offline-first service worker. __VERSION__ is replaced at build time (tools/build.js) so every deploy refreshes the cache.
+const VERSION = '__VERSION__';
+const CACHE = 'heroes3-js-' + VERSION;
+const ASSETS = ['./', './index.html', './style.css', './manifest.webmanifest', './js/sfx.js', './js/data.js', './js/map.js', './js/battle.js', './js/main.js', './icons/icon-192.png', './icons/icon-512.png'];
+
+self.addEventListener('install', (e) => {
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+});
+self.addEventListener('activate', (e) => {
+  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith('heroes3-js-') && k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+});
+// cache-first for the app shell; falls back to network and refreshes the cache in the background
+self.addEventListener('fetch', (e) => {
+  const req = e.request;
+  if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
+  e.respondWith(caches.match(req).then((hit) => {
+    const net = fetch(req).then((res) => { if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); } return res; }).catch(() => hit);
+    return hit || net;
+  }));
+});

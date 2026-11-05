@@ -84,7 +84,8 @@ async function siege() {
   }
 }
 
-(async () => {
+module.exports = { makeEnv, fight, winRate };
+if (require.main === module) (async () => {
   const cmd = process.argv[2];
   if (cmd === 'calibrate') await calibrate();
   else if (cmd === 'siege') await siege();

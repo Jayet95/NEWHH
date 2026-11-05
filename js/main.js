@@ -30,6 +30,12 @@
   const eTown = () => G.objs.find(o => o.t === 'town' && o.owner === 1);
   const armyCount = (h) => h.army.reduce((s, a) => s + (a ? a.n : 0), 0);
   const maxMana = (h) => h.kn * 10 + 15 * perk(h, 'wisdom');
+  const heroMorale = (h) => {
+    const facs = new Set(h.army.filter(Boolean).map(a => C[a.t].fac).filter(Boolean));
+    return Math.max(-3, Math.min(3, perk(h, 'leadership') - Math.max(0, facs.size - 1)));
+  };
+  const heroLuck = (h) => Math.min(3, perk(h, 'fortune'));
+  const sgn = (n) => (n > 0 ? '+' : '') + n;
   const sizeMv = () => (G && SIZES[G.size] && SIZES[G.size].mv) || 1;
   const maxMove = (h) => Math.round(MOVE_PER_DAY * sizeMv() * (1 + 0.1 * perk(h, 'logistics')));
   const need = (l) => 150 * l * l;
@@ -282,6 +288,7 @@
     $('hero').innerHTML = `<div class="hlist">${G.heroes.map((x, i) => `<button class="hbtn${x === h ? ' on' : ''}" data-h="${i}" title="${x.name} (${x.cls})">${x.icon}</button>`).join('')}</div>
       <h3>${h.icon} ${h.name} <span class="small">${h.cls} — Level ${h.lvl}</span></h3>
       <div class="stats"><span>⚔️ Attack ${h.att}</span><span>🛡 Defense ${h.def}</span><span>✨ Spell Pow ${h.sp}</span><span>📚 Knowledge ${h.kn}</span></div>
+      <div class="small" title="Morale: each point = 4% chance of an extra turn (negative: of skipping a turn). Mixing creatures from different castles lowers it; undead and golems are immune. Luck: each point = 4% chance of double damage.">😀 Morale ${sgn(heroMorale(h))} · 🍀 Luck ${sgn(heroLuck(h))}</div>
       <div class="small">Movement ${h.move}/${maxMove(h)}</div><div class="bar mv"><i style="width:${Math.min(100, h.move / maxMove(h) * 100)}%"></i></div>
       ${h.boat != null ? '<div class="small">⛵ Sailing — walk onto a shore tile to disembark</div>' : ''}
       <div class="small">Mana ${h.mana}/${maxMana(h)}</div><div class="bar mn"><i style="width:${Math.min(100, h.mana / maxMana(h) * 100)}%"></i></div>
@@ -555,7 +562,7 @@
   }
   async function fight(h, guard, eStats, title, siege, eHero) {
     if (!armyCount(h)) { toast(`${h.name} has no army! Recruit in town first.`); return false; }
-    const res = await Battle.run({ hero: { att: h.att, def: h.def, sp: h.sp, mana: h.mana, spells: G.spells, perks: h.perks, name: h.name, icon: h.icon },
+    const res = await Battle.run({ hero: { att: h.att, def: h.def, sp: h.sp, mana: h.mana, spells: G.spells, perks: h.perks, name: h.name, icon: h.icon, morale: heroMorale(h), luck: heroLuck(h) },
       army: h.army, enemy: guard.map(a => ({ ...a })), eStats, eHero, title, siege, canRetreat: true });
     h.mana = res.mana;
     if (res.win) {

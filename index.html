@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Heroes of Might &amp; Magic — JS Edition</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header id="top">
+    <div id="res"></div>
+    <div id="date"></div>
+    <div class="btns">
+      <button id="bTown" title="Open town (T)">🏰 Town</button>
+      <button id="bEnd" class="primary" title="End turn (E)">⏭ End Turn</button>
+      <button id="bSave" title="Save game">💾</button>
+      <button id="bHelp" title="Help">❓</button>
+    </div>
+  </header>
+  <div id="game">
+    <div id="stage">
+      <canvas id="map" width="960" height="640"></canvas>
+      <canvas id="bat" width="960" height="640"></canvas>
+      <div id="tip" class="hide"></div>
+      <div id="toast"></div>
+    </div>
+    <aside id="side">
+      <canvas id="mini" width="240" height="168"></canvas>
+      <div id="hero"></div>
+      <div id="army"></div>
+      <div id="batui">
+        <h3 id="btitle">Battle</h3>
+        <div class="row">
+          <button id="bWait">⏳ Wait</button>
+          <button id="bDef">🛡 Defend</button>
+          <button id="bSpell">📖 Spells</button>
+        </div>
+        <div class="row">
+          <button id="bAuto">⏩ Auto</button>
+          <button id="bFlee">🏳 Retreat</button>
+          <span id="bManaB" class="pill"></span>
+        </div>
+        <div id="spells" class="hide"></div>
+        <div id="blog"></div>
+      </div>
+    </aside>
+  </div>
+  <div id="modal" class="hide"><div id="mbox"></div></div>
+  <div id="title">
+    <div class="titlebox">
+      <h1>⚔️ Heroes of Might &amp; Magic</h1>
+      <p class="sub">JS Edition — conquer the Necropolis</p>
+      <div class="col">
+        <button id="tNew" class="primary">New Game</button>
+        <button id="tCont">Continue</button>
+        <button id="tHelp">How to Play</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="js/data.js"></script>
+<script src="js/map.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

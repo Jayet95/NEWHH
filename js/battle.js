@@ -650,7 +650,7 @@ const Battle = (() => {
       }
     }
     // spell / strike targeting hint
-    if (B.spell) {
+    if (B.spell && B.spell !== '__mine') {
       const ally = B.spell !== '__strike' && SPELLS[B.spell].tgt === 'ally';
       for (const s of alive(ally ? 0 : 1)) { const p = hexPx(s.c, s.r); hexPath(p.x, p.y, HR - 3); ctx.strokeStyle = ally ? 'rgba(120,255,170,.95)' : 'rgba(255,200,80,.95)'; ctx.lineWidth = 3; ctx.stroke(); }
     }

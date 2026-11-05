@@ -305,21 +305,91 @@ const PERKS = {
   sorcery:    { n: 'Sorcery',    i: '🔮', d: '+15% spell damage per rank' },
   estates:    { n: 'Estates',    i: '💰', d: '+300 gold per day per rank' },
   ballistics: { n: 'Ballistics', i: '🎯', d: '+50% siege damage (catapult and walls) per rank' },
+  necromancy: { n: 'Necromancy', i: '🦴', d: 'Raise skeletons after battle: 10 / 20 / 30% of the enemy hit points slain' },
+  navigation: { n: 'Navigation', i: '⚓', d: 'Sailing costs 10 / 20 / 30% less movement' },
+  scouting:   { n: 'Scouting',   i: '🔭', d: 'See 1 / 2 / 3 tiles farther through the fog of war' },
+  mysticism:  { n: 'Mysticism',  i: '🌀', d: 'Regain 2 / 4 / 6 extra mana per day' },
+  learning:   { n: 'Learning',   i: '🎓', d: '+10% / +20% / +30% experience' },
   forester:   { n: 'Forester',   i: '🌲', d: 'Walk through forests (cost 200 / 150 / 100 per tile)', minLvl: 4 },
   mountaineer: { n: 'Mountaineer', i: '🧗', d: 'Climb mountains (cost 300 / 250 / 200 per tile)', minLvl: 6 },
   waterwalk:  { n: 'Water Walk', i: '🌊', d: 'Walk on water without a boat (cost 160 / 130 / 100 per tile)', minLvl: 8 },
   charisma:   { n: 'Charisma',   i: '🤝', d: 'Much weaker neutral stacks may join you: 50% / 75% / 100% of them, at a lower strength advantage per rank' },
 };
 
-const ARTIFACTS = [
-  { n: "Centaur's Axe", i: '🪓', stat: 'att', v: 2 },
-  { n: 'Dragon Scale Shield', i: '🛡️', stat: 'def', v: 3 },
-  { n: 'Orb of Inhibition', i: '🔮', stat: 'sp', v: 2 },
-  { n: 'Tome of Lore', i: '📖', stat: 'kn', v: 3 },
-  { n: 'Trident of the Deep', i: '🔱', stat: 'att', v: 3 },
-  { n: "Admiral's Compass", i: '🧭', stat: 'kn', v: 2 },
-];
-const LAND_ARTS = 4;
+// ---------- hero skills: starting skills and level-up odds by class ----------
+const RANK_NAMES = ['', 'Basic', 'Advanced', 'Expert'];
+const MAX_SKILLS = 8;
+const START_SKILLS = {
+  Knight: ['leadership', 'armorer'], Cleric: ['wisdom', 'mysticism'], Ranger: ['archery', 'logistics'], Druid: ['wisdom', 'learning'], Wizard: ['wisdom', 'sorcery'],
+  Demoniac: ['offense', 'armorer'], Heretic: ['sorcery', 'mysticism'], 'Death Knight': ['necromancy', 'offense'], Necromancer: ['necromancy', 'wisdom'],
+  Overlord: ['offense', 'leadership'], Warlock: ['sorcery', 'wisdom'], Barbarian: ['offense', 'logistics'], 'Battle Mage': ['sorcery', 'leadership'],
+  Beastmaster: ['armorer', 'charisma'], Witch: ['learning', 'mysticism'], Planeswalker: ['logistics', 'sorcery'], Elementalist: ['sorcery', 'mysticism'],
+};
+const SKILL_ARCH = {
+  might: { offense: 4, armorer: 4, leadership: 3, logistics: 3, ballistics: 3, estates: 2, archery: 2, fortune: 2, navigation: 2, scouting: 2, charisma: 1, forester: 1, mountaineer: 1, waterwalk: 1, learning: 1, mysticism: 1, wisdom: 1, sorcery: 1, necromancy: 1 },
+  magic: { wisdom: 4, sorcery: 4, mysticism: 4, learning: 3, fortune: 2, leadership: 2, estates: 2, scouting: 2, charisma: 2, navigation: 2, logistics: 2, offense: 1, armorer: 1, archery: 1, ballistics: 1, forester: 1, mountaineer: 1, waterwalk: 2, necromancy: 1 },
+  ranger: { archery: 4, logistics: 4, scouting: 4, forester: 3, mountaineer: 2, fortune: 3, offense: 2, armorer: 2, navigation: 2, waterwalk: 1, leadership: 1, wisdom: 1, sorcery: 1, mysticism: 1, learning: 1, estates: 1, charisma: 1, ballistics: 1, necromancy: 1 },
+};
+const CLASS_ARCH = { Knight: 'might', Barbarian: 'might', Overlord: 'might', Demoniac: 'might', 'Death Knight': 'might', Beastmaster: 'might', Ranger: 'ranger',
+  Cleric: 'magic', Druid: 'magic', Wizard: 'magic', Heretic: 'magic', Necromancer: 'magic', Warlock: 'magic', Witch: 'magic', Planeswalker: 'magic', Elementalist: 'magic', 'Battle Mage': 'magic' };
+const NECRO_CLASSES = ['Necromancer', 'Death Knight', 'Warlock'];
+function skillWeight(cls, id) { const w = SKILL_ARCH[CLASS_ARCH[cls] || 'might'][id] || 1; return id === 'necromancy' && NECRO_CLASSES.includes(cls) ? w + 4 : w; }
+
+// ---------- artifacts: equipment with slots, tiers, set bonuses and special effects ----------
+// stats: att def sp kn morale luck | move (% daily movement) mana (flat max mana) | sk (extra skill ranks)
+const SLOT_NAMES = { head: '🪖 Head', neck: '📿 Neck', torso: '🦺 Armor', weapon: '🗡️ Weapon', shield: '🛡️ Shield', feet: '🥾 Feet', cape: '🧣 Cape', ring1: '💍 Ring', ring2: '💍 Ring' };
+const SLOT_ORDER = ['head', 'neck', 'torso', 'weapon', 'shield', 'feet', 'cape', 'ring1', 'ring2'];
+const ART = {
+  centaur:   { n: "Centaur's Axe", i: '🪓', slot: 'weapon', tier: 1, att: 2 },
+  blackshard: { n: 'Blackshard of the Dead Knight', i: '⚔️', slot: 'weapon', tier: 2, att: 3 },
+  flail:     { n: "Greater Gnoll's Flail", i: '🔨', slot: 'weapon', tier: 2, att: 4 },
+  club:      { n: "Ogre's Club of Havoc", i: '🏏', slot: 'weapon', tier: 3, att: 5 },
+  hellfire:  { n: 'Sword of Hellfire', i: '🗡️', slot: 'weapon', tier: 3, att: 6 },
+  gladius:   { n: "Titan's Gladius", i: '⚡', slot: 'weapon', tier: 4, att: 8, set: 'titan' },
+  trident:   { n: 'Trident of the Deep', i: '🔱', slot: 'weapon', tier: 2, att: 3, sk: { navigation: 1 } },
+  dwarven:   { n: 'Shield of the Dwarven Lords', i: '🛡️', slot: 'shield', tier: 1, def: 2 },
+  scale:     { n: 'Dragon Scale Shield', i: '🐲', slot: 'shield', tier: 2, def: 3 },
+  yawning:   { n: 'Shield of the Yawning Dead', i: '💀', slot: 'shield', tier: 2, def: 3, luck: 1 },
+  buckler:   { n: 'Buckler of the Gnoll King', i: '🛡️', slot: 'shield', tier: 3, def: 4 },
+  targ:      { n: 'Targ of the Rampaging Ogre', i: '🛡️', slot: 'shield', tier: 3, def: 5 },
+  sentinel:  { n: "Sentinel's Shield", i: '🏰', slot: 'shield', tier: 4, def: 8, set: 'titan' },
+  skull:     { n: 'Skull Helmet', i: '🪖', slot: 'head', tier: 1, kn: 1 },
+  unicorn:   { n: 'Helm of the Alabaster Unicorn', i: '🦄', slot: 'head', tier: 2, luck: 1, kn: 1 },
+  crown:     { n: 'Crown of the Supreme Magi', i: '👑', slot: 'head', tier: 3, kn: 3, sp: 1, set: 'magus' },
+  halo:      { n: 'Helm of Heavenly Enlightenment', i: '😇', slot: 'head', tier: 4, att: 2, def: 2, sp: 2, kn: 2 },
+  orb:       { n: 'Orb of Inhibition', i: '🔮', slot: 'neck', tier: 1, sp: 2, set: 'magus' },
+  tome:      { n: 'Tome of Lore', i: '📖', slot: 'neck', tier: 2, kn: 3 },
+  swiftness: { n: 'Necklace of Swiftness', i: '📿', slot: 'neck', tier: 2, move: 10 },
+  courage:   { n: 'Pendant of Courage', i: '📿', slot: 'neck', tier: 3, morale: 1, luck: 1, set: 'magus' },
+  compass:   { n: "Admiral's Compass", i: '🧭', slot: 'neck', tier: 2, kn: 2, sk: { navigation: 1 } },
+  wood:      { n: 'Breastplate of Petrified Wood', i: '🌳', slot: 'torso', tier: 1, def: 2 },
+  brimstone: { n: 'Breastplate of Brimstone', i: '🔥', slot: 'torso', tier: 3, def: 5, att: 1 },
+  cuirass:   { n: "Titan's Cuirass", i: '🥋', slot: 'torso', tier: 4, def: 8, set: 'titan' },
+  speed:     { n: 'Boots of Speed', i: '👢', slot: 'feet', tier: 2, move: 25 },
+  levitation: { n: 'Boots of Levitation', i: '🥾', slot: 'feet', tier: 3, sk: { waterwalk: 1 }, set: 'wanderer' },
+  saint:     { n: 'Sandals of the Saint', i: '🩴', slot: 'feet', tier: 4, move: 15, morale: 1, def: 2 },
+  velocity:  { n: 'Cape of Velocity', i: '🧣', slot: 'cape', tier: 2, move: 15, set: 'wanderer' },
+  undead:    { n: 'Cloak of the Undead King', i: '🦇', slot: 'cape', tier: 4, sk: { necromancy: 2 } },
+  vitality:  { n: 'Ring of Vitality', i: '💍', slot: 'ring', tier: 1, kn: 1, mana: 5 },
+  conjuring: { n: 'Ring of Conjuring', i: '💍', slot: 'ring', tier: 2, sp: 2 },
+  wayfarer:  { n: 'Ring of the Wayfarer', i: '💍', slot: 'ring', tier: 2, move: 10, morale: 1, set: 'wanderer' },
+  wizardry:  { n: "Ring of the Wizard's Might", i: '💍', slot: 'ring', tier: 3, mana: 15, sp: 1 },
+};
+for (const id in ART) ART[id].id = id;
+const ART_SETS = {
+  titan: { n: "Titan's Regalia", parts: ['gladius', 'cuirass', 'sentinel'], att: 6, def: 6 },
+  magus: { n: 'Regalia of the Magi', parts: ['crown', 'orb', 'courage'], sp: 3, kn: 3, mana: 10 },
+  wanderer: { n: "Wanderer's Kit", parts: ['levitation', 'velocity', 'wayfarer'], move: 30, morale: 1, luck: 1 },
+};
+const MAX_PACK = 12;
+// random artifact id of at most the given tier (rng = () => [0,1))
+function randomArt(rng, tierMax) {
+  const pool = Object.keys(ART).filter(k => ART[k].tier <= tierMax && ART[k].tier >= Math.max(1, tierMax - 1));
+  return pool[Math.floor(rng() * pool.length)];
+}
+// artifact tier by distance from the player's start (0..1), a little random
+function artTierFor(depth, rng) { return Math.max(1, Math.min(4, 1 + Math.floor(depth * 3.4 + rng() * 1.2))); }
+
 
 const T = { GRASS: 0, FOREST: 1, MOUNT: 2, WATER: 3, ROAD: 4, SAND: 5 };
 const TCOST = { 0: 100, 4: 70, 5: 150 };

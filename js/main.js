@@ -5,7 +5,7 @@
   const TS = 32, FONT = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
   const COARSE = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   let VW = 960, VH = 640, Z = (COARSE || window.innerWidth < 700) ? 1.5 : 1;
-  const SAVE = 'h3js_save_v5';
+  const SAVE = 'h3js_save_v6';
   const MOVE_PER_DAY = 1700;
   const FLEE_RATIO = 3;
   const cmap = $('map'), cx = cmap.getContext('2d'), mini = $('mini'), mx = mini.getContext('2d');
@@ -25,7 +25,26 @@
     });
     $('modal').classList.remove('hide');
   });
-  const perk = (h, id) => (h.perks && h.perks[id]) || 0;
+  // artifact bonuses: equipped items plus completed sets (cached per hero; h.av bumps when equipment changes)
+  const BONUS_KEYS = ['att', 'def', 'sp', 'kn', 'morale', 'luck', 'move', 'mana'];
+  function artBonus(h) {
+    if (h._ab && h._abv === (h.av || 0)) return h._ab;
+    const b = { att: 0, def: 0, sp: 0, kn: 0, morale: 0, luck: 0, move: 0, mana: 0, sk: {} }, ids = [];
+    for (const s of SLOT_ORDER) if (h.arts && h.arts[s]) ids.push(h.arts[s]);
+    for (const id of ids) {
+      const a = ART[id];
+      BONUS_KEYS.forEach(k => { b[k] += a[k] || 0; });
+      if (a.sk) for (const k in a.sk) b.sk[k] = (b.sk[k] || 0) + a.sk[k];
+    }
+    for (const sid in ART_SETS) { const set = ART_SETS[sid]; if (set.parts.every(p => ids.includes(p))) BONUS_KEYS.forEach(k => { b[k] += set[k] || 0; }); }
+    h._ab = b; h._abv = h.av || 0; return b;
+  }
+  const rawPerk = (h, id) => (h.perks && h.perks[id]) || 0;
+  const perk = (h, id) => Math.min(MAX_PERK, rawPerk(h, id) + ((h.arts && artBonus(h).sk[id]) || 0));
+  const eff = (h, k) => h[k] + (h.arts ? artBonus(h)[k] : 0);
+  const perksOf = (h) => Object.fromEntries(Object.keys(PERKS).map(k => [k, perk(h, k)]));
+  const artStats = (a) => ['att', 'def', 'sp', 'kn', 'morale', 'luck'].filter(k => a[k]).map(k => `${a[k] > 0 ? '+' : ''}${a[k]} ${{ att: 'Attack', def: 'Defense', sp: 'Spell Power', kn: 'Knowledge', morale: 'Morale', luck: 'Luck' }[k]}`)
+    .concat(a.move ? [`+${a.move}% movement`] : [], a.mana ? [`+${a.mana} mana`] : [], a.sk ? Object.keys(a.sk).map(k => `+${a.sk[k]} ${PERKS[k].n}`) : []).join(', ');
   const myTowns = () => G.objs.filter(o => o.t === 'town' && o.owner === 0);
   const town = () => myTowns()[0] || null;
   const townAt = (x, y) => { const o = objAt(G, x, y); return o && o.t === 'town' && o.owner === 0 ? o : null; };
@@ -38,16 +57,16 @@
   const ownCol = (o) => (o === null || o === undefined) ? '#999' : o === 0 ? '#3a8aff' : AICOL[(o - 1) % 4];
   const ownFill = (o, a) => { const c = ownCol(o); return `rgba(${parseInt(c.slice(1, 3), 16)},${parseInt(c.slice(3, 5), 16)},${parseInt(c.slice(5, 7), 16)},${a})`; };
   const armyCount = (h) => h.army.reduce((s, a) => s + (a ? a.n : 0), 0);
-  const maxMana = (h) => h.kn * 10 + 15 * perk(h, 'wisdom');
+  const maxMana = (h) => eff(h, 'kn') * 10 + 15 * perk(h, 'wisdom') + (h.arts ? artBonus(h).mana : 0);
   const heroMorale = (h) => {
     const facs = new Set(h.army.filter(Boolean).map(a => C[a.t].fac).filter(Boolean));
-    return Math.max(-3, Math.min(3, perk(h, 'leadership') - Math.max(0, facs.size - 1)));
+    return Math.max(-3, Math.min(3, perk(h, 'leadership') - Math.max(0, facs.size - 1) + (h.arts ? artBonus(h).morale : 0) + (h.buff ? h.buff.morale : 0)));
   };
-  const heroLuck = (h) => Math.min(3, perk(h, 'fortune'));
-  const capsOf = (h) => ({ forest: perk(h, 'forester'), mount: perk(h, 'mountaineer'), water: perk(h, 'waterwalk') });
+  const heroLuck = (h) => Math.max(-3, Math.min(3, perk(h, 'fortune') + (h.arts ? artBonus(h).luck : 0) + (h.buff ? h.buff.luck : 0)));
+  const capsOf = (h) => ({ forest: perk(h, 'forester'), mount: perk(h, 'mountaineer'), water: perk(h, 'waterwalk'), nav: perk(h, 'navigation') });
   const sgn = (n) => (n > 0 ? '+' : '') + n;
   const sizeMv = () => (G && SIZES[G.size] && SIZES[G.size].mv) || 1;
-  const maxMove = (h) => Math.round(MOVE_PER_DAY * sizeMv() * (1 + 0.1 * perk(h, 'logistics')));
+  const maxMove = (h) => Math.round(MOVE_PER_DAY * sizeMv() * (1 + 0.1 * perk(h, 'logistics') + (h.arts ? artBonus(h).move : 0) / 100));
   const need = (l) => 150 * l * l;
   const heroesAt = (x, y) => G.heroes.filter(h => h.x === x && h.y === y);
   const heroAtTown = (h) => !!townAt(h.x, h.y);
@@ -81,7 +100,42 @@
   }
   function makeHero(def, x, y) {
     return { id: def.id, name: def.name, cls: def.cls, icon: def.i, x, y, att: def.att, def: def.def, sp: def.sp, kn: def.kn,
-      lvl: 1, xp: 0, mana: def.kn * 10, move: MOVE_PER_DAY, army: emptyArmy(), perks: {} };
+      lvl: 1, xp: 0, mana: def.kn * 10, move: MOVE_PER_DAY, army: emptyArmy(), perks: Object.fromEntries((START_SKILLS[def.cls] || []).map(k => [k, 1])), arts: {}, pack: [], av: 0 };
+  }
+  // ---------- artifacts & equipment ----------
+  function slotFor(h, a) { return a.slot === 'ring' ? (!h.arts.ring1 ? 'ring1' : !h.arts.ring2 ? 'ring2' : null) : (!h.arts[a.slot] ? a.slot : null); }
+  // equips into a free slot, otherwise the backpack; returns 'equipped' | 'pack' | 'full'
+  function giveArt(h, id) {
+    const a = ART[id], slot = slotFor(h, a);
+    if (slot) { h.arts[slot] = id; h.av++; return 'equipped'; }
+    if (h.pack.length < MAX_PACK) { h.pack.push(id); return 'pack'; }
+    return 'full';
+  }
+  function equipFromPack(h, idx) {
+    const id = h.pack[idx], a = ART[id]; let slot = slotFor(h, a) || (a.slot === 'ring' ? 'ring1' : a.slot);
+    const old = h.arts[slot]; h.arts[slot] = id; h.pack.splice(idx, 1); if (old) h.pack.push(old); h.av++;
+  }
+  function unequip(h, slot) { if (h.pack.length >= MAX_PACK) return toast('Backpack is full.'); h.pack.push(h.arts[slot]); h.arts[slot] = null; h.av++; }
+  function openEquip(h) {
+    const b = artBonus(h), others = heroesAt(h.x, h.y).filter(x => x !== h);
+    const slots = SLOT_ORDER.map(s => { const id = h.arts[s], a = id && ART[id];
+      return `<div class="trow" style="grid-template-columns:96px 1fr auto"><div class="small">${SLOT_NAMES[s]}</div>
+        <div>${a ? `${a.i} <b>${a.n}</b><br><span class="small">${artStats(a)}</span>` : '<span class="small">— empty —</span>'}</div>
+        <div class="acts">${a ? `<button data-un="${s}">Unequip</button>` : ''}</div></div>`; }).join('');
+    const pack = h.pack.map((id, i) => { const a = ART[id];
+      return `<div class="trow" style="grid-template-columns:30px 1fr auto"><div class="ic">${a.i}</div><div><b>${a.n}</b> <span class="small">${SLOT_NAMES[a.slot === 'ring' ? 'ring1' : a.slot]}</span><br><span class="small">${artStats(a)}</span></div>
+        <div class="acts"><button data-eq="${i}">Equip</button>${others.map(o => `<button data-give="${i}:${G.heroes.indexOf(o)}" title="Give to ${o.name}">→ ${o.icon}</button>`).join('')}</div></div>`; }).join('');
+    const sets = Object.entries(ART_SETS).map(([sid, st]) => { const have = st.parts.filter(p => Object.values(h.arts).includes(p)).length;
+      return `<div class="small">${st.n}: ${have}/${st.parts.length} ${have === st.parts.length ? '✅ active' : '· ' + st.parts.map(p => ART[p].n).join(', ')}</div>`; }).join('');
+    $('mbox').innerHTML = `<h2>🎒 ${h.name} — Equipment</h2>
+      <div class="small">Bonus from artifacts: ${['att', 'def', 'sp', 'kn', 'morale', 'luck'].filter(k => b[k]).map(k => `${b[k] > 0 ? '+' : ''}${b[k]} ${k}`).join(', ') || 'none'}${b.move ? `, +${b.move}% move` : ''}${b.mana ? `, +${b.mana} mana` : ''}</div>
+      ${slots}<h4>Backpack (${h.pack.length}/${MAX_PACK})</h4>${pack || '<div class="small">Empty.</div>'}<h4>Sets</h4>${sets}
+      <div class="mb"><button class="primary" id="eClose">Close</button></div>`;
+    $('eClose').onclick = () => { $('modal').classList.add('hide'); renderAll(); };
+    $('mbox').querySelectorAll('[data-un]').forEach(x => x.onclick = () => { unequip(h, x.dataset.un); renderAll(); openEquip(h); });
+    $('mbox').querySelectorAll('[data-eq]').forEach(x => x.onclick = () => { equipFromPack(h, +x.dataset.eq); sfx('build'); renderAll(); openEquip(h); });
+    $('mbox').querySelectorAll('[data-give]').forEach(x => x.onclick = () => { const [i, hi] = x.dataset.give.split(':').map(Number), t = G.heroes[hi]; if (t.pack.length >= MAX_PACK) return toast(`${t.name}'s backpack is full.`); t.pack.push(h.pack.splice(i, 1)[0]); openEquip(h); });
+    $('modal').classList.remove('hide');
   }
   function learn(spells) { for (const k of spells) if (!G.spells.includes(k)) G.spells.push(k); }
   function rollTavern() {
@@ -129,7 +183,7 @@
     reindex(G); buildTerrain(); sizeMini(); centerOn(h.x, h.y); renderAll();
     toast(`${MAPS[preset].name} (${SIZES[size].name}, seed ${seed}) · ${D.name}: defeat ${nAI > 1 ? 'all ' + nAI + ' rivals by capturing their towns' : 'the rival by capturing their towns'}. Good luck, ${h.name}!`);
   }
-  const saveJSON = () => JSON.stringify(G, (k, v) => (k === 'omap' || k === 'hero') ? undefined : v);
+  const saveJSON = () => JSON.stringify(G, (k, v) => (k === 'omap' || k === 'hero' || k[0] === '_') ? undefined : v);
   function save() { try { localStorage.setItem(SAVE, saveJSON()); toast('Game saved.'); } catch (e) { toast('Save failed.'); } }
   function load() {
     try {
@@ -188,10 +242,11 @@
       case 'fort': return '🏯';
       case 'merchant': return '⛺';
       case 'wreck': return '🚢';
+      case 'spring': return '⛲';
       case 'mine': return MINE_ICON[o.kind];
       case 'pile': return RES_ICON[o.kind];
       case 'chest': return '🧰';
-      case 'art': return ARTIFACTS[o.art].i;
+      case 'art': return ART[o.art].i;
       case 'monster': return C[o.guard[0].t].i;
     }
   }
@@ -304,10 +359,11 @@
     const d = G.day - 1;
     $('date').textContent = `Month ${Math.floor(d / 28) + 1} · Week ${Math.floor(d % 28 / 7) + 1} · Day ${d % 7 + 1} · ${DF().icon} ${DF().name}`;
     const h = G.hero;
-    const perkTxt = Object.keys(h.perks).filter(k => h.perks[k]).map(k => `${PERKS[k].i}${PERKS[k].n} ${'★'.repeat(h.perks[k])}`).join(' · ');
+    const ab = artBonus(h), plus = (v) => v ? ` <span class="bonus">(${v > 0 ? '+' : ''}${v})</span>` : '';
+    const perkTxt = Object.keys(PERKS).filter(k => perk(h, k) > 0).map(k => `<span title="${PERKS[k].d}">${PERKS[k].i}${PERKS[k].n} ${RANK_NAMES[perk(h, k)]}${ab.sk[k] ? '*' : ''}</span>`).join(' · ');
     $('hero').innerHTML = `<div class="hlist">${G.heroes.map((x, i) => `<button class="hbtn${x === h ? ' on' : ''}" data-h="${i}" title="${x.name} (${x.cls})">${x.icon}</button>`).join('')}</div>
       <h3>${h.icon} ${h.name} <span class="small">${h.cls} — Level ${h.lvl}</span></h3>
-      <div class="stats"><span>⚔️ Attack ${h.att}</span><span>🛡 Defense ${h.def}</span><span>✨ Spell Pow ${h.sp}</span><span>📚 Knowledge ${h.kn}</span></div>
+      <div class="stats"><span>⚔️ Attack ${h.att}${plus(ab.att)}</span><span>🛡 Defense ${h.def}${plus(ab.def)}</span><span>✨ Spell Pow ${h.sp}${plus(ab.sp)}</span><span>📚 Knowledge ${h.kn}${plus(ab.kn)}</span></div>
       <div class="small" title="Morale: each point = 4% chance of an extra turn (negative: of skipping a turn). Mixing creatures from different castles lowers it; undead and golems are immune. Luck: each point = 4% chance of double damage.">😀 Morale ${sgn(heroMorale(h))} · 🍀 Luck ${sgn(heroLuck(h))}</div>
       <div class="small">Movement ${h.move}/${maxMove(h)}</div><div class="bar mv"><i style="width:${Math.min(100, h.move / maxMove(h) * 100)}%"></i></div>
       ${h.boat != null ? '<div class="small">⛵ Sailing — walk onto a shore tile to disembark</div>' : ''}
@@ -315,9 +371,11 @@
       <div class="small">XP ${h.xp}/${need(h.lvl)}</div><div class="bar xp"><i style="width:${Math.min(100, h.xp / need(h.lvl) * 100)}%"></i></div>
       ${perkTxt ? `<div class="small">${perkTxt}</div>` : ''}
       <div class="small" title="${G.spells.map(k => SPELLS[k].n).join(', ')}">Spells: ${G.spells.map(k => SPELLS[k].i).join(' ')}</div>
+      <button id="bEquip" class="small-btn" title="Equip artifacts">🎒 Equipment (${Object.values(h.arts).filter(Boolean).length} worn, ${h.pack.length} in pack)</button>
       <button id="bPortal" class="small-btn" title="Teleport to your castle">🌀 Town Portal (${PORTAL_COST} mana)</button>`;
     $('hero').querySelectorAll('[data-h]').forEach(b => b.onclick = () => { if (busy) return; setActive(+b.dataset.h); G.path = null; centerOn(G.hero.x, G.hero.y); renderAll(); });
     $('bPortal').onclick = townPortal;
+    $('bEquip').onclick = () => { if (!busy) openEquip(G.hero); };
     const zs = G.objs.filter(o => o.t === 'fort' || o.t === 'town').sort((a, b) => a.zone - b.zone);
     const mineIncome = G.objs.filter(o => o.t === 'mine' && o.owner === 0 && zoneOwner(G, G.zone[o.y][o.x]) === 0).length;
     const mine = zs.filter(z => z.owner === 0), rest = zs.length - mine.length;
@@ -383,6 +441,7 @@
             : `<b>${o.name}</b> — neutral ${fn} town${g}<br>Capture it for a new castle (siege battle).`;
       }
       case 'merchant': return '<b>Wandering Merchant</b><br>Buy missing resources';
+      case 'spring': return `<b>${SPRING[o.kind].n}</b><br>${SPRING[o.kind].d}<br><span class="small">Once per week per hero.</span>`;
       case 'wreck': return `<b>Shipwreck</b><br>Salvage: ${RES_ICON.gold}${o.gold} + ${RES_ICON[o.res]}${g}`;
       case 'mine': {
         const supplied = o.owner === 0 && zoneOwner(G, G.zone[o.y][o.x]) === 0;
@@ -395,7 +454,7 @@
       }
       case 'pile': return `${RES_ICON[o.kind]} ${o.amt} ${o.kind}`;
       case 'chest': return 'Treasure chest';
-      case 'art': return `<b>${ARTIFACTS[o.art].n}</b> (+${ARTIFACTS[o.art].v} ${ARTIFACTS[o.art].stat})${g}`;
+      case 'art': return `<b>${ART[o.art].n}</b> <span class="small">(${SLOT_NAMES[ART[o.art].slot === 'ring' ? 'ring1' : ART[o.art].slot]}, tier ${ART[o.art].tier})</span><br>${artStats(ART[o.art])}${ART[o.art].set ? '<br>Part of ' + ART_SETS[ART[o.art].set].n : ''}${g}`;
       case 'monster': return `Monsters: ${armyList(o.guard, true)}`;
     }
   }
@@ -530,6 +589,21 @@
     else { G.res.gold += o.gold; toast(`The chest holds ${o.gold} 🪙 gold!`); }
     G.objs.splice(G.objs.indexOf(o), 1); reindex(G);
   }
+  const SPRING = {
+    mana: { n: '⛲ Magic Spring', d: 'Restores all mana and adds 50% more.' },
+    oasis: { n: '🌴 Oasis', d: '+800 movement now and +1 Morale in the next battle.' },
+    fortune: { n: '🍀 Fountain of Fortune', d: '+1 Luck in the next battle (+2 for a hero with Fortune).' },
+  };
+  function drinkSpring(o, h) {
+    const week = Math.floor((G.day - 1) / 7);
+    if (o.used[h.id] === week) return showModal(`<h2>${SPRING[o.kind].n}</h2><p>${h.name} has already drunk here this week.</p>`);
+    o.used[h.id] = week; h.buff = h.buff || { morale: 0, luck: 0 };
+    if (o.kind === 'mana') h.mana = Math.round(maxMana(h) * 1.5);
+    else if (o.kind === 'oasis') { h.move += 800; h.buff.morale = 1; }
+    else h.buff.luck = 1 + (perk(h, 'fortune') ? 1 : 0);
+    sfx('level'); renderAll();
+    return showModal(`<h2>${SPRING[o.kind].n}</h2><p>${h.name} refreshes at the water. ${SPRING[o.kind].d}</p>`);
+  }
   // defenders of a town/fort: its garrison (or neutral guard), plus a rival hero standing inside
   function defendersOf(o, eh) {
     const base = o.owner ? o.garrison.filter(Boolean) : (o.guard || []);
@@ -545,6 +619,7 @@
       G.res.gold += o.gold; G.res[o.res] += n; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); renderAll();
       return showModal(`<h2>🚢 Shipwreck salvaged</h2><p>${h.name}'s crew recovers ${RES_ICON.gold}${o.gold} and ${RES_ICON[o.res]}${n} from the wreck.</p>`);
     }
+    if (o.t === 'spring') return drinkSpring(o, h);
     if (o.t === 'merchant') return openMarket(MERCHANT_RATE + ((G.wk && G.wk.rateBonus) || 0), 'Wandering Merchant', false);
     if (o.t === 'town') {
       if (o.owner === 0) { for (const x of heroesAt(o.x, o.y)) x.mana = maxMana(x); return openTown(o); }
@@ -553,7 +628,7 @@
     if (o.t === 'fort') {
       if (o.owner === 0) return openFort(o, h);
       const army = defendersOf(o, eh);
-      if (army.length && !(await fight(h, army, { att: eh ? eh.att : o.owner ? 4 : 0, def: eh ? eh.def : o.owner ? 4 : 0 }, `Siege of ${o.name}`, siegeOf(o, 1), eh))) { if (eh) shrinkArmy(eh.army, 0.5); return; }
+      if (army.length && !(await fight(h, army, { att: eh ? eff(eh, 'att') : o.owner ? 4 : 0, def: eh ? eff(eh, 'def') : o.owner ? 4 : 0 }, `Siege of ${o.name}`, siegeOf(o, 1), eh))) { if (eh) shrinkArmy(eh.army, 0.5); return; }
       if (eh) removeAiHero(eh);
       o.owner = 0; o.guard = []; o.garrison = emptyArmy();
       renderAll();
@@ -567,9 +642,10 @@
     }
     if (o.t === 'art') {
       if (o.guard && o.guard.length) { if (!(await fight(h, o.guard, { att: 0, def: 0 }, 'Artifact guardians'))) return; o.guard = []; }
-      const a = ARTIFACTS[o.art]; h[a.stat] += a.v;
-      G.objs.splice(G.objs.indexOf(o), 1); reindex(G);
-      return showModal(`<h2>${a.i} ${a.n}</h2><p>Found by ${h.name}! +${a.v} ${a.stat === 'att' ? 'Attack' : a.stat === 'def' ? 'Defense' : a.stat === 'sp' ? 'Spell Power' : 'Knowledge'}.</p>`);
+      const a = ART[o.art], got = giveArt(h, o.art);
+      if (got === 'full') return toast('Your backpack is full — drop something first.');
+      G.objs.splice(G.objs.indexOf(o), 1); reindex(G); renderAll();
+      return showModal(`<h2>${a.i} ${a.n}</h2><p>${h.name} found a tier ${a.tier} artifact: <b>${artStats(a)}</b>.${a.set ? ' Part of the <b>' + ART_SETS[a.set].n + '</b> set.' : ''}</p><p class="small">${got === 'equipped' ? 'It was equipped automatically.' : 'Placed in the backpack (the slot is taken).'}</p>`);
     }
     if (o.t === 'monster') {
       const ratio = armyValue(h.army) / Math.max(1, armyValue(o.guard)), cr = perk(h, 'charisma');
@@ -606,7 +682,7 @@
   }
   async function conquerTown(h, o, hero) {
     const defenders = defendersOf(o, hero);
-    const cmd = hero ? { name: hero.name, icon: hero.icon, att: hero.att, def: hero.def } : { name: 'Garrison commander', icon: '🏰', att: 4, def: 4 };
+    const cmd = hero ? { name: hero.name, icon: hero.icon, att: eff(hero, 'att'), def: eff(hero, 'def') } : { name: 'Garrison commander', icon: '🏰', att: 4, def: 4 };
     if (defenders.length && !(await fight(h, defenders, { att: cmd.att, def: cmd.def }, `Siege of ${o.name}`, siegeOf(o, 1), cmd))) { if (hero) shrinkArmy(hero.army, 0.5); return; }
     if (hero) removeAiHero(hero);
     takeTown(o, 0);
@@ -627,28 +703,46 @@
   }
   async function fight(h, guard, eStats, title, siege, eHero) {
     if (!armyCount(h)) { toast(`${h.name} has no army! Recruit in town first.`); return false; }
-    const res = await Battle.run({ hero: { att: h.att, def: h.def, sp: h.sp, mana: h.mana, spells: G.spells, perks: h.perks, name: h.name, icon: h.icon, morale: heroMorale(h), luck: heroLuck(h) },
+    const res = await Battle.run({ hero: { att: eff(h, 'att'), def: eff(h, 'def'), sp: eff(h, 'sp'), mana: h.mana, spells: G.spells, perks: perksOf(h), name: h.name, icon: h.icon, morale: heroMorale(h), luck: heroLuck(h) },
       army: h.army, enemy: guard.filter(Boolean).map(a => ({ ...a })), eStats, eHero, title, siege, canRetreat: true });
-    h.mana = res.mana;
+    h.mana = res.mana; h.buff = null;
     if (res.win) {
       res.survivors.forEach((n, i) => { if (h.army[i]) { if (n > 0) h.army[i].n = n; else h.army[i] = null; } });
+      const nec = perk(h, 'necromancy');
+      if (nec && res.xp > 0) {
+        const raised = Math.floor(res.xp * 0.1 * nec / 6);
+        if (raised > 0 && addToArmy(h, 'necropolis1', raised)) toast(`💀 ${h.name} raises ${raised} skeletons from the fallen (Necromancy ${RANK_NAMES[nec]}).`);
+      }
       await gainXp(h, res.xp);
     } else retreat(h);
     renderAll();
     return res.win;
   }
+  // two skills are offered (weighted by hero class); a hero knows at most MAX_SKILLS different skills
+  function skillChoices(h) {
+    const known = Object.keys(h.perks).filter(k => rawPerk(h, k) > 0).length;
+    const pool = Object.keys(PERKS).filter(k => rawPerk(h, k) < MAX_PERK && perk(h, k) < MAX_PERK && (!PERKS[k].minLvl || h.lvl >= PERKS[k].minLvl) && (known < MAX_SKILLS || rawPerk(h, k) > 0));
+    const out = [];
+    while (out.length < 2 && pool.length) {
+      const tot = pool.reduce((s, k) => s + skillWeight(h.cls, k), 0); let r = Math.random() * tot, idx = 0;
+      for (let i = 0; i < pool.length; i++) { r -= skillWeight(h.cls, pool[i]); if (r <= 0) { idx = i; break; } }
+      out.push(pool.splice(idx, 1)[0]);
+    }
+    return out;
+  }
   async function gainXp(h, xp) {
-    h.xp += xp;
+    h.xp += Math.round(xp * (1 + 0.1 * perk(h, 'learning')));
     while (h.xp >= need(h.lvl)) {
       h.xp -= need(h.lvl); h.lvl++; sfx('level');
       const r = Math.random(), st = r < .3 ? 'att' : r < .6 ? 'def' : r < .8 ? 'sp' : 'kn';
       h[st]++;
       const statName = { att: 'Attack', def: 'Defense', sp: 'Spell Power', kn: 'Knowledge' }[st];
-      const opts = shuffle(Object.keys(PERKS).filter(k => perk(h, k) < MAX_PERK && (!PERKS[k].minLvl || h.lvl >= PERKS[k].minLvl))).slice(0, 2);
+      const opts = skillChoices(h);
       const head = `<h2>⭐ ${h.name} reaches level ${h.lvl}!</h2><p>+1 ${statName}</p>`;
       if (!opts.length) { await showModal(head); continue; }
-      const i = await showModal(`${head}<p>Choose a perk:</p><div class="small">${opts.map(k => `${PERKS[k].i} <b>${PERKS[k].n}</b> (rank ${perk(h, k) + 1}) — ${PERKS[k].d}`).join('<br>')}</div>`, opts.map(k => `${PERKS[k].i} ${PERKS[k].n}`));
-      h.perks[opts[i]] = perk(h, opts[i]) + 1;
+      const rankOf = (k) => rawPerk(h, k) + 1;
+      const i = await showModal(`${head}<p>Choose a skill (${Object.keys(h.perks).filter(k => rawPerk(h, k) > 0).length}/${MAX_SKILLS} known):</p><div class="small">${opts.map(k => `${PERKS[k].i} <b>${PERKS[k].n}</b> → ${RANK_NAMES[rankOf(k)]} — ${PERKS[k].d}`).join('<br>')}</div>`, opts.map(k => `${PERKS[k].i} ${PERKS[k].n} (${RANK_NAMES[rankOf(k)]})`));
+      h.perks[opts[i]] = rankOf(opts[i]);
     }
   }
   // a player hero fights a rival hero (open field, or a siege when the rival attacks a town/fort the hero stands in)
@@ -656,7 +750,7 @@
     const atTown = heroAtTown(h), fo = objAt(G, h.x, h.y), atFort = fo && fo.t === 'fort' && fo.owner === 0;
     if (!armyCount(h)) { retreat(h); return false; }
     const siege = !playerAttacks && (atTown || atFort) ? siegeOf(townAt(h.x, h.y) || fo, 0) : null;
-    const win = await fight(h, e.army, { att: e.att, def: e.def }, `${e.name}'s army`, siege, e);
+    const win = await fight(h, e.army, { att: eff(e, 'att'), def: eff(e, 'def') }, `${e.name}'s army`, siege, e);
     if (win) { removeAiHero(e); toast(`${e.name} is defeated!`); return true; }
     shrinkArmy(e.army, 0.5);
     return false;
@@ -975,7 +1069,7 @@
     if (!gar.some(Boolean)) { await aiCapture(o, ah); return false; }
     centerOn(o.x, o.y); toast(`${ah.name} assaults ${o.name}!`);
     const res = await Battle.run({ hero: { att: 0, def: 3, sp: 0, mana: 0, spells: [], perks: {}, name: 'Garrison', icon: '🛡️' }, army: gar, enemy: ah.army.map(a => a && ({ ...a })),
-      eStats: { att: ah.att, def: ah.def }, eHero: ah, title: `Defending ${o.name}`, siege: siegeOf(o, 0), canRetreat: false });
+      eStats: { att: eff(ah, 'att'), def: eff(ah, 'def') }, eHero: ah, title: `Defending ${o.name}`, siege: siegeOf(o, 0), canRetreat: false });
     res.survivors.forEach((n, i) => { if (gar[i]) { if (n > 0) gar[i].n = n; else gar[i] = null; } });
     if (res.win) { removeAiHero(ah); toast(`${o.name} held! ${ah.name} is slain.`); return true; }
     shrinkArmy(ah.army, 0.5);
@@ -1126,7 +1220,7 @@
     const lose = () => { aiKill(ai, h); return true; };
     switch (o.t) {
       case 'monster': if (!win(o.guard)) return lose(); G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return true;
-      case 'art': if (o.guard && o.guard.length && !win(o.guard)) return lose(); h[ARTIFACTS[o.art].stat] += ARTIFACTS[o.art].v; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return true;
+      case 'art': if (o.guard && o.guard.length && !win(o.guard)) return lose(); giveArt(h, o.art); G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return true;
       case 'mine': if (o.guard && o.guard.length && !win(o.guard)) return lose(); o.guard = []; o.owner = ai.id; return true;
       case 'fort': case 'town': {
         if (o.owner === 0) { await defendStructure(o, h); return true; }
@@ -1206,7 +1300,7 @@
     const newWeek = (G.day - 1) % 7 === 0;
     let wev = null;
     if (newWeek) { G.wk = {}; wev = rollWeekEvent(); }
-    for (const h of G.heroes) { h.move = maxMove(h); h.mana = Math.min(maxMana(h), h.mana + 4); if (heroAtTown(h)) h.mana = maxMana(h); }
+    for (const h of G.heroes) { h.move = maxMove(h); h.mana = Math.min(maxMana(h), h.mana + 4 + 2 * perk(h, 'mysticism')); if (heroAtTown(h)) h.mana = maxMana(h); }
     const gain = computeGain();
     RES.forEach(k => { G.res[k] += gain[k]; });
     const parts = RES.filter(k => gain[k]).map(k => `+${gain[k]}${RES_ICON[k]}`);
@@ -1257,6 +1351,7 @@
     <p><b>Territory:</b> the map is split into zones, each ruled by a fort. Capture a fort to own the zone: +${FORT_INCOME} gold/day, your mines there pay, +${MILITIA} militia/week. <b>Station troops in forts</b> — the enemy hero raids undefended forts.</p>
     <p><b>Town:</b> Town Hall levels 1-5 raise income and unlock dwellings (tiers 3-7) and creature upgrades (up to 5 levels). Mage Guild teaches spells, the Marketplace trades resources, the Tavern hires up to ${MAX_HEROES} heroes.</p>
     <p><b>Defenses:</b> build Fortifications (Citadel → Castle → Fortress) to strengthen walls, gate and arrow towers, and a Minefield for hidden mines in front of the walls — mines hurt and halt attackers. When you defend, you can also lay mines yourself (💣 button, key M); even without a minefield you get ${EMERGENCY_MINES}. Forts can be fortified too.</p>
+    <p><b>Skills &amp; artifacts:</b> each hero starts with two skills and, at every level-up, picks one of two offered skills (Basic → Advanced → Expert; up to ${MAX_SKILLS} skills; the offers favour the hero's class). Artifacts are equipment: they have slots (head, neck, armor, weapon, shield, feet, cape, two rings), tiers, special effects (movement, mana, morale, luck, extra skill ranks such as Water Walk) and <b>sets</b> that give bonuses when completed. Use 🎒 Equipment on the hero panel; heroes standing together can hand artifacts to each other.</p>
     <p><b>Battle:</b> click a green hex to move, click an enemy to attack (archers shoot — +25% at close range, weaker the farther the target, and <b>half damage beyond 10 hexes: the broken arrow 💔</b>; flyers ignore obstacles). Your hero stands beside the field: cast one spell per round and make one Hero Strike per round. Castle assaults are <b>sieges</b>: break the gate or walls (your catapult helps), beware arrow towers and the moat; flyers can cross the walls. Level-ups let you pick one of two perks.</p>`;
   function refreshTitle() { $('tCont').disabled = !localStorage.getItem(SAVE); }
   function showDifficultySelect() {

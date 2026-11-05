@@ -193,3 +193,4 @@ body.inbattle { padding-bottom: 0; }
   #tip { max-width: 220px; font-size: 12px; }
 }
 @media (pointer: coarse) { button, .card, .slot { -webkit-user-select: none; user-select: none; } #zoomctl button { width: 44px; height: 44px; } }
+.bonus { color: #8fe08f; }

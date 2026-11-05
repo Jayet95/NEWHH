@@ -190,6 +190,18 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
     }
   }
 
+  // ---- water sources: springs, oases and fountains found on shores next to lakes and seas ----
+  {
+    const shore = cand.filter(c => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = c.x + dx, ny = c.y + dy; if (nx >= 0 && ny >= 0 && nx < W && ny < H && tiles[ny][nx] === T.WATER) return true; } return false; });
+    const kinds = ['mana', 'oasis', 'fortune'], nSpr = Math.max(2, Math.round(4 * Math.sqrt(sc)));
+    for (let i = 0; i < nSpr && shore.length; i++) {
+      const c = shore.splice(Math.floor(R() * shore.length), 1)[0];
+      cand = cand.filter(o => dist(o, c) > 1);
+      objs.push({ t: 'spring', kind: kinds[Math.floor(R() * kinds.length)], x: c.x, y: c.y, used: {} });
+      for (let j = shore.length - 1; j >= 0; j--) if (dist(shore[j], c) < 4) shore.splice(j, 1);
+    }
+  }
+
   const kindsBase = ['gold', 'gold', 'gold', 'wood', 'wood', 'ore', 'ore', 'mercury', 'sulfur', 'crystal', 'gems'];
   const nMines = Math.max(8, Math.round(11 * Math.pow(sc, 0.8)));
   const mineKinds = Array.from({ length: nMines }, (_, i) => kindsBase[i % kindsBase.length]);
@@ -197,7 +209,7 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
   for (let i = 0, n = sc < 0.8 ? 2 : Math.round(3 * Math.sqrt(sc)); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'merchant', x: c.x, y: c.y }); }
   for (let i = 0, n = Math.round(20 * sc); i < n; i++) { const c = pick(); if (!c) break; const k = RES[Math.floor(R() * RES.length)]; objs.push({ t: 'pile', kind: k, amt: k === 'gold' ? 500 + 250 * Math.floor(R() * 5) : 3 + Math.floor(R() * 6), x: c.x, y: c.y }); }
   for (let i = 0, n = Math.round(5 * sc); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'chest', x: c.x, y: c.y, gold: 1000 + 500 * Math.floor(R() * 4) }); }
-  for (let i = 0, n = Math.round(LAND_ARTS * Math.sqrt(sc)); i < n; i++) { const c = pick(); if (c) objs.push({ t: 'art', art: i % LAND_ARTS, x: c.x, y: c.y, guard: [guard(c, 1.1)] }); }
+  for (let i = 0, n = Math.round(5 * Math.sqrt(sc)); i < n; i++) { const c = pick(); if (c) objs.push({ t: 'art', art: randomArt(R, artTierFor(depthOf(c), R)), x: c.x, y: c.y, guard: [guard(c, 1.1)] }); }
   for (let i = 0, n = Math.round(28 * sc * MP.density); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'monster', x: c.x, y: c.y, guard: [guard(c)] }); }
 
   // ---- the sea: nearest bay tile to the castle is the dock; collectibles float in the connected water ----
@@ -218,7 +230,7 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
     for (let i = 0; i < 3 * nSea; i++) { const c = spick(); if (!c) break; objs.push({ t: 'chest', sea: true, x: c.x, y: c.y, gold: 1500 + 500 * Math.floor(R() * 4) }); }
     for (let i = 0; i < 2 * nSea; i++) { const c = spick(); if (!c) break; objs.push({ t: 'wreck', x: c.x, y: c.y, gold: 1500 + 500 * Math.floor(R() * 4), res: RES[1 + Math.floor(R() * (RES.length - 1))], guard: [seaGuard(c, 0.8)] }); }
     for (let i = 0; i < 3 * nSea; i++) { const c = spick(); if (!c) break; objs.push({ t: 'monster', sea: true, x: c.x, y: c.y, guard: [seaGuard(c)] }); }
-    for (let i = 0; i < Math.min(4, 1 + nSea); i++) { const c = spick(); if (c) objs.push({ t: 'art', sea: true, art: LAND_ARTS + (i % (ARTIFACTS.length - LAND_ARTS)), x: c.x, y: c.y, guard: [seaGuard(c, 1.3)] }); }
+    for (let i = 0; i < Math.min(4, 1 + nSea); i++) { const c = spick(); if (c) objs.push({ t: 'art', sea: true, art: randomArt(R, 2 + Math.floor(R() * 3)), x: c.x, y: c.y, guard: [seaGuard(c, 1.3)] }); }
   }
 
   return { W, H, tiles, objs, P, E, aiStarts, zone, dock };
@@ -245,7 +257,7 @@ function findPath(G, sx, sy, tx, ty, ignoreObjs, sail, caps) {
   const target = k(tx, ty);
   const tcost = (nx, ny, nk) => {
     const t = G.tiles[ny][nx], c = TCOST[t];
-    if (sail) return t === T.WATER ? 100 : (c && nk === target ? c : 0);
+    if (sail) return t === T.WATER ? 100 - 10 * ((caps && caps.nav) || 0) : (c && nk === target ? c : 0);
     if (t === T.WATER) {
       if (!ignoreObjs && nk === target && G.boats && G.boats.some(b => b.x === nx && b.y === ny)) return 100;
       return caps && caps.water ? WATERWALK_COST[caps.water] : 0;

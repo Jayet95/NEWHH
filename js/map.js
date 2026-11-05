@@ -124,7 +124,7 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
   const pick = () => {
     if (!cand.length) return null;
     const i = Math.floor(R() * cand.length), c = cand[i];
-    cand = cand.filter(o => dist(o, c) > 1);
+    cand = cand.filter(o => Math.abs(o.x - c.x) + Math.abs(o.y - c.y) > 1);
     return c;
   };
   const depthOf = (c) => Math.min(1, dist(c, P) / dist(P, E));
@@ -211,6 +211,30 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
   for (let i = 0, n = Math.round(5 * sc); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'chest', x: c.x, y: c.y, gold: 1000 + 500 * Math.floor(R() * 4) }); }
   for (let i = 0, n = Math.round(5 * Math.sqrt(sc)); i < n; i++) { const c = pick(); if (c) objs.push({ t: 'art', art: randomArt(R, artTierFor(depthOf(c), R)), x: c.x, y: c.y, guard: [guard(c, 1.1)] }); }
   for (let i = 0, n = Math.round(28 * sc * MP.density); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'monster', x: c.x, y: c.y, guard: [guard(c)] }); }
+
+  // ---- more adventure objects ----
+  const facKeys2 = Object.keys(FACTIONS), spellKeys = Object.keys(SPELLS);
+  for (let i = 0, n = Math.round(5 * sc); i < n; i++) { // creature dwellings: beat the guards, then recruit weekly
+    const c = pick(); if (!c) break; const d = depthOf(c), tier = 1 + Math.min(3, Math.floor(R() * (2 + d * 3)));
+    objs.push({ t: 'dwelling', fac: facKeys2[Math.floor(R() * facKeys2.length)], tier, owner: null, avail: GROWTH[tier - 1], x: c.x, y: c.y, guard: [guard(c, 0.9)] });
+  }
+  for (let i = 0, n = Math.round(5 * sc); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'resobj', kind: ['windmill', 'waterwheel', 'garden'][Math.floor(R() * 3)], week: -1, x: c.x, y: c.y }); }
+  for (let i = 0, n = Math.round(2 * sc); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'stone', used: {}, x: c.x, y: c.y }); }
+  for (let i = 0, n = Math.round(2 * sc); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'shrine', spell: spellKeys[Math.floor(R() * spellKeys.length)], used: {}, x: c.x, y: c.y }); }
+  for (let i = 0, n = Math.round(2 * sc); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'tower', used: false, x: c.x, y: c.y }); }
+  for (let i = 0, n = Math.round(3 * sc); i < n; i++) { // creature banks: strong guards, rich rewards
+    const c = pick(); if (!c) break; const d = depthOf(c), kind = ['crypt', 'utopia', 'stockpile'][Math.floor(R() * 3)];
+    const gt = kind === 'crypt' ? 'necropolis' : kind === 'utopia' ? null : 'stronghold', ti = gt ? factionTiers(gt) : null, m = (0.8 + d * 1.2) * DM.neutral;
+    const gd = kind === 'utopia' ? [{ t: 'dragon', n: Math.max(2, Math.round(m * 3)) }] : [{ t: ti[2], n: Math.max(4, Math.round(m * 18)) }, { t: ti[4], n: Math.max(2, Math.round(m * 7)) }];
+    objs.push({ t: 'bank', kind, x: c.x, y: c.y, guard: gd, gold: Math.round((1500 + d * 3500) * (kind === 'utopia' ? 2 : 1)), art: R() < (kind === 'utopia' ? 0.9 : 0.4) ? randomArt(R, artTierFor(d, R)) : null });
+  }
+  for (let i = 0, n = Math.max(1, Math.round(sc)); i < n; i++) { // monolith pairs
+    const a = pick(), b = pick(); if (!a || !b) break; objs.push({ t: 'mono', id: i, x: a.x, y: a.y }, { t: 'mono', id: i, x: b.x, y: b.y });
+  }
+  for (let i = 0, n = Math.round(2 * sc); i < n; i++) { // seers: bring them resources for an artifact
+    const c = pick(); if (!c) break; const d = depthOf(c), k = ['wood', 'ore', 'mercury', 'sulfur', 'crystal', 'gems'][Math.floor(R() * 6)];
+    objs.push({ t: 'seer', need: k, amt: k === 'wood' || k === 'ore' ? 12 + Math.floor(R() * 10) : 5 + Math.floor(R() * 4), art: randomArt(R, Math.max(2, artTierFor(d, R))), x: c.x, y: c.y });
+  }
 
   // ---- the sea: nearest bay tile to the castle is the dock; collectibles float in the connected water ----
   if (dock) {

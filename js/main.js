@@ -5,7 +5,7 @@
   const TS = 32, FONT = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
   const COARSE = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   let VW = 960, VH = 640, Z = (COARSE || window.innerWidth < 700) ? 1.5 : 1;
-  const SAVE = 'h3js_save_v6';
+  const SAVE = 'h3js_save_v7';
   const MOVE_PER_DAY = 1700;
   const FLEE_RATIO = 3;
   const cmap = $('map'), cx = cmap.getContext('2d'), mini = $('mini'), mx = mini.getContext('2d');
@@ -180,6 +180,7 @@
     h.army = [{ t: ti[0], n: 20 }, { t: ti[1], n: 10 }, { t: ti[2], n: 5 }, null, null, null, null];
     h.move = maxMove(h);
     G.heroes.push(h); setActive(0); learn(def.spells); rollTavern();
+    G.fog = map.fog !== false; initFog();
     reindex(G); buildTerrain(); sizeMini(); centerOn(h.x, h.y); renderAll();
     toast(`${MAPS[preset].name} (${SIZES[size].name}, seed ${seed}) · ${D.name}: defeat ${nAI > 1 ? 'all ' + nAI + ' rivals by capturing their towns' : 'the rival by capturing their towns'}. Good luck, ${h.name}!`);
   }
@@ -190,7 +191,7 @@
       const s = localStorage.getItem(SAVE); if (!s) return false;
       G = JSON.parse(s); if (!G.zone || !G.heroes || !G.ais) return false;
       G.path = null; G.boats = G.boats || []; setFaction(G.faction); setActive(Math.min(G.sel, G.heroes.length - 1));
-      reindex(G); buildTerrain(); sizeMini(); centerOn(G.hero.x, G.hero.y); renderAll(); return true;
+      initFog(); reindex(G); buildTerrain(); sizeMini(); centerOn(G.hero.x, G.hero.y); renderAll(); return true;
     } catch (e) { return false; }
   }
 
@@ -211,6 +212,32 @@
       if (t === T.MOUNT) c.fillText('⛰️', px + 16, py + 17);
     }
   }
+  // ---------- fog of war ----------
+  let vis = null, fogDirty = true, miniFog = null;
+  const fogOn = () => G.fog !== false;
+  const isExpl = (x, y) => !fogOn() || G.expl[y * G.W + x] === 1;
+  const isVis = (x, y) => !fogOn() || vis[y * G.W + x] === 1;
+  function initFog() { const n = G.W * G.H; if (!G.expl) G.expl = new Array(n).fill(0); vis = new Uint8Array(n); fogDirty = true; }
+  function markView(x, y, r, seeNow = true) {
+    const r2 = r * r + r;
+    for (let dy = -r; dy <= r; dy++) {
+      const yy = y + dy; if (yy < 0 || yy >= G.H) continue;
+      for (let dx = -r; dx <= r; dx++) {
+        if (dx * dx + dy * dy > r2) continue;
+        const xx = x + dx; if (xx < 0 || xx >= G.W) continue;
+        const i = yy * G.W + xx;
+        if (seeNow) vis[i] = 1;
+        if (G.expl[i] === 0) { G.expl[i] = 1; fogDirty = true; }
+      }
+    }
+  }
+  function recomputeVision() {
+    if (!fogOn() || !vis) return;
+    vis.fill(0);
+    for (const h of G.heroes) markView(h.x, h.y, 6 + perk(h, 'scouting'));
+    for (const o of G.objs) if (o.owner === 0) markView(o.x, o.y, o.t === 'town' ? 9 : o.t === 'fort' ? 6 : 4);
+    for (const b of G.boats) markView(b.x, b.y, 3);
+  }
   let MK = 6, miniTerr = null, miniCache = null, miniSig = '';
   function sizeMini() {
     MK = Math.max(3, Math.floor(240 / G.W)); mini.width = G.W * MK; mini.height = G.H * MK; miniSig = '';
@@ -218,6 +245,7 @@
     const t = miniTerr.getContext('2d');
     for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) { t.fillStyle = MC[G.tiles[y][x]]; t.fillRect(x * MK, y * MK, MK, MK); }
     miniCache = document.createElement('canvas'); miniCache.width = mini.width; miniCache.height = mini.height;
+    miniFog = document.createElement('canvas'); miniFog.width = mini.width; miniFog.height = mini.height; fogDirty = true;
   }
   function clampCam() {
     cam.x = G.W * TS <= VW ? -(VW - G.W * TS) / 2 : Math.max(0, Math.min(G.W * TS - VW, cam.x));
@@ -243,6 +271,14 @@
       case 'merchant': return '⛺';
       case 'wreck': return '🚢';
       case 'spring': return '⛲';
+      case 'dwelling': return C[factionTiers(o.fac)[o.tier - 1]].i;
+      case 'resobj': return { windmill: '🌬️', waterwheel: '🎡', garden: '🌻' }[o.kind];
+      case 'stone': return '📚';
+      case 'shrine': return '⛩️';
+      case 'tower': return '🔭';
+      case 'bank': return { crypt: '⚰️', utopia: '🐲', stockpile: '🏚️' }[o.kind];
+      case 'mono': return '🌌';
+      case 'seer': return '🧙';
       case 'mine': return MINE_ICON[o.kind];
       case 'pile': return RES_ICON[o.kind];
       case 'chest': return '🧰';
@@ -281,6 +317,7 @@
     }
     for (const o of G.objs) {
       if (o.x < x0 - 1 || o.x > x0 + vx || o.y < y0 - 1 || o.y > y0 + vy) continue;
+      if (fogOn()) { const fi = o.y * G.W + o.x; if (!G.expl[fi] || (o.t === 'monster' && !vis[fi])) continue; }
       const px = o.x * TS - cam.x + TS / 2, py = o.y * TS - cam.y + TS / 2;
       if (o.t === 'monster' || o.t === 'art' || o.t === 'mine' || o.t === 'wreck') {
         cx.beginPath(); cx.arc(px, py, 15, 0, 7);
@@ -293,7 +330,7 @@
         const gn = o.garrison.reduce((s, a) => s + (a ? a.n : 0), 0);
         if (o.owner === 0 && gn) { cx.font = 'bold 11px sans-serif'; cx.fillStyle = '#000b'; cx.fillRect(px - 14, py + 10, 28, 13); cx.fillStyle = '#fff'; cx.fillText(gn, px, py + 17); }
       }
-      if (o.t === 'mine') { cx.beginPath(); cx.arc(px + 12, py - 12, 5, 0, 7); cx.fillStyle = ownCol(o.owner); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke(); }
+      if (o.t === 'mine' || o.t === 'dwelling') { cx.beginPath(); cx.arc(px + 12, py - 12, 5, 0, 7); cx.fillStyle = ownCol(o.owner); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke(); }
       if (o.t === 'town') { cx.beginPath(); cx.arc(px + 16, py - 18, 6, 0, 7); cx.fillStyle = ownCol(o.owner); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke(); }
       if (o.t === 'town' || o.t === 'fort') {
         cx.font = 'bold 11px sans-serif'; cx.lineWidth = 3; cx.strokeStyle = '#000'; cx.fillStyle = o.owner === 0 ? '#bcd8ff' : o.owner ? '#ffb3a8' : '#f3e7bd';
@@ -305,6 +342,7 @@
       cx.font = `30px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText('⛵', px, py + 2);
     }
     for (const ai of G.ais) for (const eh of ai.heroes) {
+      if (!isVis(eh.x, eh.y)) continue;
       const px = eh.x * TS - cam.x + TS / 2, py = eh.y * TS - cam.y + TS / 2;
       cx.beginPath(); cx.arc(px, py, 15, 0, 7); cx.fillStyle = ownCol(ai.id); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 2; cx.stroke();
       cx.font = `22px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(eh.icon, px, py + 1);
@@ -316,6 +354,13 @@
       cx.strokeStyle = h === G.hero ? '#ffd24a' : '#fff'; cx.lineWidth = h === G.hero ? 3 : 1.5; cx.stroke();
       cx.font = `${h.boat != null ? 16 : 22}px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(h.icon, px, py + 1 - (h.boat != null ? 6 : 0));
     });
+    if (fogOn()) {
+      for (let y = Math.max(0, y0); y < Math.min(G.H, y0 + vy); y++) for (let x = Math.max(0, x0); x < Math.min(G.W, x0 + vx); x++) {
+        const fi = y * G.W + x;
+        if (!G.expl[fi]) { cx.fillStyle = '#05030a'; cx.fillRect(x * TS - cam.x, y * TS - cam.y, TS, TS); }
+        else if (!vis[fi]) { cx.fillStyle = 'rgba(5,3,10,.5)'; cx.fillRect(x * TS - cam.x, y * TS - cam.y, TS, TS); }
+      }
+    }
     if (hover) { cx.strokeStyle = 'rgba(255,255,255,.8)'; cx.lineWidth = 2; cx.strokeRect(hover.x * TS - cam.x + 1, hover.y * TS - cam.y + 1, TS - 2, TS - 2); }
     drawMini();
   }
@@ -333,12 +378,21 @@
       }
     }
     mx.drawImage(miniCache, 0, 0);
+    if (fogOn()) {
+      if (fogDirty) {
+        const c = miniFog.getContext('2d'); c.clearRect(0, 0, miniFog.width, miniFog.height); c.fillStyle = '#000';
+        for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) if (!G.expl[y * G.W + x]) c.fillRect(x * k, y * k, k, k);
+        fogDirty = false;
+      }
+      mx.drawImage(miniFog, 0, 0);
+    }
     for (const o of G.objs) {
+      if (fogOn() && (!isExpl(o.x, o.y) || (o.t === 'monster' && !isVis(o.x, o.y)))) continue;
       mx.fillStyle = (o.t === 'fort' || o.t === 'town') ? ownCol(o.owner) : o.t === 'monster' ? '#a33' : o.t === 'mine' ? (o.owner !== null ? ownCol(o.owner) : '#ddd') : o.t === 'merchant' ? '#fa0' : '#ee6';
       mx.fillRect(o.x * k - (o.t === 'town' ? 1 : 0), o.y * k - (o.t === 'town' ? 1 : 0), k + (o.t === 'town' ? 2 : 0), k + (o.t === 'town' ? 2 : 0));
     }
     mx.fillStyle = '#8df'; for (const b of G.boats) mx.fillRect(b.x * k, b.y * k, k, k);
-    for (const ai of G.ais) for (const eh of ai.heroes) { mx.fillStyle = ownCol(ai.id); mx.fillRect(eh.x * k - 1, eh.y * k - 1, k + 2, k + 2); mx.strokeStyle = '#000'; mx.strokeRect(eh.x * k - 1, eh.y * k - 1, k + 2, k + 2); }
+    for (const ai of G.ais) for (const eh of ai.heroes) { if (!isVis(eh.x, eh.y)) continue; mx.fillStyle = ownCol(ai.id); mx.fillRect(eh.x * k - 1, eh.y * k - 1, k + 2, k + 2); mx.strokeStyle = '#000'; mx.strokeRect(eh.x * k - 1, eh.y * k - 1, k + 2, k + 2); }
     mx.fillStyle = '#fff'; for (const h of G.heroes) mx.fillRect(h.x * k - 1, h.y * k - 1, k + 2, k + 2);
     mx.strokeStyle = '#fff'; mx.lineWidth = 1; mx.strokeRect(cam.x / TS * k, cam.y / TS * k, VW / TS * k, VH / TS * k);
   }
@@ -353,6 +407,7 @@
   // ---------- UI panels ----------
   function renderAll() {
     if (!G) return;
+    recomputeVision();
     const gn = computeGain();
     $('res').innerHTML = RES.map(k => `<span class="chip" title="${k[0].toUpperCase() + k.slice(1)}: ${G.res[k]}${gn[k] ? ` (+${gn[k]}/day)` : ''}">${RES_ICON[k]} <b>${fmtN(G.res[k])}</b></span>`).join('');
     $('income').innerHTML = `📈 ${RES.filter(k => gn[k]).map(k => `+${fmtN(gn[k])}${RES_ICON[k]}`).join(' ') || 'no income'}<small>/day</small>`;
@@ -427,10 +482,13 @@
   }
   function armyList(arr, vague) { return arr.filter(Boolean).map(a => vague ? `${groupLabel(a.n)} ${C[a.t].n}s` : `${a.n} ${C[a.t].n}`).join(', '); }
   function describe(x, y) {
-    const ah = aiHeroAt(x, y); if (ah) return `<b>${ah.name}</b> (rival ${FACTIONS[aiById(ah.ai).fac].name} hero, L${ah.lvl})<br>${armyList(ah.army, true)}`;
+    if (!isExpl(x, y)) return 'Unexplored territory';
+    const seen = isVis(x, y);
+    const ah = seen ? aiHeroAt(x, y) : null; if (ah) return `<b>${ah.name}</b> (rival ${FACTIONS[aiById(ah.ai).fac].name} hero, L${ah.lvl})<br>${armyList(ah.army, true)}`;
     const hs = heroesAt(x, y); if (hs.length) return hs.map(h => `<b>${h.name}</b> (${h.cls} L${h.lvl})${h.boat != null ? ' ⛵ sailing' : ''}`).join('<br>');
     if (G.boats.some(b => b.x === x && b.y === y)) return '<b>⛵ Your boat</b><br>Walk onto it from the shore to set sail.';
-    const o = objAt(G, x, y);
+    let o = objAt(G, x, y);
+    if (o && o.t === 'monster' && !seen) o = null;
     if (!o) return ['Grass', 'Forest (needs Forester)', 'Mountains (needs Mountaineer)', 'Water (needs a boat or Water Walk)', 'Road (fast)', 'Sand (slow)'][G.tiles[y][x]];
     const g = o.guard && o.guard.length ? `<br>Guarded by: ${armyList(o.guard, true)}` : '';
     switch (o.t) {
@@ -441,6 +499,14 @@
             : `<b>${o.name}</b> — neutral ${fn} town${g}<br>Capture it for a new castle (siege battle).`;
       }
       case 'merchant': return '<b>Wandering Merchant</b><br>Buy missing resources';
+      case 'dwelling': { const c = C[dwId(o)]; return `<b>${c.i} ${c.n} dwelling</b> (${FACTIONS[o.fac].name}) — ${o.owner === 0 ? `yours, ${o.avail} available` : 'unclaimed'}${g}`; }
+      case 'resobj': return `<b>${{ windmill: 'Windmill', waterwheel: 'Water Wheel', garden: 'Mystical Garden' }[o.kind]}</b><br>Yields resources once per week.`;
+      case 'stone': return '<b>Learning Stone</b><br>Grants experience once per hero.';
+      case 'shrine': return `<b>Shrine of ${SPELLS[o.spell].n}</b><br>Teaches a spell once per hero.`;
+      case 'tower': return '<b>Observation Tower</b><br>Reveals a large area.';
+      case 'bank': return `<b>${{ crypt: 'Crypt', utopia: 'Dragon Utopia', stockpile: 'Cyclops Stockpile' }[o.kind]}</b><br>Guarded treasure: ${armyList(o.guard, true)}`;
+      case 'mono': return '<b>Monolith</b><br>Teleports to its twin.';
+      case 'seer': return `<b>Seer's Hut</b><br>Wants ${o.amt} ${o.need} for an artifact.`;
       case 'spring': return `<b>${SPRING[o.kind].n}</b><br>${SPRING[o.kind].d}<br><span class="small">Once per week per hero.</span>`;
       case 'wreck': return `<b>Shipwreck</b><br>Salvage: ${RES_ICON.gold}${o.gold} + ${RES_ICON[o.res]}${g}`;
       case 'mine': {
@@ -589,6 +655,85 @@
     else { G.res.gold += o.gold; toast(`The chest holds ${o.gold} 🪙 gold!`); }
     G.objs.splice(G.objs.indexOf(o), 1); reindex(G);
   }
+  // ---------- adventure objects: dwellings, resource sites, stones, shrines, towers, banks, monoliths, seers ----------
+  const weekNow = () => Math.floor((G.day - 1) / 7);
+  const dwId = (o) => factionTiers(o.fac)[o.tier - 1];
+  async function visitDwelling(o, h) {
+    if (o.owner !== 0) {
+      if (o.guard && o.guard.length && !(await fight(h, o.guard, { att: 0, def: 0 }, 'Dwelling guardians'))) return;
+      o.owner = 0; o.guard = []; toast(`You now own the ${C[dwId(o)].n} dwelling!`); renderAll();
+    }
+    openDwelling(o, h);
+  }
+  function openDwelling(o, h) {
+    const id = dwId(o), c = C[id];
+    $('mbox').innerHTML = `<h2>${c.i} ${c.n} dwelling</h2><div class="small">${FACTIONS[o.fac].name} · produces +${GROWTH[o.tier - 1]} per week while you hold it. Recruits join ${h.name}.</div>
+      <div class="trow"><div class="ic">${c.i}</div><div><b>${c.n}</b> <span class="small">Att ${c.a} Def ${c.d} Dmg ${c.lo}-${c.hi} HP ${c.hp} Spd ${c.s}</span><br><span class="small">Available: <b>${o.avail}</b> · ${fmtCost(c.cost)} each</span></div>
+        <div class="acts"><input type="number" id="dwN" min="1" max="${o.avail}" value="${o.avail}"><button id="dwBuy">Recruit</button></div></div>
+      <div class="mb"><button class="primary" id="dwClose">Close</button></div>`;
+    $('dwClose').onclick = () => { $('modal').classList.add('hide'); renderAll(); };
+    $('dwBuy').onclick = () => {
+      let n = Math.min(parseInt($('dwN').value) || 0, o.avail);
+      while (n > 0 && !canAfford(G.res, Object.fromEntries(Object.entries(c.cost).map(([k, v]) => [k, v * n])))) n--;
+      if (n <= 0) return toast('Cannot recruit (resources or availability).');
+      if (!addToArmy(h, id, n)) return toast('No free army slot.');
+      pay(G.res, c.cost, n); o.avail -= n; toast(`Recruited ${n} ${c.n}${n > 1 ? 's' : ''}.`); sfx('build'); renderAll(); openDwelling(o, h);
+    };
+    $('modal').classList.remove('hide');
+  }
+  function visitResObj(o, h) {
+    const NAMES = { windmill: '🌬️ Windmill', waterwheel: '🎡 Water Wheel', garden: '🌻 Mystical Garden' };
+    if (o.week === weekNow()) return showModal(`<h2>${NAMES[o.kind]}</h2><p>Nothing more to collect until next week.</p>`);
+    o.week = weekNow(); let txt;
+    if (o.kind === 'waterwheel') { G.res.gold += 1000; txt = `+1000 ${RES_ICON.gold}`; }
+    else if (o.kind === 'garden') { if (Math.random() < 0.5) { G.res.gems += 5; txt = `+5 ${RES_ICON.gems}`; } else { G.res.gold += 500; txt = `+500 ${RES_ICON.gold}`; } }
+    else { const k = ['wood', 'ore', 'mercury', 'sulfur', 'crystal', 'gems'][Math.floor(Math.random() * 6)], n = 2 + Math.floor(Math.random() * 4); G.res[k] += n; txt = `+${n} ${RES_ICON[k]} ${k}`; }
+    sfx('coin'); renderAll();
+    return showModal(`<h2>${NAMES[o.kind]}</h2><p>${h.name} collects this week's yield: <b>${txt}</b>. Visit again next week!</p>`);
+  }
+  async function visitStone(o, h) {
+    if (o.used[h.id]) return showModal(`<h2>📚 Learning Stone</h2><p>${h.name} has already studied here.</p>`);
+    o.used[h.id] = true; const xp = 400 + 150 * h.lvl;
+    await showModal(`<h2>📚 Learning Stone</h2><p>${h.name} studies the ancient runes and gains <b>${xp}</b> experience.</p>`);
+    await gainXp(h, Math.round(xp / (1 + 0.1 * perk(h, 'learning')))); renderAll();
+  }
+  function visitShrine(o, h) {
+    const sp = SPELLS[o.spell];
+    if (o.used[h.id]) return showModal(`<h2>⛩️ Shrine of ${sp.n}</h2><p>${h.name} has already prayed here.</p>`);
+    if (G.spells.includes(o.spell)) return showModal(`<h2>⛩️ Shrine of ${sp.n}</h2><p>Your spellbook already holds ${sp.i} ${sp.n}.</p>`);
+    if (sp.cost > maxMana(h)) return showModal(`<h2>⛩️ Shrine of ${sp.n}</h2><p>The spell is too complex for ${h.name} (needs ${sp.cost} maximum mana).</p>`);
+    o.used[h.id] = true; learn([o.spell]); sfx('level'); renderAll();
+    return showModal(`<h2>⛩️ Shrine of ${sp.n}</h2><p>${h.name} learns <b>${sp.i} ${sp.n}</b>: ${sp.desc}.</p>`);
+  }
+  function visitTower(o, h) {
+    if (o.used) return showModal('<h2>🔭 Observation Tower</h2><p>The surroundings are already mapped.</p>');
+    o.used = true; markView(o.x, o.y, 16, false); renderAll();
+    return showModal('<h2>🔭 Observation Tower</h2><p>From the top you survey the land: a large area of the map is revealed.</p>');
+  }
+  async function visitBank(o, h) {
+    const NAMES = { crypt: '⚰️ Crypt', utopia: '🐲 Dragon Utopia', stockpile: '🏚️ Cyclops Stockpile' };
+    if (!(await fight(h, o.guard, { att: 0, def: 0 }, NAMES[o.kind].slice(3)))) return;
+    let txt = `${RES_ICON.gold}${o.gold}`; G.res.gold += o.gold;
+    if (o.kind === 'stockpile') { for (const k of ['wood', 'ore', 'mercury', 'sulfur', 'crystal', 'gems']) G.res[k] += 4; txt += ' and 4 of every other resource'; }
+    let extra = '';
+    if (o.art) { const a = ART[o.art], got = giveArt(h, o.art); extra = `<p>${a.i} <b>${a.n}</b> (${artStats(a)}) — ${got === 'equipped' ? 'equipped' : got === 'pack' ? 'in the backpack' : 'left behind, backpack full'}.</p>`; }
+    G.objs.splice(G.objs.indexOf(o), 1); reindex(G); sfx('coin'); renderAll();
+    return showModal(`<h2>${NAMES[o.kind]} plundered</h2><p>${h.name} claims <b>${txt}</b>.</p>${extra}`);
+  }
+  function visitMono(o, h) {
+    const other = G.objs.find(x => x.t === 'mono' && x.id === o.id && x !== o);
+    if (!other) return toast('The monolith is silent.');
+    h.x = other.x; h.y = other.y; h.boat = null; G.path = null; h.move = Math.max(0, h.move - 100); sfx('level'); centerOn(h.x, h.y); renderAll();
+    return toast(`${h.name} steps through the monolith and emerges far away!`);
+  }
+  async function visitSeer(o, h) {
+    const a = ART[o.art], have = G.res[o.need] >= o.amt;
+    const i = await showModal(`<h2>🏚️ Seer's Hut</h2><p>"Bring me <b>${o.amt} ${RES_ICON[o.need]} ${o.need}</b> and I will give you ${a.i} <b>${a.n}</b> (${artStats(a)})."</p><p class="small">You have ${G.res[o.need]}.</p>`, have ? ['Accept the deal', 'Not now'] : ['Not now']);
+    if (!have || i !== 0) return;
+    const got = giveArt(h, o.art); if (got === 'full') return toast('Your backpack is full.');
+    G.res[o.need] -= o.amt; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); sfx('build'); renderAll();
+    toast(`${a.n} acquired!`);
+  }
   const SPRING = {
     mana: { n: '⛲ Magic Spring', d: 'Restores all mana and adds 50% more.' },
     oasis: { n: '🌴 Oasis', d: '+800 movement now and +1 Morale in the next battle.' },
@@ -620,6 +765,14 @@
       return showModal(`<h2>🚢 Shipwreck salvaged</h2><p>${h.name}'s crew recovers ${RES_ICON.gold}${o.gold} and ${RES_ICON[o.res]}${n} from the wreck.</p>`);
     }
     if (o.t === 'spring') return drinkSpring(o, h);
+    if (o.t === 'dwelling') return visitDwelling(o, h);
+    if (o.t === 'resobj') return visitResObj(o, h);
+    if (o.t === 'stone') return visitStone(o, h);
+    if (o.t === 'shrine') return visitShrine(o, h);
+    if (o.t === 'tower') return visitTower(o, h);
+    if (o.t === 'bank') return visitBank(o, h);
+    if (o.t === 'mono') return visitMono(o, h);
+    if (o.t === 'seer') return visitSeer(o, h);
     if (o.t === 'merchant') return openMarket(MERCHANT_RATE + ((G.wk && G.wk.rateBonus) || 0), 'Wandering Merchant', false);
     if (o.t === 'town') {
       if (o.owner === 0) { for (const x of heroesAt(o.x, o.y)) x.mana = maxMana(x); return openTown(o); }
@@ -1285,6 +1438,7 @@
       () => { hs.forEach(h => { h.mana = maxMana(h); }); return ['🔷', 'Mana Spring', "A surge of magic restores every hero's mana."]; },
       () => { hs.forEach(h => { h.move = Math.floor(h.move * 0.7); }); return ['⛈️', 'Storm', 'Heavy storms slow your heroes: -30% movement today.']; },
       () => { const ah = allAiHeroes().sort((a, b) => dist(a, G.hero) - dist(b, G.hero))[0]; return ['📜', 'Rumors', ah ? `Scouts report ${ah.name} of the ${FACTIONS[aiById(ah.ai).fac].name} ${dist(ah, G.hero)} tiles from ${G.hero.name}.` : 'Scouts see no rival army on the roads.']; },
+      () => { const o = G.objs[Math.floor(Math.random() * G.objs.length)]; markView(o.x, o.y, 10, false); renderAll(); return ['🗺️', 'Scouts Return', 'Your scouts bring back maps of a distant region: part of the unexplored land is revealed.']; },
       () => { const h = rh(); h.kn++; return ['📖', 'Visiting Scholar', `A wandering scholar tutors ${h.name}: +1 Knowledge.`]; },
       () => { const h = rh(), a = h.army.find(Boolean); if (!a || a.n < 8) return ['🍀', 'Quiet Day', 'Nothing of note happens.']; const lost = Math.max(1, Math.floor(a.n * 0.06)); a.n -= lost; return ['🤒', 'Camp Fever', `Sickness spreads in ${h.name}'s camp: ${lost} ${C[a.t].n}s fall ill and leave.`]; },
     ];
@@ -1306,6 +1460,7 @@
     const parts = RES.filter(k => gain[k]).map(k => `+${gain[k]}${RES_ICON[k]}`);
     if ((G.day - 1) % 7 === 0) {
       for (const tw of G.objs) if (tw.t === 'town') for (let i = 1; i <= 7; i++) if (tw.b[i]) tw.avail[i] = (tw.avail[i] || 0) + GROWTH[i - 1];
+      for (const dw of G.objs) if (dw.t === 'dwelling' && dw.owner === 0) dw.avail += GROWTH[dw.tier - 1];
       for (const o of G.objs) if (o.t === 'fort' && o.owner === 0) {
         const mil = CASTLE_TIERS[0];
         const s = o.garrison.find(a => a && a.t === mil);
@@ -1350,6 +1505,7 @@
     <p><b>Events:</b> every new week brings a weekly event (double growth for a creature, plague, bountiful harvest, merchant caravans, heroic training...) and most days a random event may strike — treasure, bandits, mercenaries, storms, rumors.</p>
     <p><b>Territory:</b> the map is split into zones, each ruled by a fort. Capture a fort to own the zone: +${FORT_INCOME} gold/day, your mines there pay, +${MILITIA} militia/week. <b>Station troops in forts</b> — the enemy hero raids undefended forts.</p>
     <p><b>Town:</b> Town Hall levels 1-5 raise income and unlock dwellings (tiers 3-7) and creature upgrades (up to 5 levels). Mage Guild teaches spells, the Marketplace trades resources, the Tavern hires up to ${MAX_HEROES} heroes.</p>
+    <p><b>Fog of war:</b> unexplored land is black; explored land you no longer see is dimmed and hides monsters and rival heroes. Heroes see 6 tiles (+1 per Scouting rank), towns 9, forts 6. Observation towers and scouts reveal large areas. <b>Adventure sites:</b> dwellings (capture, then recruit weekly), windmills / water wheels / gardens (weekly resources), learning stones (experience), shrines (spells), creature banks (guarded treasure), monoliths (teleport pairs), seers (trade resources for an artifact) and springs (mana, movement or luck).</p>
     <p><b>Defenses:</b> build Fortifications (Citadel → Castle → Fortress) to strengthen walls, gate and arrow towers, and a Minefield for hidden mines in front of the walls — mines hurt and halt attackers. When you defend, you can also lay mines yourself (💣 button, key M); even without a minefield you get ${EMERGENCY_MINES}. Forts can be fortified too.</p>
     <p><b>Skills &amp; artifacts:</b> each hero starts with two skills and, at every level-up, picks one of two offered skills (Basic → Advanced → Expert; up to ${MAX_SKILLS} skills; the offers favour the hero's class). Artifacts are equipment: they have slots (head, neck, armor, weapon, shield, feet, cape, two rings), tiers, special effects (movement, mana, morale, luck, extra skill ranks such as Water Walk) and <b>sets</b> that give bonuses when completed. Use 🎒 Equipment on the hero panel; heroes standing together can hand artifacts to each other.</p>
     <p><b>Battle:</b> click a green hex to move, click an enemy to attack (archers shoot — +25% at close range, weaker the farther the target, and <b>half damage beyond 10 hexes: the broken arrow 💔</b>; flyers ignore obstacles). Your hero stands beside the field: cast one spell per round and make one Hero Strike per round. Castle assaults are <b>sieges</b>: break the gate or walls (your catapult helps), beware arrow towers and the moat; flyers can cross the walls. Level-ups let you pick one of two perks.</p>`;
@@ -1367,11 +1523,13 @@
     const sizes = Object.entries(SIZES).map(([k, s]) => `<button class="${st.size === k ? 'primary' : ''}" data-s="${k}">${s.name} (${s.w}×${s.h})</button>`).join(' ');
     $('mbox').innerHTML = `<h2>Choose your map <span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid two">${cards}</div>
       <p>Size: ${sizes}</p>
+      <p>Fog of war: ${[[true, 'On'], [false, 'Off']].map(([v, n]) => `<button class="${(st.fog !== false) === v ? 'primary' : ''}" data-fog="${v}">${n}</button>`).join(' ')} <span class="small">Unexplored land is hidden; scouts, towers and your heroes reveal it.</span></p>
       <p>Rivals: ${[0, 1, 2, 3, 4].map(n => `<button class="${(st.ais || 0) === n ? 'primary' : ''}" data-a="${n}">${n ? n : 'Auto'}</button>`).join(' ')} <span class="small">AI players that expand and fight you.</span></p><p>Seed: <input id="mSeed" placeholder="empty = random map" value="${st.seed}" style="width:230px;background:#120d08;color:#f1e6c4;border:1px solid #6b4f24;padding:4px"> <span class="small">Share a seed to replay the same map.</span></p>
       <div class="mb"><button id="sBack">Back</button><button class="primary" id="sNext">Next: castle</button></div>`;
     const keep = () => { st.seed = $('mSeed').value; };
     $('mbox').querySelectorAll('[data-m]').forEach(c => c.onclick = () => { keep(); st.preset = c.dataset.m; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-s]').forEach(b => b.onclick = () => { keep(); st.size = b.dataset.s; showMapSelect(diff, st); });
+    $('mbox').querySelectorAll('[data-fog]').forEach(b => b.onclick = () => { keep(); st.fog = b.dataset.fog === 'true'; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-a]').forEach(b => b.onclick = () => { keep(); st.ais = +b.dataset.a; showMapSelect(diff, st); });
     $('sBack').onclick = showDifficultySelect;
     $('sNext').onclick = () => { keep(); showFactionSelect(diff, { ...st }); };

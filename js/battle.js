@@ -50,6 +50,16 @@ const Battle = (() => {
   const adjEnemy = (s) => nbrs(s.c, s.r).some(([c, r]) => { const o = stackAt(c, r); return o && o.side !== s.side; });
   const canShoot = (s) => C[s.t].shoot && s.ammo > 0 && !adjEnemy(s);
 
+  // shooters: stronger point blank, weaker far away, half damage beyond 10 hexes ("broken arrow")
+  function rangeMul(a, d) {
+    const dd = hexDist(a, d);
+    if (dd > 10) return 0.5;
+    return Math.max(0.85, 1.25 - 0.05 * Math.max(0, dd - 2));
+  }
+  function rangeNote(a, d) {
+    const dd = hexDist(a, d), m = rangeMul(a, d);
+    return dd > 10 ? `  💔 Broken arrow: ${dd} hexes — half damage` : m >= 1.1 ? `  🎯 Close range (+${Math.round((m - 1) * 100)}%)` : m < 0.95 ? `  ↘ Long range (${Math.round((m - 1) * 100)}%)` : '';
+  }
   function baseDmg(a, avg) {
     const c = C[a.t];
     if (a.bless) return a.n * c.hi;
@@ -67,6 +77,7 @@ const Battle = (() => {
     let m = A >= D ? 1 + 0.05 * Math.min(A - D, 60) : 1 - 0.025 * Math.min(D - A, 28);
     if (melee && c.shoot && !abil(a, 'nopen')) m *= 0.5;
     if (hates(a, d)) m *= 2;
+    if (!melee && c.shoot) m *= rangeMul(a, d);
     if (melee && joust) m *= 1 + 0.05 * joust;
     if (a.side === 0) m *= 1 + 0.1 * perk(melee ? 'offense' : 'archery');
     return Math.max(1, Math.floor(base * m));
@@ -688,7 +699,8 @@ const Battle = (() => {
     if (B.cur && B.cur.side === 0 && h && stackAt(h.c, h.r) && stackAt(h.c, h.r).side === 1 && B.input) {
       const e = stackAt(h.c, h.r), a = B.cur;
       const d = calcDmg(a, e, !canShoot(a), true), kills = Math.floor(Math.min(d, totalHp(e)) / C[e.t].hp);
-      ctx.fillStyle = '#ffb3a8'; ctx.fillText(`${canShoot(a) ? 'Shoot' : 'Attack'}: ~${d} dmg (~${kills} kills)`, 14, 630);
+      ctx.fillStyle = '#ffb3a8'; ctx.fillText(`${canShoot(a) ? 'Shoot' : 'Attack'}: ~${d} dmg (~${kills} kills)${canShoot(a) ? rangeNote(a, e) : ''}`, 14, 630);
+      if (canShoot(a) && hexDist(a, e) > 10) { const ep = hexPx(e.c, e.r); ctx.font = '22px ' + FONT; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText('💔', ep.x + 18, ep.y - 22); ctx.textAlign = 'left'; ctx.font = '14px sans-serif'; }
     } else {
       const at = abilityText(s.t);
       if (at) { ctx.fillStyle = '#bfe3a8'; ctx.fillText('★ ' + at, 14, 630); }

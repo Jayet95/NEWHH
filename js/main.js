@@ -1059,6 +1059,7 @@
       ai.gold -= HIRE_COST; const t = towns[0]; spawnAiHero(ai, t); aiRecruit(ai, t);
     }
   }
+  const defPower = (o) => (o.owner !== null ? armyPower(o.garrison) : armyPower(o.guard || [])) + heroesAt(o.x, o.y).reduce((s, hh) => s + armyPower(hh.army), 0);
   function aiTargets(ai, h, power) {
     const R = 22 * sizeMv(), list = [];
     for (const o of G.objs) {
@@ -1070,8 +1071,8 @@
         case 'pile': sc = 350 / (d + 4); break;
         case 'chest': sc = 500 / (d + 4); break;
         case 'mine': { const gp = armyPower(o.guard || []); if (power >= gp * 1.2) sc = 900 / (d + 6); break; }
-        case 'fort': { const dp = o.owner ? armyPower(o.garrison) : armyPower(o.guard); if (power >= dp * 1.3 + 1) sc = 1600 / (d + 8); break; }
-        case 'town': { const dp = o.owner ? armyPower(o.garrison) : armyPower(o.guard || []); if (power >= dp * 1.4 + 1) sc = 4000 / (d + 10); break; }
+        case 'fort': { const dp = defPower(o); if (power >= dp * 1.3 + 1) sc = 1600 / (d + 8); break; }
+        case 'town': { const dp = defPower(o); if (power >= dp * 1.4 + 1) sc = 4000 / (d + 10); break; }
       }
       if (sc > 0) list.push({ x: o.x, y: o.y, score: sc });
     }
@@ -1256,7 +1257,7 @@
     <p><b>Territory:</b> the map is split into zones, each ruled by a fort. Capture a fort to own the zone: +${FORT_INCOME} gold/day, your mines there pay, +${MILITIA} militia/week. <b>Station troops in forts</b> — the enemy hero raids undefended forts.</p>
     <p><b>Town:</b> Town Hall levels 1-5 raise income and unlock dwellings (tiers 3-7) and creature upgrades (up to 5 levels). Mage Guild teaches spells, the Marketplace trades resources, the Tavern hires up to ${MAX_HEROES} heroes.</p>
     <p><b>Defenses:</b> build Fortifications (Citadel → Castle → Fortress) to strengthen walls, gate and arrow towers, and a Minefield for hidden mines in front of the walls — mines hurt and halt attackers. When you defend, you can also lay mines yourself (💣 button, key M); even without a minefield you get ${EMERGENCY_MINES}. Forts can be fortified too.</p>
-    <p><b>Battle:</b> click a green hex to move, click an enemy to attack (archers shoot, flyers ignore obstacles). Your hero stands beside the field: cast one spell per round and make one Hero Strike per round. Castle assaults are <b>sieges</b>: break the gate or walls (your catapult helps), beware arrow towers and the moat; flyers can cross the walls. Level-ups let you pick one of two perks.</p>`;
+    <p><b>Battle:</b> click a green hex to move, click an enemy to attack (archers shoot — +25% at close range, weaker the farther the target, and <b>half damage beyond 10 hexes: the broken arrow 💔</b>; flyers ignore obstacles). Your hero stands beside the field: cast one spell per round and make one Hero Strike per round. Castle assaults are <b>sieges</b>: break the gate or walls (your catapult helps), beware arrow towers and the moat; flyers can cross the walls. Level-ups let you pick one of two perks.</p>`;
   function refreshTitle() { $('tCont').disabled = !localStorage.getItem(SAVE); }
   function showDifficultySelect() {
     const cards = Object.entries(DIFFICULTY).map(([k, d]) => `<div class="card" data-d="${k}"><div class="big">${d.icon}</div><b>${d.name}</b><div class="small">${d.desc}</div>

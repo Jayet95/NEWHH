@@ -150,13 +150,15 @@ const Battle = (() => {
     }
   }
   async function doMove(s, hex) {
-    const path = C[s.t].fly ? [{ c: s.c, r: s.r }, hex] : pathTo(B.reach, hex);
+    const fly = C[s.t].fly, path = fly ? [{ c: s.c, r: s.r }, hex] : pathTo(B.reach, hex);
     for (let i = 1; i < path.length; i++) {
       const p = hexPx(path[i].c, path[i].r);
-      await tweenTo(s, p.x, p.y, C[s.t].fly ? 280 : 90);
+      await tweenTo(s, p.x, p.y, fly ? 280 : 90);
+      if (!fly && B.mines && B.mines.has(key(path[i].c, path[i].r))) { s.c = path[i].c; s.r = path[i].r; detonate(s); return; }
     }
     s.c = hex.c; s.r = hex.r;
     const p = hexPx(s.c, s.r); s.px = p.x; s.py = p.y;
+    if (fly && B.mines && B.mines.has(key(s.c, s.r))) detonate(s);
   }
   // luck: each point = 4% chance of a lucky (double) or unlucky (half) strike
   function luckMul(s) {
@@ -180,6 +182,7 @@ const Battle = (() => {
   async function doMelee(s, e, spot) {
     const origin = { c: s.c, r: s.r }, moved = hexDist(s, spot);
     if (spot.c !== s.c || spot.r !== s.r) await doMove(s, spot);
+    if (s.dead || s.c !== spot.c || s.r !== spot.r) return;
     const targets = abil(s, 'allAdj') ? adjStacks(s).filter(o => o.side !== s.side) : [e];
     const strikes = abil(s, 'dstrike') ? 2 : 1, joust = abil(s, 'joust') ? moved : 0;
     for (const tgt of targets) {
@@ -216,6 +219,7 @@ const Battle = (() => {
   const structDmg = (a, ranged) => Math.max(1, Math.floor(baseDmg(a, true) * (ranged ? 0.5 : 0.8) * (a.side === 0 ? 1 + 0.5 * perk('ballistics') : 1)));
   async function doStructMelee(s, st, spot) {
     if (spot.c !== s.c || spot.r !== s.r) await doMove(s, spot);
+    if (s.dead || s.c !== spot.c || s.r !== spot.r) return;
     hitStruct(st, structDmg(s, false), `${C[s.t].n} batters`);
     await sleep(300);
   }
@@ -226,13 +230,42 @@ const Battle = (() => {
     hitStruct(st, structDmg(s, true), `${C[s.t].n} shoots`);
     await sleep(240);
   }
-  function setupSiege(dside) {
-    B.siege = { dside };
+  function setupSiege(sg) {
+    const dside = sg.dside, fl = FORT_LEVELS[Math.max(0, Math.min(3, sg.fort || 0))];
+    B.siege = { dside, fort: sg.fort || 0, minel: sg.minel || 0 };
+    B.towerMul = fl.tower;
     const cw = dside === 1 ? 9 : 5, mc = dside === 1 ? 8 : 6;
-    ['wall', 'wall', 'tower', 'wall', 'wall', 'gate', 'wall', 'wall', 'tower', 'wall', 'wall'].forEach((k, r) =>
-      B.walls.set(key(cw, r), { k, hp: STRUCT[k].hp, max: STRUCT[k].hp, c: cw, r }));
+    ['wall', 'wall', 'tower', 'wall', 'wall', 'gate', 'wall', 'wall', 'tower', 'wall', 'wall'].forEach((k, r) => {
+      const hp = Math.round(STRUCT[k].hp * fl.hp);
+      B.walls.set(key(cw, r), { k, hp, max: hp, c: cw, r });
+    });
     for (let r = 0; r < BH; r++) if (r < 4 || r > 6) B.moat.add(key(mc, r));
     B.cw = cw;
+    B.mines = new Map(); B.mineStock = sg.mines || 0; B.mineReserve = 0; B.mineDmg = 60 + 20 * (sg.minel || 0);
+  }
+  // mines lie on open ground in front of the walls
+  const inMineZone = (c) => B.siege.dside === 1 ? (c >= 2 && c <= B.cw - 2) : (c >= B.cw + 2 && c <= 12);
+  const freeMineHex = (c, r) => B.siege && inMineZone(c) && !blockedGround(c, r) && !stackAt(c, r) && !B.mines.has(key(c, r));
+  function placeMines() {
+    if (!B.siege) return;
+    const playerDef = B.siege.dside === 0, stock = B.mineStock, auto = playerDef ? Math.ceil(stock / 2) : stock;
+    B.mineReserve = playerDef ? Math.floor(stock / 2) + (stock ? 0 : EMERGENCY_MINES) : 0;
+    for (let i = 0, tries = 0; i < auto && tries < 300; tries++) {
+      const c = B.siege.dside === 1 ? 2 + Math.floor(Math.random() * (B.cw - 3)) : B.cw + 2 + Math.floor(Math.random() * (12 - B.cw - 1)), r = Math.floor(Math.random() * BH);
+      if (freeMineHex(c, r)) { B.mines.set(key(c, r), { r: 1 }); i++; }
+    }
+  }
+  function detonate(s) {
+    const k = key(s.c, s.r); B.mines.delete(k);
+    const p = hexPx(s.c, s.r); s.px = p.x; s.py = p.y;
+    B.fx.push({ x: p.x, y: p.y - 6, txt: '💥', col: '#fff', t0: performance.now() });
+    sfx('crash'); hit(s, B.mineDmg, '💣 A mine explodes under');
+  }
+  function layMine(h) {
+    if (!B.siege || B.siege.dside !== 0 || B.mineReserve <= 0 || B.mineUsed) return;
+    if (!freeMineHex(h.c, h.r)) return toast('Mines go on free open ground in front of the walls.');
+    B.mines.set(key(h.c, h.r), { r: 1 }); B.mineReserve--; B.mineUsed = true; B.spell = null;
+    log('💣 A mine is laid.'); sfx('click'); refreshButtons();
   }
   async function doShoot(s, e) {
     s.ammo--; sfx('shoot');
@@ -267,7 +300,7 @@ const Battle = (() => {
     if (B.round > 60) { log('Stalemate — the attackers withdraw.'); finish(false, false); return; }
     for (const s of alive()) { s.ret = true; s.waited = false; }
     B.queue = alive().sort((a, b) => speedOf(b) - speedOf(a) || a.side - b.side);
-    B.waitQ = []; B.strikeUsed = false;
+    B.waitQ = []; B.strikeUsed = false; B.mineUsed = false;
     log(`— Round ${B.round} —`);
     if (B.siege) {
       for (let i = 0; i < 2; i++) {
@@ -280,7 +313,7 @@ const Battle = (() => {
         const atk = alive(1 - B.siege.dside);
         for (const st of [...B.walls.values()]) if (st.k === 'tower' && atk.length) {
           const tg = atk.filter(a => !a.dead)[Math.floor(Math.random() * atk.length)];
-          if (tg) hit(tg, 25 + Math.floor(Math.random() * 20), '🗼 Arrow Tower hits');
+          if (tg) hit(tg, Math.round((25 + Math.floor(Math.random() * 20)) * (B.towerMul || 1)), '🗼 Arrow Tower hits');
         }
       }
     }
@@ -381,6 +414,7 @@ const Battle = (() => {
       B.pend = null;
     }
     const s = B.cur, t = stackAt(h.c, h.r);
+    if (B.spell === '__mine') { layMine(h); return; }
     if (B.spell === '__strike') { heroStrike(t); return; }
     if (B.spell) { castSpell(B.spell, t); return; }
     const st = structAt(h.c, h.r);
@@ -462,6 +496,8 @@ const Battle = (() => {
     $('bDef').disabled = !mine;
     $('bSpell').disabled = !mine || B.castUsed || !B.hero.spells.length || B.hero.mana < 5;
     $('bHero').disabled = !mine || B.strikeUsed;
+    const canMine = !!B.siege && B.siege.dside === 0 && B.mineReserve > 0;
+    $('bMine').classList.toggle('hide', !canMine); $('bMine').disabled = !mine || B.mineUsed; $('bMine').textContent = `💣 Lay mine (${B.mineReserve || 0})`;
     $('bFlee').disabled = !B.canRetreat;
     $('bAuto').textContent = B.auto ? '⏸ Manual' : '⏩ Auto';
     $('bManaB').textContent = `🔷 ${B.hero.mana}${B.castUsed ? ' (cast used)' : ''}`;
@@ -485,7 +521,7 @@ const Battle = (() => {
     cv.addEventListener('contextmenu', (e) => { e.preventDefault(); if (B) B.spell = null; });
     document.addEventListener('keydown', (e) => {
       if (!B || B.over || e.ctrlKey || e.metaKey || e.altKey) return;
-      const k = e.key.toLowerCase(), map = { w: 'bWait', d: 'bDef', s: 'bSpell', h: 'bHero', a: 'bAuto' };
+      const k = e.key.toLowerCase(), map = { w: 'bWait', d: 'bDef', s: 'bSpell', h: 'bHero', a: 'bAuto', m: 'bMine' };
       if (k === 'escape') { B.spell = null; $('spells').classList.add('hide'); return; }
       if (map[k] && !$(map[k]).disabled) { e.preventDefault(); $(map[k]).onclick(); }
     });
@@ -493,6 +529,7 @@ const Battle = (() => {
     $('bDef').onclick = () => B && playerAct(async () => { B.cur.defb = true; log(`${C[B.cur.t].n} defends.`); });
     $('bSpell').onclick = () => B && B.input && openSpells();
     $('bHero').onclick = () => { if (B && B.input && !B.strikeUsed) { B.spell = '__strike'; toast('Hero Strike: pick an enemy stack'); } };
+    $('bMine').onclick = () => { if (B && B.input && B.siege && B.mineReserve > 0 && !B.mineUsed) { B.spell = '__mine'; toast('Lay a mine: pick free ground in front of the walls'); } };
     $('bAuto').onclick = () => {
       if (!B) return; B.auto = !B.auto; refreshButtons();
       if (B.auto && B.input && !B.busy) runAI(B.cur);
@@ -532,6 +569,8 @@ const Battle = (() => {
       ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1; ctx.stroke();
       if (B.obs.has(k)) { ctx.fillStyle = '#fff'; emoji(B.obs.get(k), p.x, p.y, 30); }
       if (B.siege && B.moat.has(k)) { ctx.fillStyle = 'rgba(255,255,255,.5)'; emoji('≈', p.x, p.y, 20); }
+      if (B.siege && B.mines && B.mines.has(k) && B.siege.dside === 0) { ctx.fillStyle = '#fff'; emoji('💣', p.x, p.y + 2, 18); }
+      if (B.spell === '__mine' && freeMineHex(c, r)) { hexPath(p.x, p.y, HR - 4); ctx.strokeStyle = 'rgba(255,200,80,.8)'; ctx.lineWidth = 2; ctx.stroke(); }
       const st = structAt(c, r);
       if (st) {
         hexPath(p.x, p.y, HR - 1);
@@ -692,7 +731,7 @@ const Battle = (() => {
         });
       };
       mk(0, opts.army); mk(1, opts.enemy);
-      if (opts.siege) setupSiege(opts.siege.dside);
+      if (opts.siege) setupSiege(opts.siege);
       const icons = ['🪨', '🌲', '🪵'];
       const lo = !opts.siege ? 3 : opts.siege.dside === 1 ? 2 : 8, span = !opts.siege ? 9 : 5, want = opts.siege ? 5 : 11;
       for (let i = 0, tries = 0; i < want && tries < 100; tries++) {
@@ -700,6 +739,7 @@ const Battle = (() => {
         if (B.obs.has(key(c, r)) || stackAt(c, r)) continue;
         B.obs.set(key(c, r), icons[i % 3]); i++;
       }
+      placeMines();
       $('blog').innerHTML = ''; $('btitle').textContent = opts.title || 'Battle';
       document.body.classList.add('inbattle');
       log(opts.siege ? (opts.siege.dside === 1 ? '🏰 Siege! Break the gate, cross the drawbridge, beware the towers.' : '🏰 The castle is under siege — hold the walls!') : 'Battle begins!');

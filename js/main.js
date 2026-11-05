@@ -104,6 +104,7 @@
     t.avail = { 1: GROWTH[0], 2: GROWTH[1] };
     if (level) t.avail[3] = GROWTH[2];
     if (!t.garrison) t.garrison = emptyArmy();
+    t.fort = level ? 1 : 0; t.minel = 0;
   }
   function newGame(faction, heroId, diff = 'normal', map = {}) {
     const D = DIFFICULTY[diff], r = (n) => Math.max(1, Math.round(n * D.res));
@@ -552,7 +553,7 @@
     if (o.t === 'fort') {
       if (o.owner === 0) return openFort(o, h);
       const army = defendersOf(o, eh);
-      if (army.length && !(await fight(h, army, { att: eh ? eh.att : o.owner ? 4 : 0, def: eh ? eh.def : o.owner ? 4 : 0 }, `Siege of ${o.name}`, { dside: 1 }, eh))) { if (eh) shrinkArmy(eh.army, 0.5); return; }
+      if (army.length && !(await fight(h, army, { att: eh ? eh.att : o.owner ? 4 : 0, def: eh ? eh.def : o.owner ? 4 : 0 }, `Siege of ${o.name}`, siegeOf(o, 1), eh))) { if (eh) shrinkArmy(eh.army, 0.5); return; }
       if (eh) removeAiHero(eh);
       o.owner = 0; o.guard = []; o.garrison = emptyArmy();
       renderAll();
@@ -606,7 +607,7 @@
   async function conquerTown(h, o, hero) {
     const defenders = defendersOf(o, hero);
     const cmd = hero ? { name: hero.name, icon: hero.icon, att: hero.att, def: hero.def } : { name: 'Garrison commander', icon: '🏰', att: 4, def: 4 };
-    if (defenders.length && !(await fight(h, defenders, { att: cmd.att, def: cmd.def }, `Siege of ${o.name}`, { dside: 1 }, cmd))) { if (hero) shrinkArmy(hero.army, 0.5); return; }
+    if (defenders.length && !(await fight(h, defenders, { att: cmd.att, def: cmd.def }, `Siege of ${o.name}`, siegeOf(o, 1), cmd))) { if (hero) shrinkArmy(hero.army, 0.5); return; }
     if (hero) removeAiHero(hero);
     takeTown(o, 0);
     await showModal(`<h2>🏰 ${o.name} captured!</h2><p>A new ${FACTIONS[o.fac].name} town joins your realm. Recruit its creatures, build up its Town Hall, and garrison it against the rivals.</p>`);
@@ -654,7 +655,7 @@
   async function fightAiHero(h, e, playerAttacks) {
     const atTown = heroAtTown(h), fo = objAt(G, h.x, h.y), atFort = fo && fo.t === 'fort' && fo.owner === 0;
     if (!armyCount(h)) { retreat(h); return false; }
-    const siege = !playerAttacks && (atTown || atFort) ? { dside: 0 } : null;
+    const siege = !playerAttacks && (atTown || atFort) ? siegeOf(townAt(h.x, h.y) || fo, 0) : null;
     const win = await fight(h, e.army, { att: e.att, def: e.def }, `${e.name}'s army`, siege, e);
     if (win) { removeAiHero(e); toast(`${e.name} is defeated!`); return true; }
     shrinkArmy(e.army, 0.5);
@@ -663,16 +664,17 @@
   function removeAiHero(e) { const ai = aiById(e.ai); if (ai) { ai.heroes = ai.heroes.filter(x => x !== e); ai.spawnWait = 3; } }
 
   // ---------- generic army exchange ----------
-  function openExchange(title, note, A, nameA, B, nameB, back) {
+  function openExchange(title, note, A, nameA, B, nameB, back, extra) {
     let sel = null;
     const arr = (r) => r === 'a' ? A : B;
     const render = () => {
       const row = (a, rk) => a.map((s, i) => `<button class="slot${s ? '' : ' empty'}${sel && sel.r === rk && sel.i === i ? ' sel' : ''}" data-r="${rk}" data-i="${i}">${s ? `${C[s.t].i}<small>${s.n}</small>` : ''}</button>`).join('');
-      $('mbox').innerHTML = `<h2>${title}</h2><div class="small">${note}</div>
+      $('mbox').innerHTML = `<h2>${title}</h2><div class="small">${note}</div>${extra ? extra.html : ''}
         <h4>${nameA}</h4><div class="armyrow">${row(A, 'a')}</div><h4>${nameB}</h4><div class="armyrow">${row(B, 'b')}</div>
         <div class="small">Click a slot, then another: move / merge / swap.</div>
         <div class="mb"><button class="primary" id="xClose">${back ? 'Back' : 'Close'}</button></div>`;
       $('xClose').onclick = () => { if (back) back(); else { $('modal').classList.add('hide'); renderAll(); } };
+      if (extra) extra.bind();
       $('mbox').querySelectorAll('.slot').forEach(b => b.onclick = () => {
         const r = b.dataset.r, i = +b.dataset.i;
         if (!sel) { if (arr(r)[i]) sel = { r, i }; }
@@ -854,6 +856,12 @@
         <div class="acts">${!coastal ? '' : t.b.ship ? `<button data-boat="1" ${G.boats.length >= MAX_BOATS ? 'disabled' : ''}>⛵ Build boat</button>` : '<button data-build="ship">Build</button>'}</div></div>
       <div class="trow"><div class="ic">🛡️</div><div><b>Garrison</b><br><span class="small">${armyList(t.garrison, false) || 'No troops stationed.'} The garrison defends the town when no hero is inside${here ? '' : ' (bring a hero to move troops)'}.</span></div>
         <div class="acts"><button data-garr="1">Manage garrison</button></div></div>
+      <div class="trow"><div class="ic">🧱</div><div><b>${FORT_LEVELS[t.fort || 0].n}</b> <span class="stars">${starStr(t.fort || 0, 3)}</span><br>
+        <span class="small">Walls, gate and arrow towers are ×${FORT_LEVELS[t.fort || 0].hp} as strong in a siege${(t.fort || 0) < 3 ? ` — next: ${FORT_LEVELS[(t.fort || 0) + 1].n} (×${FORT_LEVELS[(t.fort || 0) + 1].hp} walls, ×${FORT_LEVELS[(t.fort || 0) + 1].tower} tower fire)` : ''}.</span></div>
+        <div class="acts">${(t.fort || 0) < 3 ? `<button data-fortify="1" title="${fmtCost(FORT_LEVELS[(t.fort || 0) + 1].cost)}">⬆ ${fmtCost(FORT_LEVELS[(t.fort || 0) + 1].cost)}</button>` : '<span class="small">MAX</span>'}</div></div>
+      <div class="trow"><div class="ic">💣</div><div><b>${MINE_LEVELS[t.minel || 0].n}</b> <span class="stars">${starStr(t.minel || 0, 3)}</span><br>
+        <span class="small">Hidden mines (${MINE_LEVELS[t.minel || 0].stock}) in front of the walls hurt and halt attackers. A defending hero can lay ${EMERGENCY_MINES} extra mines even without a minefield${(t.minel || 0) < 3 ? ` — next: ${MINE_LEVELS[(t.minel || 0) + 1].n} (${MINE_LEVELS[(t.minel || 0) + 1].stock} mines)` : ''}.</span></div>
+        <div class="acts">${(t.minel || 0) < 3 ? `<button data-minefield="1" title="${fmtCost(MINE_LEVELS[(t.minel || 0) + 1].cost)}">⬆ ${fmtCost(MINE_LEVELS[(t.minel || 0) + 1].cost)}</button>` : '<span class="small">MAX</span>'}</div></div>
       <div class="trow"><div class="ic">🍺</div><div><b>Tavern</b><br><span class="small">Heroes ${G.heroes.length}/${MAX_HEROES}. Hire more heroes and exchange troops between heroes in town.</span></div>
         <div class="acts"><button data-tavern="1">Hire heroes</button>${heroesAt(t.x, t.y).length > 1 ? '<button data-xhero="1">Exchange troops</button>' : ''}</div></div>
       <div class="small" style="margin-top:8px">${RES.map(k => RES_ICON[k] + ' ' + G.res[k]).join('  ')}</div>
@@ -864,6 +872,14 @@
     const again = () => { openTown(t); renderAll(); };
     const q = (sel, fn) => $('mbox').querySelectorAll(sel).forEach(fn);
     q('[data-tab]', b => b.onclick = () => openTown(mt[+b.dataset.tab]));
+    q('[data-fortify]', b => b.onclick = () => {
+      const nx = FORT_LEVELS[(t.fort || 0) + 1]; if (!canAfford(G.res, nx.cost)) return toast('Not enough resources.');
+      pay(G.res, nx.cost); t.fort = (t.fort || 0) + 1; sfx('build'); toast(`${nx.n} built — the walls are stronger.`); again();
+    });
+    q('[data-minefield]', b => b.onclick = () => {
+      const nx = MINE_LEVELS[(t.minel || 0) + 1]; if (!canAfford(G.res, nx.cost)) return toast('Not enough resources.');
+      pay(G.res, nx.cost); t.minel = (t.minel || 0) + 1; sfx('build'); toast(`${nx.n} laid: ${nx.stock} mines guard the approach.`); again();
+    });
     q('[data-garr]', b => b.onclick = () => {
       if (!th) { toast('A hero must be in the town to move troops.'); return; }
       openExchange(`🛡️ ${t.name} garrison`, 'The garrison defends the town when no hero is inside.', t.garrison, 'Garrison', th.army, th.name, () => openTown(t));
@@ -937,19 +953,29 @@
   function openFort(f, h) {
     const hs = heroesAt(f.x, f.y), hero = hs.includes(h) ? h : hs[0];
     const note = `+${FORT_INCOME} 🪙/day · zone mine income · +${MILITIA} militia/week · the garrison fights enemy heroes inside the walls with +3 Defense`;
+    const fl = f.fort || 0, ml = f.minel || 0, fc = fl < FORT_MAX_FORT ? FORT_WALL_COST[fl + 1] : null, mc = ml < FORT_MAX_MINE ? FORT_MINE_COST[ml + 1] : null;
+    const extra = {
+      html: `<div class="trow" style="grid-template-columns:30px 1fr auto"><div class="ic">🧱</div><div><b>${FORT_LEVELS[fl].n}</b> <span class="small">walls ×${FORT_LEVELS[fl].hp}</span></div><div class="acts">${fc ? `<button data-fw="1">⬆ ${fmtCost(fc)}</button>` : '<span class="small">MAX</span>'}</div></div>
+        <div class="trow" style="grid-template-columns:30px 1fr auto"><div class="ic">💣</div><div><b>${MINE_LEVELS[ml].n}</b> <span class="small">${MINE_LEVELS[ml].stock} hidden mines</span></div><div class="acts">${mc ? `<button data-fm="1">Build ${fmtCost(mc)}</button>` : '<span class="small">MAX</span>'}</div></div>`,
+      bind: () => {
+        $('mbox').querySelectorAll('[data-fw]').forEach(b => b.onclick = () => { if (!canAfford(G.res, fc)) return toast('Not enough resources.'); pay(G.res, fc); f.fort = fl + 1; sfx('build'); renderAll(); openFort(f, hero || h); });
+        $('mbox').querySelectorAll('[data-fm]').forEach(b => b.onclick = () => { if (!canAfford(G.res, mc)) return toast('Not enough resources.'); pay(G.res, mc); f.minel = ml + 1; sfx('build'); renderAll(); openFort(f, hero || h); });
+      } };
     if (!hero) {
-      $('mbox').innerHTML = `<h2>🏯 ${f.name}</h2><div class="small">${note}</div><p>Garrison: ${armyList(f.garrison, false) || 'empty'}</p><p class="small">Visit the fort with a hero to transfer troops.</p><div class="mb"><button class="primary" id="fClose">Close</button></div>`;
-      $('fClose').onclick = () => $('modal').classList.add('hide'); $('modal').classList.remove('hide'); return;
+      $('mbox').innerHTML = `<h2>🏯 ${f.name}</h2><div class="small">${note}</div>${extra.html}<p>Garrison: ${armyList(f.garrison, false) || 'empty'}</p><p class="small">Visit the fort with a hero to transfer troops.</p><div class="mb"><button class="primary" id="fClose">Close</button></div>`;
+      $('fClose').onclick = () => $('modal').classList.add('hide'); extra.bind(); $('modal').classList.remove('hide'); return;
     }
-    openExchange(`🏯 ${f.name}`, note, f.garrison, 'Garrison', hero.army, hero.name);
+    openExchange(`🏯 ${f.name}`, note, f.garrison, 'Garrison', hero.army, hero.name, undefined, extra);
   }
+  // siege parameters for a structure: wall strength (fortifications) and mines (minefield); dside = who defends (1 = the opposing side of the player)
+  const siegeOf = (o, dside) => ({ dside, fort: (o && o.fort) || 0, minel: (o && o.minel) || 0, mines: o && o.minel ? MINE_LEVELS[o.minel].stock : 0 });
   // a rival hero attacks a player-owned fort or town: the garrison defends in a real siege battle, an empty one falls at once
   async function defendStructure(o, ah) {
     const gar = o.garrison;
     if (!gar.some(Boolean)) { await aiCapture(o, ah); return false; }
     centerOn(o.x, o.y); toast(`${ah.name} assaults ${o.name}!`);
     const res = await Battle.run({ hero: { att: 0, def: 3, sp: 0, mana: 0, spells: [], perks: {}, name: 'Garrison', icon: '🛡️' }, army: gar, enemy: ah.army.map(a => a && ({ ...a })),
-      eStats: { att: ah.att, def: ah.def }, eHero: ah, title: `Defending ${o.name}`, siege: { dside: 0 }, canRetreat: false });
+      eStats: { att: ah.att, def: ah.def }, eHero: ah, title: `Defending ${o.name}`, siege: siegeOf(o, 0), canRetreat: false });
     res.survivors.forEach((n, i) => { if (gar[i]) { if (n > 0) gar[i].n = n; else gar[i] = null; } });
     if (res.win) { removeAiHero(ah); toast(`${o.name} held! ${ah.name} is slain.`); return true; }
     shrinkArmy(ah.army, 0.5);
@@ -1006,6 +1032,9 @@
       const lv = t.up[tier];
       if (t.b[tier] && lv < MAX_LV && hall >= UP_HALL[lv + 1] && afford(upgradeCost(tier, lv + 1))) { ai.gold -= goldEq(upgradeCost(tier, lv + 1)); t.up[tier]++; return true; }
     }
+    const fl = t.fort || 0, ml = t.minel || 0;
+    if (fl < 3 && G.day > 10 * (fl + 1) && afford(FORT_LEVELS[fl + 1].cost)) { ai.gold -= goldEq(FORT_LEVELS[fl + 1].cost); t.fort = fl + 1; return true; }
+    if (ml < 3 && fl >= 1 && G.day > 14 * (ml + 1) && afford(MINE_LEVELS[ml + 1].cost)) { ai.gold -= goldEq(MINE_LEVELS[ml + 1].cost); t.minel = ml + 1; return true; }
     return false;
   }
   function aiRecruit(ai, t) {
@@ -1226,6 +1255,7 @@
     <p><b>Events:</b> every new week brings a weekly event (double growth for a creature, plague, bountiful harvest, merchant caravans, heroic training...) and most days a random event may strike — treasure, bandits, mercenaries, storms, rumors.</p>
     <p><b>Territory:</b> the map is split into zones, each ruled by a fort. Capture a fort to own the zone: +${FORT_INCOME} gold/day, your mines there pay, +${MILITIA} militia/week. <b>Station troops in forts</b> — the enemy hero raids undefended forts.</p>
     <p><b>Town:</b> Town Hall levels 1-5 raise income and unlock dwellings (tiers 3-7) and creature upgrades (up to 5 levels). Mage Guild teaches spells, the Marketplace trades resources, the Tavern hires up to ${MAX_HEROES} heroes.</p>
+    <p><b>Defenses:</b> build Fortifications (Citadel → Castle → Fortress) to strengthen walls, gate and arrow towers, and a Minefield for hidden mines in front of the walls — mines hurt and halt attackers. When you defend, you can also lay mines yourself (💣 button, key M); even without a minefield you get ${EMERGENCY_MINES}. Forts can be fortified too.</p>
     <p><b>Battle:</b> click a green hex to move, click an enemy to attack (archers shoot, flyers ignore obstacles). Your hero stands beside the field: cast one spell per round and make one Hero Strike per round. Castle assaults are <b>sieges</b>: break the gate or walls (your catapult helps), beware arrow towers and the moat; flyers can cross the walls. Level-ups let you pick one of two perks.</p>`;
   function refreshTitle() { $('tCont').disabled = !localStorage.getItem(SAVE); }
   function showDifficultySelect() {

@@ -263,8 +263,8 @@ const FORT_LEVELS = [
 const MINE_LEVELS = [
   { n: 'No minefield', stock: 0 },
   { n: 'Minefield I', stock: 3, cost: { gold: 1000, sulfur: 2 } },
-  { n: 'Minefield II', stock: 6, cost: { gold: 2000, sulfur: 4 } },
-  { n: 'Minefield III', stock: 9, cost: { gold: 3000, sulfur: 6, mercury: 3 } },
+  { n: 'Minefield II', stock: 5, cost: { gold: 2000, sulfur: 4 } },
+  { n: 'Minefield III', stock: 7, cost: { gold: 3000, sulfur: 6, mercury: 3 } },
 ];
 const FORT_MAX_FORT = 2, FORT_MAX_MINE = 1;   // map forts can reach Castle-level walls and one minefield
 const FORT_WALL_COST = [null, { gold: 800, ore: 5 }, { gold: 1800, ore: 10, wood: 5 }];

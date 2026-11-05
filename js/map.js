@@ -94,6 +94,30 @@ function genMap(seed) {
   objs.push({ t: 'town', owner: 1, x: E.x, y: E.y, name: 'Necropolis Blackspire',
     guard: [{ t: 'zombie', n: 40 }, { t: 'wraith', n: 14 }, { t: 'vampire', n: 12 }, { t: 'lich', n: 9 }, { t: 'skeleton', n: 60 }] });
 
+  objs[0].zone = 0; objs[1].zone = 1;
+  const seeds = [{ x: P.x, y: P.y, id: 0 }, { x: E.x, y: E.y, id: 1 }];
+  const fortNames = ['Mistvale Keep', 'Ironhold Bastion', 'Sunspire Outpost', 'Grimwatch Tower'];
+  for (let i = 0; i < 4; i++) {
+    let c = null;
+    for (let tries = 0; tries < 400 && !c; tries++) {
+      const t = cand[Math.floor(R() * cand.length)];
+      if (t && seeds.every(s => dist(s, t) >= 10)) c = t;
+    }
+    if (!c) break;
+    cand = cand.filter(o => dist(o, c) > 1);
+    seeds.push({ x: c.x, y: c.y, id: 2 + i });
+    objs.push({ t: 'fort', zone: 2 + i, name: fortNames[i], owner: null, x: c.x, y: c.y, guard: [guard(c, 1.4)], garrison: [null, null, null, null, null, null, null] });
+  }
+  const zone = [];
+  for (let yy = 0; yy < H; yy++) {
+    zone[yy] = [];
+    for (let xx = 0; xx < W; xx++) {
+      let best = 0, bd = 1e9;
+      for (const s of seeds) { const d = (s.x - xx) ** 2 + (s.y - yy) ** 2; if (d < bd) { bd = d; best = s.id; } }
+      zone[yy][xx] = best;
+    }
+  }
+
   const mineKinds = ['gold', 'gold', 'gold', 'wood', 'wood', 'ore', 'ore', 'gems'];
   for (const k of mineKinds) { const c = pick(); if (!c) break; objs.push({ t: 'mine', kind: k, owner: null, x: c.x, y: c.y, guard: [guard(c, 0.8)] }); }
   for (let i = 0; i < 16; i++) { const c = pick(); if (!c) break; const k = RES[Math.floor(R() * 4)]; objs.push({ t: 'pile', kind: k, amt: k === 'gold' ? 500 + 250 * Math.floor(R() * 5) : 3 + Math.floor(R() * 6), x: c.x, y: c.y }); }
@@ -101,7 +125,12 @@ function genMap(seed) {
   ARTIFACTS.forEach((a, i) => { const c = pick(); if (c) objs.push({ t: 'art', art: i, x: c.x, y: c.y, guard: [guard(c, 1.1)] }); });
   for (let i = 0; i < 28; i++) { const c = pick(); if (!c) break; objs.push({ t: 'monster', x: c.x, y: c.y, guard: [guard(c)] }); }
 
-  return { W, H, tiles, objs, P, E };
+  return { W, H, tiles, objs, P, E, zone };
+}
+
+function zoneOwner(G, z) {
+  const o = G.objs.find(o => (o.t === 'fort' || o.t === 'town') && o.zone === z);
+  return o ? o.owner : null;
 }
 
 function reindex(G) {

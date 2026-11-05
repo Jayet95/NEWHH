@@ -38,6 +38,8 @@ const DWELL_COST = [
 ];
 const HALL_COST = { gold: 2500, wood: 5, ore: 5 };
 const HALL_INCOME = 500;
+const FORT_INCOME = 400;
+const MILITIA = 6;
 
 const SPELLS = {
   arrow:     { n: 'Magic Arrow',    i: '🏹', cost: 5,  tgt: 'enemy', desc: 'Damage 10 x Spell Power + 10' },

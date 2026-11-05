@@ -18,6 +18,13 @@ button.primary { background: linear-gradient(#8a6a1c, #5c4410); border-color: va
 #stage canvas#bat { display: none; }
 #side { width: 262px; flex: none; display: flex; flex-direction: column; gap: 8px; }
 #mini { width: 100%; image-rendering: pixelated; border: 2px solid var(--edge); border-radius: 4px; cursor: pointer; background: #000; }
+#terr { background: var(--panel); border: 2px solid var(--edge); border-radius: 6px; padding: 8px; font-size: 13px; }
+#terr h3 { margin: 0 0 6px; color: var(--gold); font-size: 15px; }
+.zrow { padding: 1px 0; }
+.zdot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; border: 1px solid #000; }
+.zp { background: #3a8aff; } .ze { background: #e03a3a; } .zn { background: #999; }
+.armyrow { display: grid; grid-template-columns: repeat(7, 56px); gap: 4px; margin-bottom: 6px; }
+#mbox h4 { margin: 10px 0 4px; }
 #hero, #army, #batui { background: var(--panel); border: 2px solid var(--edge); border-radius: 6px; padding: 8px; }
 #hero h3, #batui h3 { margin: 0 0 6px; color: var(--gold); font-size: 16px; }
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; font-size: 14px; }
@@ -33,7 +40,7 @@ button.primary { background: linear-gradient(#8a6a1c, #5c4410); border-color: va
 #batui { display: none; }
 .inbattle #batui { display: block; }
 .inbattle #stage canvas#bat { display: block; }
-.inbattle #map, .inbattle #mini, .inbattle #hero, .inbattle #army, .inbattle .btns, .inbattle #tip { display: none !important; }
+.inbattle #map, .inbattle #mini, .inbattle #terr, .inbattle #hero, .inbattle #army, .inbattle .btns, .inbattle #tip { display: none !important; }
 #batui .row { display: flex; gap: 4px; margin-bottom: 4px; flex-wrap: wrap; align-items: center; }
 #batui .row button { flex: 1; padding: 4px 4px; font-size: 13px; }
 .pill { background: #000; border: 1px solid var(--edge); padding: 3px 6px; border-radius: 10px; font-size: 12px; }

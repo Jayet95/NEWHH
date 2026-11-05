@@ -3,7 +3,7 @@
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   const TS = 32, VW = 960, VH = 640, FONT = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
-  const SAVE = 'h3js_save_v1';
+  const SAVE = 'h3js_save_v2';
   const MOVE_PER_DAY = 1700;
   const cmap = $('map'), cx = cmap.getContext('2d'), mini = $('mini'), mx = mini.getContext('2d');
   let G = null, cam = { x: 0, y: 0 }, hover = null, busy = false, selSlot = -1, terrain = null, running = false;
@@ -42,7 +42,7 @@
   // ---------- new game / save ----------
   function newGame() {
     const seed = Math.floor(Math.random() * 1e9), m = genMap(seed);
-    G = { seed, W: m.W, H: m.H, tiles: m.tiles, objs: m.objs, day: 1, over: false, path: null,
+    G = { seed, W: m.W, H: m.H, tiles: m.tiles, zone: m.zone, objs: m.objs, day: 1, over: false, path: null,
       res: { gold: 10000, wood: 20, ore: 20, gems: 10 },
       hero: { name: 'Sir Roland', x: m.P.x, y: m.P.y, att: 2, def: 2, sp: 3, kn: 4, lvl: 1, xp: 0, mana: 40, move: MOVE_PER_DAY,
         army: [{ t: 'pikeman', n: 20 }, { t: 'archer', n: 10 }, { t: 'griffin', n: 5 }, null, null, null, null] },
@@ -57,7 +57,7 @@
   function load() {
     try {
       const s = localStorage.getItem(SAVE); if (!s) return false;
-      G = JSON.parse(s); G.path = null; reindex(G); buildTerrain(); centerOn(G.hero.x, G.hero.y); renderAll(); return true;
+      G = JSON.parse(s); if (!G.zone) return false; G.path = null; reindex(G); buildTerrain(); centerOn(G.hero.x, G.hero.y); renderAll(); return true;
     } catch (e) { return false; }
   }
 
@@ -86,6 +86,7 @@
   function objIcon(o) {
     switch (o.t) {
       case 'town': return '🏰';
+      case 'fort': return '🏯';
       case 'mine': return { gold: '💰', wood: '🪵', ore: '⛏️', gems: '💎' }[o.kind];
       case 'pile': return RES_ICON[o.kind];
       case 'chest': return '🧰';
@@ -99,6 +100,16 @@
     cx.drawImage(terrain, cam.x, cam.y, VW, VH, 0, 0, VW, VH);
     const x0 = Math.floor(cam.x / TS), y0 = Math.floor(cam.y / TS);
     cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    // territory overlay
+    const ZC = { 0: 'rgba(60,130,255,.20)', 1: 'rgba(230,60,60,.20)' };
+    cx.lineWidth = 2; cx.strokeStyle = 'rgba(255,255,255,.45)';
+    const zo = {}; for (const o of G.objs) if (o.t === 'fort' || o.t === 'town') zo[o.zone] = o.owner;
+    for (let y = Math.max(0, y0); y < Math.min(G.H, y0 + 22); y++) for (let x = Math.max(0, x0); x < Math.min(G.W, x0 + 31); x++) {
+      const z = G.zone[y][x], ow = zo[z], px = x * TS - cam.x, py = y * TS - cam.y;
+      if (ow !== null && G.tiles[y][x] !== T.WATER) { cx.fillStyle = ZC[ow]; cx.fillRect(px, py, TS, TS); }
+      if (x + 1 < G.W && G.zone[y][x + 1] !== z) { cx.beginPath(); cx.moveTo(px + TS, py); cx.lineTo(px + TS, py + TS); cx.stroke(); }
+      if (y + 1 < G.H && G.zone[y + 1][x] !== z) { cx.beginPath(); cx.moveTo(px, py + TS); cx.lineTo(px + TS, py + TS); cx.stroke(); }
+    }
     // path preview
     if (G.path) {
       let left = G.hero.move;
@@ -116,8 +127,13 @@
         cx.beginPath(); cx.arc(px, py, 15, 0, 7);
         cx.fillStyle = o.t === 'monster' ? 'rgba(90,10,10,.65)' : 'rgba(0,0,0,.45)'; cx.fill();
       }
-      cx.font = `${o.t === 'town' ? 40 : 26}px ${FONT}`; cx.fillStyle = '#fff';
+      cx.font = `${o.t === 'town' ? 40 : o.t === 'fort' ? 34 : 26}px ${FONT}`; cx.fillStyle = '#fff';
       cx.fillText(objIcon(o), px, py + 1);
+      if (o.t === 'fort') {
+        cx.beginPath(); cx.arc(px + 14, py - 16, 6, 0, 7); cx.fillStyle = o.owner === 0 ? '#3a8aff' : o.owner === 1 ? '#e03a3a' : '#999'; cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke();
+        const gn = o.garrison.reduce((s, a) => s + (a ? a.n : 0), 0);
+        if (o.owner === 0 && gn) { cx.font = 'bold 11px sans-serif'; cx.fillStyle = '#000b'; cx.fillRect(px - 14, py + 10, 28, 13); cx.fillStyle = '#fff'; cx.fillText(gn, px, py + 17); }
+      }
       if (o.t === 'mine') { cx.beginPath(); cx.arc(px + 12, py - 12, 5, 0, 7); cx.fillStyle = o.owner === 0 ? '#3a8aff' : '#999'; cx.fill(); cx.strokeStyle = '#000'; cx.stroke(); }
       if (o.t === 'town') { cx.beginPath(); cx.arc(px + 16, py - 18, 6, 0, 7); cx.fillStyle = o.owner === 0 ? '#3a8aff' : '#e03a3a'; cx.fill(); cx.strokeStyle = '#000'; cx.stroke(); }
     }
@@ -137,8 +153,13 @@
   const MC = { [T.GRASS]: '#4a7c3a', [T.FOREST]: '#2f5a2a', [T.MOUNT]: '#666', [T.WATER]: '#285c92', [T.ROAD]: '#a88a5a', [T.SAND]: '#c8b26c' };
   function drawMini() {
     const k = 6;
-    for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) { mx.fillStyle = MC[G.tiles[y][x]]; mx.fillRect(x * k, y * k, k, k); }
-    for (const o of G.objs) { mx.fillStyle = o.t === 'town' ? (o.owner === 0 ? '#4af' : '#f44') : o.t === 'monster' ? '#a33' : o.t === 'mine' ? (o.owner === 0 ? '#4af' : '#ddd') : '#ee6'; mx.fillRect(o.x * k, o.y * k, k, k); }
+    const zo = {}; for (const o of G.objs) if (o.t === 'fort' || o.t === 'town') zo[o.zone] = o.owner;
+    for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) {
+      mx.fillStyle = MC[G.tiles[y][x]]; mx.fillRect(x * k, y * k, k, k);
+      const ow = zo[G.zone[y][x]];
+      if (ow !== null && ow !== undefined) { mx.fillStyle = ow === 0 ? 'rgba(60,130,255,.35)' : 'rgba(230,60,60,.35)'; mx.fillRect(x * k, y * k, k, k); }
+    }
+    for (const o of G.objs) { mx.fillStyle = o.t === 'fort' ? (o.owner === 0 ? '#9cf' : o.owner === 1 ? '#f88' : '#ffa') : o.t === 'town' ? (o.owner === 0 ? '#4af' : '#f44') : o.t === 'monster' ? '#a33' : o.t === 'mine' ? (o.owner === 0 ? '#4af' : '#ddd') : '#ee6'; mx.fillRect(o.x * k, o.y * k, k, k); }
     if (G.eh) { mx.fillStyle = '#f0f'; mx.fillRect(G.eh.x * k - 1, G.eh.y * k - 1, k + 2, k + 2); }
     mx.fillStyle = '#fff'; mx.fillRect(G.hero.x * k - 1, G.hero.y * k - 1, k + 2, k + 2);
     mx.strokeStyle = '#fff'; mx.lineWidth = 1; mx.strokeRect(cam.x / TS * k, cam.y / TS * k, VW / TS * k, VH / TS * k);
@@ -157,6 +178,12 @@
       <div class="small">Movement ${h.move}/${MOVE_PER_DAY}</div><div class="bar mv"><i style="width:${h.move / MOVE_PER_DAY * 100}%"></i></div>
       <div class="small">Mana ${h.mana}/${maxMana()}</div><div class="bar mn"><i style="width:${h.mana / maxMana() * 100}%"></i></div>
       <div class="small">XP ${h.xp}/${need(h.lvl)}</div><div class="bar xp"><i style="width:${Math.min(100, h.xp / need(h.lvl) * 100)}%"></i></div>`;
+    const zs = G.objs.filter(o => o.t === 'fort' || o.t === 'town').sort((a, b) => a.zone - b.zone);
+    const mineIncome = G.objs.filter(o => o.t === 'mine' && o.owner === 0 && zoneOwner(G, G.zone[o.y][o.x]) === 0).length;
+    $('terr').innerHTML = `<h3>🗺 Territory — ${zs.filter(z => z.owner === 0).length}/${zs.length} zones</h3>` +
+      zs.map(z => { const gn = z.garrison ? z.garrison.reduce((s, a) => s + (a ? a.n : 0), 0) : 0;
+        return `<div class="zrow"><span class="zdot z${z.owner === 0 ? 'p' : z.owner === 1 ? 'e' : 'n'}"></span>${z.name}${z.t === 'fort' && z.owner === 0 ? ` <span class="small">garrison ${gn}</span>` : ''}</div>`; }).join('') +
+      `<div class="small">Paying mines: ${mineIncome}</div>`;
     const el = $('army'); el.innerHTML = '';
     h.army.forEach((a, i) => {
       const b = document.createElement('button');
@@ -197,7 +224,15 @@
     const g = o.guard && o.guard.length ? `<br>Guarded by: ${armyList(o.guard, true)}` : '';
     switch (o.t) {
       case 'town': return o.owner === 0 ? `<b>${o.name}</b> — your castle` : `<b>${o.name}</b> — enemy stronghold${g}`;
-      case 'mine': return `<b>${o.kind[0].toUpperCase() + o.kind.slice(1)} mine</b> (${o.owner === 0 ? 'yours' : 'unclaimed'}) +${o.kind === 'gold' ? 1000 : o.kind === 'gems' ? 1 : 2}/day${g}`;
+      case 'mine': {
+        const supplied = o.owner === 0 && zoneOwner(G, G.zone[o.y][o.x]) === 0;
+        return `<b>${o.kind[0].toUpperCase() + o.kind.slice(1)} mine</b> (${o.owner === 0 ? 'yours' : 'unclaimed'}) +${o.kind === 'gold' ? 1000 : o.kind === 'gems' ? 1 : 2}/day` +
+          (o.owner === 0 && !supplied ? '<br>⚠ Pays nothing: you do not hold this zone' : o.owner !== 0 ? '<br>Pays only if you also hold its zone' : '') + g;
+      }
+      case 'fort': {
+        const gn = o.garrison.reduce((s, a) => s + (a ? a.n : 0), 0);
+        return `<b>${o.name}</b> — ${o.owner === 0 ? `your fort (garrison ${gn})` : o.owner === 1 ? `held by the enemy${gn ? ' — garrison: ' + armyList(o.garrison, true) : ''}` : 'neutral zone stronghold'}<br>Holding it: +${FORT_INCOME} 🪙/day and zone mine income${o.owner === null ? g : ''}`;
+      }
       case 'pile': return `${RES_ICON[o.kind]} ${o.amt} ${o.kind}`;
       case 'chest': return 'Treasure chest';
       case 'art': return `<b>${ARTIFACTS[o.art].n}</b> (+${ARTIFACTS[o.art].v} ${ARTIFACTS[o.art].stat})${g}`;
@@ -220,7 +255,11 @@
   cmap.addEventListener('click', (ev) => {
     if (!G || busy || G.over) return;
     const t = tileFromEvent(ev); if (!t) return;
-    if (t.x === G.hero.x && t.y === G.hero.y) { if (heroAtTown()) openTown(); return; }
+    if (t.x === G.hero.x && t.y === G.hero.y) {
+      const o = objAt(G, t.x, t.y);
+      if (heroAtTown()) openTown(); else if (o && o.t === 'fort' && o.owner === 0) openFort(o);
+      return;
+    }
     const last = G.path && G.path[G.path.length - 1];
     if (last && last.x === t.x && last.y === t.y) return moveHero();
     const p = findPath(G, G.hero.x, G.hero.y, t.x, t.y);
@@ -272,6 +311,15 @@
       const win = await fight(o.guard, { att: 6, def: 6 }, `Assault on ${o.name}`);
       if (win) return endGame(true);
       return;
+    }
+    if (o.t === 'fort') {
+      if (o.owner === 0) return openFort(o);
+      const army = o.owner === 1 ? o.garrison.filter(Boolean) : o.guard;
+      if (army.length && !(await fight(army, { att: o.owner === 1 ? 4 : 0, def: o.owner === 1 ? 4 : 0 }, `Assault on ${o.name}`))) return;
+      o.owner = 0; o.guard = []; o.garrison = [null, null, null, null, null, null, null];
+      renderAll();
+      await showModal(`<h2>🏯 ${o.name} captured!</h2><p>The zone is yours: +${FORT_INCOME} 🪙/day, mine income in the zone, and +${MILITIA} militia per week. Station troops here to defend it from the enemy hero.</p>`);
+      return openFort(o);
     }
     if (o.t === 'mine') {
       if (o.owner === 0) return toast('This mine is already yours.');
@@ -361,6 +409,46 @@
     });
   }
 
+  // ---------- forts & garrisons ----------
+  function openFort(f) {
+    let sel = null;
+    const here = G.hero.x === f.x && G.hero.y === f.y;
+    const render = () => {
+      const row = (arr, rk) => arr.map((a, i) => `<button class="slot${a ? '' : ' empty'}${sel && sel.r === rk && sel.i === i ? ' sel' : ''}" data-r="${rk}" data-i="${i}">${a ? `${C[a.t].i}<small>${a.n}</small>` : ''}</button>`).join('');
+      $('mbox').innerHTML = `<h2>🏯 ${f.name}</h2>
+        <div class="small">+${FORT_INCOME} 🪙/day · zone mine income · +${MILITIA} militia/week · the garrison fights enemy heroes with +3 Defense</div>
+        <h4>Garrison</h4><div class="armyrow">${row(f.garrison, 'g')}</div>
+        <h4>Hero army ${here ? '' : '(hero is not here — only garrison shown for reference)'}</h4><div class="armyrow">${row(G.hero.army, 'h')}</div>
+        <div class="small">Click a slot, then another: move / merge / swap. ${here ? '' : 'Visit the fort with your hero to transfer troops.'}</div>
+        <div class="mb"><button class="primary" id="fClose">Close</button></div>`;
+      $('fClose').onclick = () => { $('modal').classList.add('hide'); renderAll(); };
+      $('mbox').querySelectorAll('.slot').forEach(b => b.onclick = () => {
+        if (!here) return toast('Your hero must be at the fort.');
+        const r = b.dataset.r, i = +b.dataset.i, arr = (rr) => rr === 'g' ? f.garrison : G.hero.army;
+        if (!sel) { if (arr(r)[i]) sel = { r, i }; }
+        else {
+          if (!(sel.r === r && sel.i === i)) {
+            const A = arr(sel.r), B = arr(r);
+            if (A[sel.i] && B[i] && A[sel.i].t === B[i].t) { B[i].n += A[sel.i].n; A[sel.i] = null; }
+            else { const tmp = A[sel.i]; A[sel.i] = B[i]; B[i] = tmp; }
+          }
+          sel = null;
+        }
+        render();
+      });
+    };
+    render(); $('modal').classList.remove('hide');
+  }
+  async function defendFort(f) {
+    const e = G.eh, gar = f.garrison;
+    const res = await Battle.run({ hero: { att: 0, def: 3, sp: 0, mana: 0 }, army: gar, enemy: e.army.map(a => ({ ...a })), eStats: { att: e.att, def: e.def }, title: `Defending ${f.name}`, canRetreat: false });
+    res.survivors.forEach((n, i) => { if (gar[i]) { if (n > 0) gar[i].n = n; else gar[i] = null; } });
+    if (res.win) { G.eh = null; G.ehTimer = 4; toast(`${f.name} held! The enemy hero is slain.`); return true; }
+    f.owner = 1; f.garrison = [{ t: 'skeleton', n: 10 }, null, null, null, null, null, null];
+    await showModal(`<h2>🏯 ${f.name} has fallen!</h2><p>The enemy now holds this zone. Retake it by defeating its garrison.</p>`);
+    return false;
+  }
+
   // ---------- turn / day ----------
   function spawnEnemyHero() {
     const e = eTown(); G.ehWave++;
@@ -371,10 +459,14 @@
   }
   async function enemyTurn() {
     const e = eTown();
-    if (G.day >= 8 && !G.eh) { if (G.ehTimer > 0) G.ehTimer--; if (G.ehTimer <= 0) spawnEnemyHero(); return; }
+    const eForts = G.objs.filter(o => o.t === 'fort' && o.owner === 1).length;
+    if (G.day >= 8 && !G.eh) { G.ehTimer = Math.max(0, G.ehTimer - 1 - eForts); if (G.ehTimer <= 0) spawnEnemyHero(); return; }
     if (!G.eh) return;
     const eh = G.eh, tw = town();
-    const target = dist(eh, G.hero) < 14 ? G.hero : tw;
+    let target = tw;
+    const mine = G.objs.filter(o => o.t === 'fort' && o.owner === 0);
+    if (dist(eh, G.hero) < 12) target = G.hero;
+    else if (mine.length) target = mine.reduce((a, b) => dist(eh, a) <= dist(eh, b) ? a : b);
     const path = findPath(G, eh.x, eh.y, target.x, target.y, true);
     if (!path) return;
     let left = 1000;
@@ -383,8 +475,17 @@
       left -= s.cost; eh.x = s.x; eh.y = s.y; await sleep(45);
       if (s.x === G.hero.x && s.y === G.hero.y) { centerOn(s.x, s.y); toast('The enemy hero attacks!'); await fightEnemyHero(false); return; }
       if (s.x === tw.x && s.y === tw.y) { await endGame(false, 'The enemy hero captured your castle while it stood undefended.'); return; }
+      const o = objAt(G, s.x, s.y);
+      if (o && o.t === 'fort' && o.owner === 0) {
+        centerOn(o.x, o.y);
+        if (!o.garrison.some(Boolean)) {
+          o.owner = 1; o.garrison = [{ t: 'skeleton', n: 10 }, null, null, null, null, null, null];
+          await showModal(`<h2>🏯 ${o.name} has fallen!</h2><p>The enemy hero seized the undefended fort. Garrison your forts to hold your zones.</p>`);
+        } else { toast(`The enemy hero assaults ${o.name}!`); await defendFort(o); }
+        return;
+      }
     }
-    toast(`Enemy hero is ${dist(eh, tw)} tiles from your castle.`);
+    toast(`Enemy hero is ${dist(eh, target)} tiles from ${target === G.hero ? 'your hero' : target.name || 'your castle'}.`);
   }
   async function endTurn() {
     if (!G || busy || G.over) return;
@@ -396,13 +497,20 @@
     h.move = MOVE_PER_DAY; h.mana = Math.min(maxMana(), h.mana + 4);
     if (heroAtTown()) h.mana = maxMana();
     let inc = t.b.hall ? HALL_INCOME : 0; const gain = { gold: inc, wood: 0, ore: 0, gems: 0 };
-    for (const o of G.objs) if (o.t === 'mine' && o.owner === 0) gain[o.kind] += o.kind === 'gold' ? 1000 : o.kind === 'gems' ? 1 : 2;
+    for (const o of G.objs) {
+      if (o.t === 'mine' && o.owner === 0 && zoneOwner(G, G.zone[o.y][o.x]) === 0) gain[o.kind] += o.kind === 'gold' ? 1000 : o.kind === 'gems' ? 1 : 2;
+      if (o.t === 'fort' && o.owner === 0) gain.gold += FORT_INCOME;
+    }
     RES.forEach(k => G.res[k] += gain[k]);
     const parts = RES.filter(k => gain[k]).map(k => `+${gain[k]}${RES_ICON[k]}`);
     if ((G.day - 1) % 7 === 0) {
       CASTLE_TIERS.forEach((id, i) => { if (t.b[i + 1]) t.avail[i + 1] = (t.avail[i + 1] || 0) + C[id].gr; });
-      toast('A new week begins — creature dwellings replenish!');
-      if (G.eh) { G.eh.army.forEach(a => a.n = Math.ceil(a.n * 1.15)); }
+      for (const o of G.objs) if (o.t === 'fort' && o.owner === 0) {
+        let s = o.garrison.find(a => a && a.t === 'pikeman');
+        if (s) s.n += MILITIA; else { const i = o.garrison.findIndex(a => !a); if (i >= 0) o.garrison[i] = { t: 'pikeman', n: MILITIA }; }
+      }
+      toast('A new week begins — dwellings replenish and forts raise militia!');
+      if (G.eh) { const m = 1.15 + 0.1 * G.objs.filter(o => o.t === 'fort' && o.owner === 1).length; G.eh.army.forEach(a => a.n = Math.ceil(a.n * m)); }
     }
     toast(`Day ${G.day}${parts.length ? ' · ' + parts.join(' ') : ''}`);
     busy = false; centerOn(h.x, h.y); renderAll();
@@ -419,6 +527,7 @@
   const HELP = `<h2>How to Play</h2><p><b>Goal:</b> defeat the Necropolis garrison in the north-east and capture it. Don't let the enemy hero take your castle.</p>
     <p><b>Map:</b> click a tile to preview the path (green = reachable today, red = next turn), click again to walk. Walk onto resources to grab them; mines give daily income; monsters, mines and artifacts are guarded.<br>
     Keys: arrows/WASD scroll · H center hero · Space go · E end turn · T town.</p>
+    <p><b>Territory:</b> the map is split into zones, each ruled by a fort. Capture a fort (beat its guards) to own the zone: +${FORT_INCOME} gold/day, your mines there start paying, and +${MILITIA} militia/week. <b>Station troops in forts</b> (stand on the fort, click your hero) — the enemy hero raids undefended forts and takes the zone. When a garrison is attacked you fight the battle yourself, with +3 Defense.</p>
     <p><b>Town:</b> recruit troops (weekly growth), build higher-tier dwellings and the Town Hall. Your hero must be in the castle to recruit.</p>
     <p><b>Battle:</b> click a green hex to move, click an enemy to attack (archers shoot from range, flyers ignore obstacles). Wait / Defend / cast one spell per round. Right-click cancels a spell. Retreat loses your army.</p>`;
   function refreshTitle() { $('tCont').disabled = !localStorage.getItem(SAVE); }

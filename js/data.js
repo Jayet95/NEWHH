@@ -273,22 +273,31 @@ const EMERGENCY_MINES = 2;                      // a defending player may always
 const FORT_INCOME = 400;
 const MILITIA = 6;
 const GUILD_COST = [null, { gold: 2000, wood: 5, ore: 5 }, { gold: 3000, mercury: 4, sulfur: 4 }, { gold: 4000, mercury: 6, sulfur: 6, crystal: 6, gems: 6 }];
-const GUILD_SPELLS = [null, ['lightning', 'haste', 'slow', 'heal'], ['fireball', 'curse', 'resurrect'], ['chain', 'implosion']];
+const GUILD_SPELLS = [null, ['lightning', 'haste', 'slow', 'heal', 'bloodlust'], ['fireball', 'curse', 'blind', 'frostring', 'shield'], ['chain', 'meteor', 'implosion', 'resurrect', 'armageddon']];
 const START_SPELLS = ['arrow', 'bless', 'stone'];
 
+// school: air / earth / fire / water (its skill ranks the spell: Basic, Advanced, Expert); lv: spell level (needs Wisdom: level <= 2 + Wisdom rank)
+const SCHOOL_SKILL = { air: 'airmagic', earth: 'earthmagic', fire: 'firemagic', water: 'watermagic' };
+const SCHOOL_ICON = { air: '🌬️', earth: '⛰️', fire: '🔥', water: '💧' };
 const SPELLS = {
-  arrow:     { n: 'Magic Arrow',    i: '🏹', cost: 5,  tgt: 'enemy', desc: 'Damage 10 x Spell Power + 10' },
-  lightning: { n: 'Lightning Bolt', i: '⚡', cost: 10, tgt: 'enemy', desc: 'Damage 25 x Spell Power' },
-  fireball:  { n: 'Fireball',       i: '🔥', cost: 15, tgt: 'enemy', desc: 'Area: 15 x Spell Power + 10 to the target and adjacent enemies' },
-  chain:     { n: 'Chain Lightning', i: '🌩️', cost: 20, tgt: 'enemy', desc: 'Hits 3 enemies: 40 x SP, then half, then half again' },
-  implosion: { n: 'Implosion',      i: '🕳️', cost: 30, tgt: 'enemy', desc: 'Damage 75 x Spell Power' },
-  slow:      { n: 'Slow',           i: '🐌', cost: 6,  tgt: 'enemy', desc: '-3 Speed for the battle' },
-  curse:     { n: 'Curse',          i: '☠️', cost: 6,  tgt: 'enemy', desc: 'Target always deals minimum damage' },
-  haste:     { n: 'Haste',          i: '💨', cost: 6,  tgt: 'ally',  desc: '+3 Speed for the battle' },
-  bless:     { n: 'Bless',          i: '✨', cost: 5,  tgt: 'ally',  desc: 'Always max damage' },
-  stone:     { n: 'Stone Skin',     i: '🪨', cost: 5,  tgt: 'ally',  desc: '+4 Defense' },
-  heal:      { n: 'Heal',           i: '💚', cost: 6,  tgt: 'ally',  desc: 'Restore 6 x Spell Power hit points (no revival)' },
-  resurrect: { n: 'Resurrection',   i: '🕊️', cost: 18, tgt: 'ally',  desc: 'Restore 40 x Spell Power hit points, reviving fallen creatures' },
+  arrow:     { n: 'Magic Arrow',    i: '🏹', cost: 5,  lv: 1, school: 'air',   tgt: 'enemy', desc: 'Damage 10 x Spell Power + 10 (stronger with Air Magic)' },
+  haste:     { n: 'Haste',          i: '💨', cost: 6,  lv: 1, school: 'air',   tgt: 'ally',  desc: '+3 Speed (+1 Advanced); Expert: all allies' },
+  lightning: { n: 'Lightning Bolt', i: '⚡', cost: 10, lv: 2, school: 'air',   tgt: 'enemy', desc: 'Damage 25 x Spell Power' },
+  shield:    { n: 'Air Shield',     i: '🌀', cost: 12, lv: 3, school: 'air',   tgt: 'ally',  desc: 'Ranged damage taken -30% / -45% / -60%; Expert: all allies' },
+  chain:     { n: 'Chain Lightning', i: '🌩️', cost: 20, lv: 4, school: 'air',   tgt: 'enemy', desc: 'Hits 3 enemies (4 at Expert): 40 x SP, then half each jump' },
+  stone:     { n: 'Stone Skin',     i: '🪨', cost: 5,  lv: 1, school: 'earth', tgt: 'ally',  desc: '+4 Defense (+6 Advanced, +8 Expert); Expert: all allies' },
+  slow:      { n: 'Slow',           i: '🐌', cost: 6,  lv: 1, school: 'earth', tgt: 'enemy', desc: '-3 Speed (-4 / -5); Expert: all enemies' },
+  curse:     { n: 'Curse',          i: '☠️', cost: 6,  lv: 2, school: 'earth', tgt: 'enemy', desc: 'Target always deals minimum damage; Expert: all enemies' },
+  meteor:    { n: 'Meteor Shower',  i: '☄️', cost: 16, lv: 4, school: 'earth', tgt: 'enemy', desc: 'Area (radius 1, 2 at Expert): 14 x Spell Power + 20' },
+  implosion: { n: 'Implosion',      i: '🕳️', cost: 30, lv: 5, school: 'earth', tgt: 'enemy', desc: 'Damage 75 x Spell Power' },
+  bloodlust: { n: 'Bloodlust',      i: '😡', cost: 5,  lv: 1, school: 'fire',  tgt: 'ally',  desc: '+3 Attack (+5 / +7); Expert: all allies' },
+  blind:     { n: 'Blind',          i: '🙈', cost: 8,  lv: 2, school: 'fire',  tgt: 'enemy', desc: 'Target loses 2 / 3 / 4 turns; Expert: all enemies' },
+  fireball:  { n: 'Fireball',       i: '🔥', cost: 15, lv: 3, school: 'fire',  tgt: 'enemy', desc: 'Area (radius 1, 2 at Expert): 15 x Spell Power + 10' },
+  armageddon: { n: 'Armageddon',    i: '🌋', cost: 24, lv: 5, school: 'fire',  tgt: 'enemy', desc: 'Burns EVERY stack on the field (yours too): 18 x Spell Power + 20' },
+  bless:     { n: 'Bless',          i: '✨', cost: 5,  lv: 1, school: 'water', tgt: 'ally',  desc: 'Always max damage; Expert: all allies' },
+  heal:      { n: 'Cure',           i: '💚', cost: 6,  lv: 1, school: 'water', tgt: 'ally',  desc: 'Restore 6 x Spell Power hit points (no revival); Expert: all allies' },
+  frostring: { n: 'Frost Ring',     i: '❄️', cost: 12, lv: 3, school: 'water', tgt: 'enemy', desc: 'Area (radius 1): 10 x Spell Power + 15 and -2 Speed (Advanced+)' },
+  resurrect: { n: 'Resurrection',   i: '🕊️', cost: 18, lv: 4, school: 'water', tgt: 'ally',  desc: 'Restore 40 x Spell Power hit points, reviving fallen creatures' },
 };
 const PORTAL_COST = 12;
 
@@ -305,6 +314,10 @@ const PERKS = {
   sorcery:    { n: 'Sorcery',    i: '🔮', d: '+15% spell damage per rank' },
   estates:    { n: 'Estates',    i: '💰', d: '+300 gold per day per rank' },
   ballistics: { n: 'Ballistics', i: '🎯', d: '+50% siege damage (catapult and walls) per rank' },
+  airmagic:   { n: 'Air Magic',   i: '🌬️', d: 'Air spells (Magic Arrow, Haste, Lightning, Air Shield, Chain Lightning) are stronger; Expert makes buffs mass' },
+  earthmagic: { n: 'Earth Magic', i: '⛰️', d: 'Earth spells (Stone Skin, Slow, Curse, Meteor Shower, Implosion) are stronger; Expert makes them mass' },
+  firemagic:  { n: 'Fire Magic',  i: '🔥', d: 'Fire spells (Bloodlust, Blind, Fireball, Armageddon) are stronger; Expert makes them mass / wider' },
+  watermagic: { n: 'Water Magic', i: '💧', d: 'Water spells (Bless, Cure, Frost Ring, Resurrection) are stronger; Expert makes them mass' },
   necromancy: { n: 'Necromancy', i: '🦴', d: 'Raise skeletons after battle: 10 / 20 / 30% of the enemy hit points slain' },
   navigation: { n: 'Navigation', i: '⚓', d: 'Sailing costs 10 / 20 / 30% less movement' },
   scouting:   { n: 'Scouting',   i: '🔭', d: 'See 1 / 2 / 3 tiles farther through the fog of war' },
@@ -320,15 +333,15 @@ const PERKS = {
 const RANK_NAMES = ['', 'Basic', 'Advanced', 'Expert'];
 const MAX_SKILLS = 8;
 const START_SKILLS = {
-  Knight: ['leadership', 'armorer'], Cleric: ['wisdom', 'mysticism'], Ranger: ['archery', 'logistics'], Druid: ['wisdom', 'learning'], Wizard: ['wisdom', 'sorcery'],
-  Demoniac: ['offense', 'armorer'], Heretic: ['sorcery', 'mysticism'], 'Death Knight': ['necromancy', 'offense'], Necromancer: ['necromancy', 'wisdom'],
-  Overlord: ['offense', 'leadership'], Warlock: ['sorcery', 'wisdom'], Barbarian: ['offense', 'logistics'], 'Battle Mage': ['sorcery', 'leadership'],
-  Beastmaster: ['armorer', 'charisma'], Witch: ['learning', 'mysticism'], Planeswalker: ['logistics', 'sorcery'], Elementalist: ['sorcery', 'mysticism'],
+  Knight: ['leadership', 'armorer'], Cleric: ['wisdom', 'watermagic'], Ranger: ['archery', 'logistics'], Druid: ['wisdom', 'earthmagic'], Wizard: ['wisdom', 'airmagic'],
+  Demoniac: ['offense', 'armorer'], Heretic: ['firemagic', 'sorcery'], 'Death Knight': ['necromancy', 'offense'], Necromancer: ['necromancy', 'earthmagic'],
+  Overlord: ['offense', 'leadership'], Warlock: ['firemagic', 'wisdom'], Barbarian: ['offense', 'logistics'], 'Battle Mage': ['firemagic', 'leadership'],
+  Beastmaster: ['armorer', 'charisma'], Witch: ['watermagic', 'mysticism'], Planeswalker: ['logistics', 'airmagic'], Elementalist: ['firemagic', 'mysticism'],
 };
 const SKILL_ARCH = {
-  might: { offense: 4, armorer: 4, leadership: 3, logistics: 3, ballistics: 3, estates: 2, archery: 2, fortune: 2, navigation: 2, scouting: 2, charisma: 1, forester: 1, mountaineer: 1, waterwalk: 1, learning: 1, mysticism: 1, wisdom: 1, sorcery: 1, necromancy: 1 },
-  magic: { wisdom: 4, sorcery: 4, mysticism: 4, learning: 3, fortune: 2, leadership: 2, estates: 2, scouting: 2, charisma: 2, navigation: 2, logistics: 2, offense: 1, armorer: 1, archery: 1, ballistics: 1, forester: 1, mountaineer: 1, waterwalk: 2, necromancy: 1 },
-  ranger: { archery: 4, logistics: 4, scouting: 4, forester: 3, mountaineer: 2, fortune: 3, offense: 2, armorer: 2, navigation: 2, waterwalk: 1, leadership: 1, wisdom: 1, sorcery: 1, mysticism: 1, learning: 1, estates: 1, charisma: 1, ballistics: 1, necromancy: 1 },
+  might: { airmagic: 1, earthmagic: 1, firemagic: 1, watermagic: 1, offense: 4, armorer: 4, leadership: 3, logistics: 3, ballistics: 3, estates: 2, archery: 2, fortune: 2, navigation: 2, scouting: 2, charisma: 1, forester: 1, mountaineer: 1, waterwalk: 1, learning: 1, mysticism: 1, wisdom: 1, sorcery: 1, necromancy: 1 },
+  magic: { airmagic: 3, earthmagic: 3, firemagic: 3, watermagic: 3, wisdom: 4, sorcery: 4, mysticism: 4, learning: 3, fortune: 2, leadership: 2, estates: 2, scouting: 2, charisma: 2, navigation: 2, logistics: 2, offense: 1, armorer: 1, archery: 1, ballistics: 1, forester: 1, mountaineer: 1, waterwalk: 2, necromancy: 1 },
+  ranger: { airmagic: 1, earthmagic: 1, firemagic: 1, watermagic: 1, archery: 4, logistics: 4, scouting: 4, forester: 3, mountaineer: 2, fortune: 3, offense: 2, armorer: 2, navigation: 2, waterwalk: 1, leadership: 1, wisdom: 1, sorcery: 1, mysticism: 1, learning: 1, estates: 1, charisma: 1, ballistics: 1, necromancy: 1 },
 };
 const CLASS_ARCH = { Knight: 'might', Barbarian: 'might', Overlord: 'might', Demoniac: 'might', 'Death Knight': 'might', Beastmaster: 'might', Ranger: 'ranger',
   Cleric: 'magic', Druid: 'magic', Wizard: 'magic', Heretic: 'magic', Necromancer: 'magic', Warlock: 'magic', Witch: 'magic', Planeswalker: 'magic', Elementalist: 'magic', 'Battle Mage': 'magic' };

@@ -31,7 +31,7 @@ const Battle = (() => {
   const COARSE = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false;
   const sfx = (n) => { if (typeof Sfx !== 'undefined') Sfx.play(n); };
   const perk = (id) => (B.hero && B.hero.perks && B.hero.perks[id]) || 0;
-  const speedOf = (s) => Math.max(1, C[s.t].s + (s.haste ? 3 : 0) - (s.slow ? 3 : 0));
+  const speedOf = (s) => Math.max(1, C[s.t].s + (s.haste || 0) - (s.slow || 0));
   const abil = (s, k) => {
     for (const x of (C[s.t].ab || [])) { if (x === k) return true; if (x.startsWith(k + ':')) return parseFloat(x.slice(k.length + 1)); }
     return false;
@@ -44,8 +44,8 @@ const Battle = (() => {
   const structAt = (c, r) => B.siege ? B.walls.get(key(c, r)) : undefined;
   const isAttacker = (s) => B.siege && s.side !== B.siege.dside;
   const bonus = (s) => s.side === 0 ? B.hero : B.eStats;
-  const attackOf = (s) => C[s.t].a + bonus(s).att;
-  const defenceOf = (s) => C[s.t].d + bonus(s).def + (s.stone ? 4 : 0) + (s.defb ? 3 : 0);
+  const attackOf = (s) => C[s.t].a + bonus(s).att + (s.bloodlust || 0);
+  const defenceOf = (s) => C[s.t].d + bonus(s).def + (s.stone || 0) + (s.defb ? 3 : 0);
   const totalHp = (s) => (s.n - 1) * C[s.t].hp + s.hp;
   const adjEnemy = (s) => nbrs(s.c, s.r).some(([c, r]) => { const o = stackAt(c, r); return o && o.side !== s.side; });
   const canShoot = (s) => C[s.t].shoot && s.ammo > 0 && !adjEnemy(s);
@@ -77,6 +77,7 @@ const Battle = (() => {
     let m = A >= D ? 1 + 0.05 * Math.min(A - D, 60) : 1 - 0.025 * Math.min(D - A, 28);
     if (melee && c.shoot && !abil(a, 'nopen')) m *= 0.5;
     if (hates(a, d)) m *= 2;
+    if (!melee && d.shield) m *= 1 - d.shield;
     if (!melee && c.shoot) m *= rangeMul(a, d);
     if (melee && joust) m *= 1 + 0.05 * joust;
     if (a.side === 0) m *= 1 + 0.1 * perk(melee ? 'offense' : 'archery');
@@ -181,7 +182,7 @@ const Battle = (() => {
   function onHitEffects(s, tgt, dmg) {
     if (abil(s, 'drain') && !s.dead) { const g = healStack(s, dmg, s.maxN); if (g > 0) log(`${C[s.t].n} drains life (+${Math.round(g)} HP).`); }
     const st = abil(s, 'stun');
-    if (st && !tgt.dead && Math.random() < st / 100) { tgt.stunned = true; log(`${C[tgt.t].n} is stunned!`); B.fx.push({ x: hexPx(tgt.c, tgt.r).x, y: hexPx(tgt.c, tgt.r).y - 20, txt: '💫', col: '#fff', t0: performance.now() }); }
+    if (st && !tgt.dead && Math.random() < st / 100) { tgt.stunned = 1; log(`${C[tgt.t].n} is stunned!`); B.fx.push({ x: hexPx(tgt.c, tgt.r).x, y: hexPx(tgt.c, tgt.r).y - 20, txt: '💫', col: '#fff', t0: performance.now() }); }
   }
   // the hex directly behind the target as seen from the attacker (dragon breath)
   function hexBehind(a, t) {
@@ -340,7 +341,7 @@ const Battle = (() => {
       }
       const c = B.queue.shift();
       if (!c || c.dead) continue;
-      if (c.stunned) { c.stunned = false; log(`💫 ${C[c.t].n} is stunned and loses its turn.`); continue; }
+      if (c.stunned > 0) { c.stunned--; log(`💫 ${C[c.t].n} cannot act and loses its turn.`); continue; }
       const mor = c.side === 0 ? (B.hero.morale || 0) : 0;
       if (mor && !abil(c, 'mindless') && Math.random() < 0.04 * Math.min(3, Math.abs(mor))) {
         if (mor > 0) B.bonus = c;
@@ -449,41 +450,54 @@ const Battle = (() => {
     return hexAt((ev.clientX - rc.left) * 960 / rc.width, (ev.clientY - rc.top) * 640 / rc.height);
   }
   function onMove(ev) { if (B) B.hover = mouseHex(ev); }
+  // spell school rank (0 = untrained) and Wisdom gate: spell level <= 2 + Wisdom rank
+  const spellRank = (sp) => perk(SCHOOL_SKILL[sp.school]);
+  const spellOk = (sp) => sp.lv <= 2 + perk('wisdom');
   function castSpell(k, t) {
     const sp = SPELLS[k];
     if (!t || (sp.tgt === 'enemy') !== (t.side === 1)) return toast('Invalid target.');
+    if (!spellOk(sp)) return toast(`${sp.n} needs Wisdom (rank ${sp.lv - 2}).`);
     if (B.hero.mana < sp.cost) return toast('Not enough mana.');
     B.hero.mana -= sp.cost; B.castUsed = true; B.spell = null; sfx('spell');
-    const p = hexPx(t.c, t.r), P = B.hero.sp, sd = (x) => Math.floor(x * (1 + 0.15 * perk('sorcery')));
+    const r = spellRank(sp), P = B.hero.sp;
+    const sd = (x) => Math.floor(x * (1 + 0.15 * perk('sorcery')) * (1 + 0.25 * r));
     B.shot = { ax: HERO_POS[0].x, ay: HERO_POS[0].y, b: { c: t.c, r: t.r }, t0: performance.now(), col: sp.tgt === 'enemy' ? '#ff9a4a' : '#8affb0' };
     B.heroFlash = [performance.now(), 0];
-    const mark = (txt) => { B.fx.push({ x: p.x, y: p.y - 20, txt, col: '#fff', t0: performance.now() }); log(`${sp.n} cast on ${C[t.t].n}.`); };
+    const mark = (tg, txt) => { const p = hexPx(tg.c, tg.r); B.fx.push({ x: p.x, y: p.y - 20, txt, col: '#fff', t0: performance.now() }); };
+    const allies = () => (r >= 3 ? alive(0) : [t]), foes = () => (r >= 3 ? alive(1) : [t]);
     const spellHit = (tg, dmg, label, fire) => {
       if (fire && abil(tg, 'fireImm')) { log(`${C[tg.t].n} is immune to fire!`); return; }
       const rs = abil(tg, 'res'); if (rs) dmg = Math.floor(dmg * (1 - rs));
       hit(tg, Math.max(1, dmg), label);
     };
+    const area = (rad, fn) => { for (const e of alive(1)) if (e === t || hexDist(e, t) <= rad) fn(e); };
     switch (k) {
       case 'arrow': spellHit(t, sd(10 * P + 10), 'Magic Arrow hits'); break;
       case 'lightning': spellHit(t, sd(25 * P), 'Lightning Bolt hits'); break;
       case 'implosion': spellHit(t, sd(75 * P), 'Implosion crushes'); break;
-      case 'fireball': for (const e of alive(1)) if (e === t || hexDist(e, t) <= 1) spellHit(e, sd(15 * P + 10), 'Fireball burns', true); break;
+      case 'fireball': area(r >= 3 ? 2 : 1, (e) => spellHit(e, sd(15 * P + 10), 'Fireball burns', true)); break;
+      case 'meteor': area(r >= 3 ? 2 : 1, (e) => spellHit(e, sd(14 * P + 20), 'Meteors strike')); break;
+      case 'frostring': area(1, (e) => { spellHit(e, sd(10 * P + 15), 'Frost Ring chills'); if (r >= 2 && !e.dead) e.slow = Math.max(e.slow || 0, 2); }); break;
+      case 'armageddon': for (const s of alive()) spellHit(s, sd(18 * P + 20), 'Armageddon burns', true); break;
       case 'chain': {
         const seen = new Set(); let cur = t, dmg = sd(40 * P);
-        for (let i = 0; i < 3 && cur; i++) {
+        for (let i = 0; i < (r >= 3 ? 4 : 3) && cur; i++) {
           spellHit(cur, Math.floor(dmg), 'Chain Lightning arcs to'); seen.add(cur); dmg /= 2;
           const from = cur;
           cur = alive(1).filter(e => !seen.has(e)).sort((a, b) => hexDist(a, from) - hexDist(b, from))[0];
         }
         break;
       }
-      case 'slow': t.slow = true; mark('🐌'); break;
-      case 'curse': t.curse = true; mark('☠️'); break;
-      case 'haste': t.haste = true; mark(sp.i); break;
-      case 'bless': t.bless = true; mark(sp.i); break;
-      case 'stone': t.stone = true; mark(sp.i); break;
-      case 'heal': { const g = healStack(t, 6 * P, t.n); mark('+' + Math.round(g)); break; }
-      case 'resurrect': { const g = healStack(t, 40 * P, t.maxN); mark('+' + Math.round(g)); break; }
+      case 'slow': foes().forEach(e => { e.slow = 3 + Math.max(0, r - 1); mark(e, '🐌'); }); log(`${sp.n} cast.`); break;
+      case 'curse': foes().forEach(e => { e.curse = true; mark(e, '☠️'); }); log(`${sp.n} cast.`); break;
+      case 'blind': foes().forEach(e => { e.stunned = 1 + Math.max(1, r); mark(e, '🙈'); }); log(`${sp.n} cast: the target loses its next turns.`); break;
+      case 'haste': allies().forEach(a => { a.haste = 3 + (r >= 2 ? 1 : 0) + (r >= 3 ? 1 : 0); mark(a, '💨'); }); log(`${sp.n} cast.`); break;
+      case 'bless': allies().forEach(a => { a.bless = true; mark(a, '✨'); }); log(`${sp.n} cast.`); break;
+      case 'stone': allies().forEach(a => { a.stone = 4 + 2 * Math.max(0, r - 1); mark(a, '🪨'); }); log(`${sp.n} cast.`); break;
+      case 'bloodlust': allies().forEach(a => { a.bloodlust = 3 + 2 * Math.max(0, r - 1); mark(a, '😡'); }); log(`${sp.n} cast.`); break;
+      case 'shield': allies().forEach(a => { a.shield = [0.3, 0.3, 0.45, 0.6][Math.min(3, r)]; mark(a, '🌀'); }); log(`${sp.n} cast.`); break;
+      case 'heal': allies().forEach(a => { const g = healStack(a, sd(6 * P), a.n); mark(a, '+' + Math.round(g)); }); log(`${sp.n} cast.`); break;
+      case 'resurrect': { const g = healStack(t, sd(40 * P), t.maxN); mark(t, '+' + Math.round(g)); log(`${sp.n} cast.`); break; }
     }
     B.reach = computeReach(B.cur);
     refreshButtons();
@@ -517,9 +531,13 @@ const Battle = (() => {
   function openSpells() {
     const list = $('spells');
     list.innerHTML = '';
-    for (const k of B.hero.spells) {
-      const sp = SPELLS[k], b = document.createElement('button');
-      b.textContent = `${sp.i} ${sp.n} (${sp.cost})`; b.title = sp.desc; b.disabled = B.hero.mana < sp.cost;
+    const order = { air: 0, earth: 1, fire: 2, water: 3 };
+    const ks = [...B.hero.spells].sort((a, b) => order[SPELLS[a].school] - order[SPELLS[b].school] || SPELLS[a].lv - SPELLS[b].lv);
+    for (const k of ks) {
+      const sp = SPELLS[k], b = document.createElement('button'), rk = spellRank(sp), ok = spellOk(sp);
+      b.textContent = `${sp.i} ${sp.n} · ${SCHOOL_ICON[sp.school]}${rk ? ' ' + RANK_NAMES[rk] : ''} · L${sp.lv} (${sp.cost})`;
+      b.title = `${sp.desc}${ok ? '' : `\nNeeds Wisdom rank ${sp.lv - 2}`}`;
+      b.disabled = B.hero.mana < sp.cost || !ok;
       b.onclick = () => { B.spell = k; list.classList.add('hide'); toast(sp.n + ': pick a ' + (sp.tgt === 'enemy' ? 'enemy' : 'friendly') + ' stack'); };
       list.appendChild(b);
     }
@@ -627,7 +645,7 @@ const Battle = (() => {
       const lab = String(s.n), w = Math.max(24, lab.length * 9 + 8);
       ctx.fillStyle = '#000c'; ctx.fillRect(p.x + 4, p.y + 14, w, 16);
       ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(lab, p.x + 4 + w / 2, p.y + 23);
-      let tags = ''; if (s.haste) tags += '💨'; if (s.bless) tags += '✨'; if (s.stone) tags += '🪨'; if (s.defb) tags += '🛡'; if (s.slow) tags += '🐌'; if (s.curse) tags += '☠️';
+      let tags = ''; if (s.haste) tags += '💨'; if (s.bless) tags += '✨'; if (s.stone) tags += '🪨'; if (s.defb) tags += '🛡'; if (s.slow) tags += '🐌'; if (s.curse) tags += '☠️'; if (s.bloodlust) tags += '😡'; if (s.shield) tags += '🌀'; if (s.stunned > 0) tags += '🙈';
       if (tags) { ctx.font = '12px ' + FONT; ctx.fillText(tags, p.x, p.y - HR * 0.78); }
     }
     if (B.shot && now - B.shot.t0 < 260) {

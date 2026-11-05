@@ -8,6 +8,14 @@ const MARKET_RATE = 0.8, MERCHANT_RATE = 0.6;
 const MARKET_COST = { gold: 1500, wood: 5, ore: 5 };
 const HIRE_COST = 2500, MAX_HEROES = 4;
 
+// gold/res: starting resources, neutral/garrison: guard strength, ehDay/ehMul/ehMove/ehGrow: enemy hero, income: your daily income
+const DIFFICULTY = {
+  easy:   { name: 'Easy',   icon: '🌱', desc: 'Generous start, weak guards, a late and gentle enemy hero.', gold: 15000, res: 1.5, neutral: 0.7, garrison: 0.7, ehDay: 11, ehMul: 0.7, ehMove: 800, ehGrow: 1.1, income: 1.25 },
+  normal: { name: 'Normal', icon: '⚔️', desc: 'The intended challenge.', gold: 10000, res: 1, neutral: 1, garrison: 1, ehDay: 8, ehMul: 1, ehMove: 1000, ehGrow: 1.15, income: 1 },
+  hard:   { name: 'Hard',   icon: '🔥', desc: 'Tougher guards, an earlier and stronger enemy hero, leaner income.', gold: 7500, res: 0.75, neutral: 1.3, garrison: 1.3, ehDay: 6, ehMul: 1.3, ehMove: 1200, ehGrow: 1.2, income: 0.85 },
+  expert: { name: 'Expert', icon: '💀', desc: 'Scarce resources, brutal guards, and the enemy hero marches almost at once.', gold: 5000, res: 0.5, neutral: 1.6, garrison: 1.6, ehDay: 4, ehMul: 1.7, ehMove: 1400, ehGrow: 1.3, income: 0.7 },
+};
+
 // a=attack d=defense lo/hi=damage hp s=speed shoot=ammo fly=flyer v=AI value gr=weekly growth
 // Neutral roaming monsters (not recruitable)
 const C = {
@@ -19,7 +27,19 @@ const C = {
   golem:   { n: 'Stone Golem', i: '🗿', a: 9,  d: 10, lo: 4,  hi: 8,  hp: 60,  s: 3,  v: 400 },
   naga:    { n: 'Naga',        i: '🐍', a: 16, d: 13, lo: 20, hi: 20, hp: 110, s: 5,  v: 1100 },
   dragon:  { n: 'Green Dragon', i: '🐉', a: 18, d: 18, lo: 40, hi: 50, hp: 180, s: 10, fly: 1, v: 3800 },
+  shark:   { n: 'Shark',       i: '🦈', a: 10, d: 6,  lo: 4,  hi: 8,  hp: 40,  s: 7,  v: 420 },
+  kraken:  { n: 'Kraken',      i: '🦑', a: 15, d: 14, lo: 15, hi: 30, hp: 130, s: 6,  v: 1500 },
 };
+
+// ---------- map presets, sizes and boats ----------
+const MAPS = {
+  plains:   { name: 'Emerald Plains', icon: '🌿', desc: 'Balanced lands, a sheltered bay by your castle.', water: 0.30, mount: 0.72, forest: 0.60, bay: 1, density: 1 },
+  highland: { name: 'Highland Frontier', icon: '⛰️', desc: 'Mountains and forests funnel armies through narrow passes.', water: 0.22, mount: 0.60, forest: 0.52, bay: 0.6, density: 1 },
+  isles:    { name: 'Sunken Isles', icon: '🏝️', desc: 'Much water and a wide sea: boats and sea treasures matter.', water: 0.42, mount: 0.78, forest: 0.62, bay: 1.5, density: 1 },
+  steppe:   { name: 'Wild Steppe', icon: '🌾', desc: 'Open plains with few obstacles and many wandering monsters.', water: 0.18, mount: 0.82, forest: 0.72, bay: 0.6, density: 1.3 },
+};
+const SIZES = { small: { name: 'Small', w: 32, h: 22 }, medium: { name: 'Medium', w: 40, h: 28 }, large: { name: 'Large', w: 52, h: 36 } };
+const SHIPYARD_COST = { gold: 2000, wood: 20 }, BOAT_COST = { gold: 1000, wood: 10 }, MAX_BOATS = 2;
 
 // ---------- the 9 castles: 7 tiers each ----------
 // [name, upgraded name, icon, att, def, minDmg, maxDmg, hp, speed, shooterAmmo, flyer, gold, extraRes, extraAmt]
@@ -28,7 +48,7 @@ const FD = {
     ['Pikeman', 'Halberdier', '🔱', 4, 5, 1, 3, 10, 4, 0, 0, 60],
     ['Archer', 'Marksman', '🏹', 6, 3, 2, 3, 10, 4, 12, 0, 100],
     ['Griffin', 'Royal Griffin', '🦅', 8, 8, 3, 6, 25, 6, 0, 1, 200],
-    ['Swordsman', 'Crusader', '⚔️', 10, 12, 6, 9, 35, 5, 0, 0, 300],
+    ['Swordsman', 'Crusader', '⚔️', 10, 12, 6, 9, 35, 5, 0, 0, 350],
     ['Monk', 'Zealot', '🧙', 12, 7, 10, 12, 30, 5, 12, 0, 400],
     ['Cavalier', 'Champion', '🐎', 15, 15, 15, 25, 100, 7, 0, 0, 1000],
     ['Angel', 'Archangel', '👼', 20, 20, 50, 50, 200, 12, 0, 1, 3000, 'gems', 1]],
@@ -37,37 +57,37 @@ const FD = {
     ['Dwarf', 'Battle Dwarf', '🧔', 6, 7, 2, 4, 20, 3, 0, 0, 120],
     ['Wood Elf', 'Grand Elf', '🧝', 9, 5, 3, 5, 15, 6, 24, 0, 200],
     ['Pegasus', 'Silver Pegasus', '🪶', 9, 8, 5, 9, 30, 8, 0, 1, 250],
-    ['Dendroid Guard', 'Dendroid Soldier', '🌳', 9, 12, 10, 14, 55, 3, 0, 0, 350],
-    ['Unicorn', 'War Unicorn', '🦄', 15, 14, 18, 22, 90, 7, 0, 0, 850],
+    ['Dendroid Guard', 'Dendroid Soldier', '🌳', 9, 12, 10, 14, 55, 3, 0, 0, 410],
+    ['Unicorn', 'War Unicorn', '🦄', 15, 14, 18, 22, 90, 7, 0, 0, 940],
     ['Green Dragon', 'Gold Dragon', '🐲', 18, 18, 40, 50, 180, 10, 0, 1, 2400, 'gems', 1]],
   tower: [
-    ['Gremlin', 'Master Gremlin', '👾', 3, 3, 1, 2, 4, 4, 8, 0, 30],
+    ['Gremlin', 'Master Gremlin', '👾', 3, 3, 1, 2, 4, 4, 8, 0, 35],
     ['Stone Gargoyle', 'Obsidian Gargoyle', '🦇', 6, 6, 2, 3, 16, 6, 0, 1, 130],
-    ['Stone Golem', 'Iron Golem', '🤖', 7, 10, 4, 5, 30, 3, 0, 0, 150],
+    ['Stone Golem', 'Iron Golem', '🤖', 7, 10, 4, 5, 30, 3, 0, 0, 170],
     ['Mage', 'Arch Mage', '🪄', 11, 8, 7, 9, 25, 5, 24, 0, 350],
     ['Genie', 'Master Genie', '🧞', 12, 12, 13, 16, 40, 7, 0, 1, 550],
     ['Naga', 'Naga Queen', '🐍', 16, 13, 20, 20, 110, 5, 0, 0, 1100],
     ['Giant', 'Titan', '🧌', 19, 16, 40, 60, 150, 7, 0, 0, 2000, 'gems', 1]],
   inferno: [
-    ['Imp', 'Familiar', '😈', 2, 3, 1, 2, 4, 5, 0, 0, 50],
+    ['Imp', 'Familiar', '😈', 2, 3, 1, 2, 4, 5, 0, 0, 40],
     ['Gog', 'Magog', '👹', 6, 4, 2, 4, 13, 4, 12, 0, 125],
     ['Hell Hound', 'Cerberus', '🐕', 10, 6, 2, 7, 25, 7, 0, 0, 200],
-    ['Demon', 'Horned Demon', '👿', 10, 10, 7, 9, 35, 5, 0, 0, 250],
+    ['Demon', 'Horned Demon', '👿', 10, 10, 7, 9, 35, 5, 0, 0, 290],
     ['Pit Fiend', 'Pit Lord', '🔥', 13, 13, 13, 17, 45, 6, 0, 0, 500],
     ['Efreet', 'Efreet Sultan', '☄️', 16, 12, 16, 24, 90, 9, 0, 1, 900],
-    ['Devil', 'Arch Devil', '😡', 19, 21, 30, 40, 160, 11, 0, 1, 2700, 'mercury', 1]],
+    ['Devil', 'Arch Devil', '😡', 19, 21, 30, 40, 160, 11, 0, 1, 2300, 'mercury', 1]],
   necropolis: [
     ['Skeleton', 'Skeleton Warrior', '💀', 5, 4, 1, 3, 6, 4, 0, 0, 60],
     ['Walking Dead', 'Zombie', '🧟', 5, 5, 2, 3, 15, 3, 0, 0, 100],
     ['Wight', 'Wraith', '👻', 7, 7, 3, 5, 18, 5, 0, 0, 170],
-    ['Vampire', 'Vampire Lord', '🧛', 10, 9, 5, 8, 30, 6, 0, 1, 360],
+    ['Vampire', 'Vampire Lord', '🧛', 10, 9, 5, 8, 30, 6, 0, 1, 310],
     ['Lich', 'Power Lich', '🔮', 13, 10, 11, 15, 30, 6, 12, 0, 550],
     ['Black Knight', 'Dread Knight', '🏇', 16, 16, 15, 30, 120, 7, 0, 0, 1200],
     ['Bone Dragon', 'Ghost Dragon', '🦴', 17, 15, 25, 50, 150, 9, 0, 1, 1800]],
   dungeon: [
     ['Troglodyte', 'Infernal Troglodyte', '🦎', 4, 3, 1, 3, 5, 4, 0, 0, 50],
-    ['Harpy', 'Harpy Hag', '🐦‍⬛', 6, 5, 1, 4, 14, 6, 0, 1, 130],
-    ['Beholder', 'Evil Eye', '👁️', 9, 7, 3, 5, 22, 5, 12, 0, 250],
+    ['Harpy', 'Harpy Hag', '🐦‍⬛', 6, 5, 1, 4, 14, 6, 0, 1, 110],
+    ['Beholder', 'Evil Eye', '👁️', 9, 7, 3, 5, 22, 5, 12, 0, 210],
     ['Medusa', 'Medusa Queen', '🧜', 9, 9, 6, 8, 25, 5, 4, 0, 300],
     ['Minotaur', 'Minotaur King', '🐂', 12, 12, 12, 20, 50, 6, 0, 0, 500],
     ['Manticore', 'Scorpicore', '🦂', 15, 13, 14, 20, 80, 7, 0, 1, 850],
@@ -76,26 +96,26 @@ const FD = {
     ['Goblin', 'Hobgoblin', '👺', 4, 2, 1, 2, 5, 5, 0, 0, 40],
     ['Wolf Rider', 'Wolf Raider', '🐺', 7, 5, 2, 4, 10, 6, 0, 0, 100],
     ['Orc', 'Orc Chieftain', '🦍', 8, 4, 2, 5, 15, 4, 12, 0, 150],
-    ['Ogre', 'Ogre Mage', '👹', 13, 7, 6, 12, 60, 4, 0, 0, 300],
+    ['Ogre', 'Ogre Mage', '👹', 13, 7, 6, 12, 60, 4, 0, 0, 370],
     ['Roc', 'Thunderbird', '🦜', 13, 11, 11, 15, 60, 7, 0, 1, 600],
-    ['Cyclops', 'Cyclops King', '🧿', 15, 12, 16, 20, 70, 6, 16, 0, 750],
-    ['Behemoth', 'Ancient Behemoth', '🦏', 17, 17, 30, 50, 160, 6, 0, 0, 1500]],
+    ['Cyclops', 'Cyclops King', '🧿', 15, 12, 16, 20, 70, 6, 16, 0, 880],
+    ['Behemoth', 'Ancient Behemoth', '🦏', 17, 17, 30, 50, 160, 6, 0, 0, 1700]],
   fortress: [
     ['Gnoll', 'Gnoll Marauder', '🐕‍🦺', 3, 5, 2, 3, 6, 4, 0, 0, 50],
     ['Lizardman', 'Lizard Warrior', '🦎', 5, 6, 2, 3, 12, 4, 12, 0, 110],
-    ['Serpent Fly', 'Dragon Fly', '🪰', 7, 9, 2, 5, 20, 9, 0, 1, 220],
+    ['Serpent Fly', 'Dragon Fly', '🪰', 7, 9, 2, 5, 20, 9, 0, 1, 180],
     ['Basilisk', 'Greater Basilisk', '🐊', 11, 11, 6, 10, 35, 5, 0, 0, 400],
-    ['Gorgon', 'Mighty Gorgon', '🐃', 10, 14, 12, 16, 70, 5, 0, 0, 525],
+    ['Gorgon', 'Mighty Gorgon', '🐃', 10, 14, 12, 16, 70, 5, 0, 0, 590],
     ['Wyvern', 'Wyvern Monarch', '🦖', 14, 14, 18, 22, 70, 7, 0, 1, 800],
     ['Hydra', 'Chaos Hydra', '🐙', 16, 18, 25, 45, 175, 5, 0, 0, 2200]],
   conflux: [
     ['Pixie', 'Sprite', '🧚', 2, 2, 1, 2, 3, 7, 0, 1, 25],
     ['Air Elemental', 'Storm Elemental', '🌪️', 9, 9, 2, 8, 30, 7, 0, 0, 250],
-    ['Water Elemental', 'Ice Elemental', '💧', 8, 10, 3, 7, 30, 5, 0, 0, 300],
-    ['Fire Elemental', 'Energy Elemental', '🔥', 10, 8, 4, 6, 35, 6, 0, 0, 350],
-    ['Earth Elemental', 'Magma Elemental', '⛰️', 10, 10, 4, 8, 40, 4, 0, 0, 400],
+    ['Water Elemental', 'Ice Elemental', '💧', 8, 10, 3, 7, 30, 5, 0, 0, 260],
+    ['Fire Elemental', 'Energy Elemental', '🔥', 10, 8, 4, 6, 35, 6, 0, 0, 290],
+    ['Earth Elemental', 'Magma Elemental', '⛰️', 10, 10, 4, 8, 40, 4, 0, 0, 350],
     ['Psychic Elemental', 'Magic Elemental', '🧠', 15, 13, 10, 20, 75, 7, 0, 0, 950],
-    ['Firebird', 'Phoenix', '☀️', 18, 18, 30, 40, 150, 13, 0, 1, 1500, 'mercury', 1]],
+    ['Firebird', 'Phoenix', '☀️', 18, 18, 30, 40, 150, 13, 0, 1, 1750, 'mercury', 1]],
 };
 const GROWTH = [14, 9, 7, 4, 3, 2, 1];
 const MAX_LV = 5;
@@ -163,6 +183,11 @@ function setFaction(f) { CASTLE_TIERS.length = 0; CASTLE_TIERS.push(...factionTi
     });
   }
 })();
+
+// BEGIN TUNED_V (generated by tools/apply_calibration.js)
+const TUNED_V = {"castle1":[95,219],"castle2":[115,292],"castle3":[269,605],"castle4":[560,1040],"castle5":[672,1441],"castle6":[1483,3667],"castle7":[3667,9543],"rampart1":[91,214],"rampart2":[176,398],"rampart3":[243,531],"rampart4":[400,900],"rampart5":[672,1681],"rampart6":[1441,3444],"rampart7":[3667,6613],"tower1":[63,153],"tower2":[146,329],"tower3":[273,672],"tower4":[486,1121],"tower5":[672,1681],"tower6":[1605,3667],"tower7":[3103,6988],"inferno1":[49,110],"inferno2":[144,365],"inferno3":[265,630],"inferno4":[458,1121],"inferno5":[770,1761],"inferno6":[1441,2751],"inferno7":[2726,7016],"necropolis1":[75,158],"necropolis2":[129,297],"necropolis3":[205,476],"necropolis4":[375,917],"necropolis5":[782,1739],"necropolis6":[1891,4482],"necropolis7":[2706,5763],"dungeon1":[63,136],"dungeon2":[133,318],"dungeon3":[240,619],"dungeon4":[425,917],"dungeon5":[720,1903],"dungeon6":[1217,2706],"dungeon7":[3185,8453],"stronghold1":[54,122],"stronghold2":[119,288],"stronghold3":[174,438],"stronghold4":[654,1441],"stronghold5":[890,1921],"stronghold6":[1441,3103],"stronghold7":[2726,8068],"fortress1":[84,163],"fortress2":[124,306],"fortress3":[215,442],"fortress4":[473,1121],"fortress5":[924,2123],"fortress6":[1132,2988],"fortress7":[2726,6391],"conflux1":[40,94],"conflux2":[325,761],"conflux3":[312,756],"conflux4":[345,781],"conflux5":[420,961],"conflux6":[1121,2567],"conflux7":[2824,6455]};
+Object.keys(TUNED_V).forEach(id => { const [v1, v5] = TUNED_V[id]; for (let L = 1; L <= MAX_LV; L++) C[lineType(id, L)].v = Math.round(v1 * Math.pow(v5 / v1, (L - 1) / 4)); });
+// END TUNED_V
 
 // hero roster: id -> definition
 const HEROES = {};
@@ -233,7 +258,10 @@ const ARTIFACTS = [
   { n: 'Dragon Scale Shield', i: '🛡️', stat: 'def', v: 3 },
   { n: 'Orb of Inhibition', i: '🔮', stat: 'sp', v: 2 },
   { n: 'Tome of Lore', i: '📖', stat: 'kn', v: 3 },
+  { n: 'Trident of the Deep', i: '🔱', stat: 'att', v: 3 },
+  { n: "Admiral's Compass", i: '🧭', stat: 'kn', v: 2 },
 ];
+const LAND_ARTS = 4;
 
 const T = { GRASS: 0, FOREST: 1, MOUNT: 2, WATER: 3, ROAD: 4, SAND: 5 };
 const TCOST = { 0: 100, 4: 70, 5: 150 };

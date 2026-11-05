@@ -3,7 +3,7 @@
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   const TS = 32, VW = 960, VH = 640, FONT = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
-  const SAVE = 'h3js_save_v3';
+  const SAVE = 'h3js_save_v4';
   const MOVE_PER_DAY = 1700;
   const FLEE_RATIO = 3;
   const cmap = $('map'), cx = cmap.getContext('2d'), mini = $('mini'), mx = mini.getContext('2d');
@@ -62,23 +62,32 @@
   }
 
   // ---------- new game / save ----------
-  function newGame(faction, heroId) {
+  const DF = () => DIFFICULTY[(G && G.diff) || 'normal'];
+  function seedFrom(s) {
+    s = String(s || '').trim();
+    if (!s) return Math.floor(Math.random() * 1e9);
+    if (/^\d+$/.test(s)) return parseInt(s, 10) % 2147483647;
+    let h = 7; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) | 0;
+    return Math.abs(h);
+  }
+  function newGame(faction, heroId, diff = 'normal', map = {}) {
     const others = Object.keys(FACTIONS).filter(f => f !== faction);
     const ef = others[Math.floor(Math.random() * others.length)];
-    const seed = Math.floor(Math.random() * 1e9), m = genMap(seed, ef);
+    const D = DIFFICULTY[diff], r = (n) => Math.max(1, Math.round(n * D.res));
+    const preset = map.preset || 'plains', size = map.size || 'medium', seed = seedFrom(map.seed), m = genMap(seed, ef, diff, { preset, size });
     setFaction(faction);
-    G = { seed, W: m.W, H: m.H, tiles: m.tiles, zone: m.zone, objs: m.objs, day: 1, over: false, path: null, faction, efaction: ef,
-      res: { gold: 10000, wood: 20, ore: 20, mercury: 5, sulfur: 5, crystal: 5, gems: 5 }, spells: [...START_SPELLS],
+    G = { seed, preset, size, W: m.W, H: m.H, tiles: m.tiles, zone: m.zone, objs: m.objs, dock: m.dock, boats: [], nextBoat: 1, day: 1, over: false, path: null, faction, efaction: ef, diff,
+      res: { gold: D.gold, wood: r(20), ore: r(20), mercury: r(5), sulfur: r(5), crystal: r(5), gems: r(5) }, spells: [...START_SPELLS],
       wk: {}, heroes: [], sel: 0, hero: null, eh: null, ehTimer: 0, ehWave: 0, tavern: [] };
     const t = town(); t.name = FACTIONS[faction].town;
-    t.b = { 1: 1, 2: 1, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, hall: 0, guild: 0, market: 0 };
+    t.b = { 1: 1, 2: 1, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, hall: 0, guild: 0, market: 0, ship: 0 };
     t.up = { 1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1 };
     t.avail = { 1: GROWTH[0], 2: GROWTH[1] };
     const def = HEROES[heroId], h = makeHero(def, m.P.x, m.P.y), ti = factionTiers(faction);
     h.army = [{ t: ti[0], n: 20 }, { t: ti[1], n: 10 }, { t: ti[2], n: 5 }, null, null, null, null];
     G.heroes.push(h); setActive(0); learn(def.spells); rollTavern();
-    reindex(G); buildTerrain(); centerOn(h.x, h.y); renderAll();
-    toast(`Capture the ${FACTIONS[ef].name} stronghold in the NE to win. Good luck, ${h.name}!`);
+    reindex(G); buildTerrain(); sizeMini(); centerOn(h.x, h.y); renderAll();
+    toast(`${MAPS[preset].name} (${SIZES[size].name}, seed ${seed}) · ${D.name}: capture the ${FACTIONS[ef].name} stronghold in the NE to win. Good luck, ${h.name}!`);
   }
   const saveJSON = () => JSON.stringify(G, (k, v) => (k === 'omap' || k === 'hero') ? undefined : v);
   function save() { try { localStorage.setItem(SAVE, saveJSON()); toast('Game saved.'); } catch (e) { toast('Save failed.'); } }
@@ -86,8 +95,8 @@
     try {
       const s = localStorage.getItem(SAVE); if (!s) return false;
       G = JSON.parse(s); if (!G.zone || !G.heroes) return false;
-      G.path = null; setFaction(G.faction); setActive(Math.min(G.sel, G.heroes.length - 1));
-      reindex(G); buildTerrain(); centerOn(G.hero.x, G.hero.y); renderAll(); return true;
+      G.path = null; G.boats = G.boats || []; setFaction(G.faction); setActive(Math.min(G.sel, G.heroes.length - 1));
+      reindex(G); buildTerrain(); sizeMini(); centerOn(G.hero.x, G.hero.y); renderAll(); return true;
     } catch (e) { return false; }
   }
 
@@ -108,6 +117,8 @@
       if (t === T.MOUNT) c.fillText('⛰️', px + 16, py + 17);
     }
   }
+  let MK = 6;
+  function sizeMini() { MK = Math.max(3, Math.floor(240 / G.W)); mini.width = G.W * MK; mini.height = G.H * MK; }
   function centerOn(x, y) {
     cam.x = Math.max(0, Math.min(G.W * TS - VW, x * TS + TS / 2 - VW / 2));
     cam.y = Math.max(0, Math.min(G.H * TS - VH, y * TS + TS / 2 - VH / 2));
@@ -118,6 +129,7 @@
       case 'town': return '🏰';
       case 'fort': return '🏯';
       case 'merchant': return '⛺';
+      case 'wreck': return '🚢';
       case 'mine': return MINE_ICON[o.kind];
       case 'pile': return RES_ICON[o.kind];
       case 'chest': return '🧰';
@@ -152,7 +164,7 @@
     for (const o of G.objs) {
       if (o.x < x0 - 1 || o.x > x0 + 31 || o.y < y0 - 1 || o.y > y0 + 21) continue;
       const px = o.x * TS - cam.x + TS / 2, py = o.y * TS - cam.y + TS / 2;
-      if (o.t === 'monster' || o.t === 'art' || o.t === 'mine') {
+      if (o.t === 'monster' || o.t === 'art' || o.t === 'mine' || o.t === 'wreck') {
         cx.beginPath(); cx.arc(px, py, 15, 0, 7);
         cx.fillStyle = o.t === 'monster' ? 'rgba(90,10,10,.65)' : 'rgba(0,0,0,.45)'; cx.fill();
       }
@@ -166,6 +178,10 @@
       if (o.t === 'mine') { cx.beginPath(); cx.arc(px + 12, py - 12, 5, 0, 7); cx.fillStyle = o.owner === 0 ? '#3a8aff' : '#999'; cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke(); }
       if (o.t === 'town') { cx.beginPath(); cx.arc(px + 16, py - 18, 6, 0, 7); cx.fillStyle = o.owner === 0 ? '#3a8aff' : '#e03a3a'; cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke(); }
     }
+    for (const b of G.boats) {
+      const px = b.x * TS - cam.x + TS / 2, py = b.y * TS - cam.y + TS / 2;
+      cx.font = `30px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText('⛵', px, py + 2);
+    }
     if (G.eh) {
       const px = G.eh.x * TS - cam.x + TS / 2, py = G.eh.y * TS - cam.y + TS / 2;
       cx.beginPath(); cx.arc(px, py, 15, 0, 7); cx.fillStyle = '#a02020'; cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 2; cx.stroke();
@@ -173,16 +189,17 @@
     }
     G.heroes.forEach((h, i) => {
       const px = h.x * TS - cam.x + TS / 2 + (G.heroes.filter((o, j) => j < i && o.x === h.x && o.y === h.y).length * 6), py = h.y * TS - cam.y + TS / 2;
-      cx.beginPath(); cx.arc(px, py, 15, 0, 7); cx.fillStyle = '#2a5fb0'; cx.fill();
+      const rr = h.boat != null ? 11 : 15;
+      cx.beginPath(); cx.arc(px, py - (h.boat != null ? 6 : 0), rr, 0, 7); cx.fillStyle = '#2a5fb0'; cx.fill();
       cx.strokeStyle = h === G.hero ? '#ffd24a' : '#fff'; cx.lineWidth = h === G.hero ? 3 : 1.5; cx.stroke();
-      cx.font = `22px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(h.icon, px, py + 1);
+      cx.font = `${h.boat != null ? 16 : 22}px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(h.icon, px, py + 1 - (h.boat != null ? 6 : 0));
     });
     if (hover) { cx.strokeStyle = 'rgba(255,255,255,.8)'; cx.lineWidth = 2; cx.strokeRect(hover.x * TS - cam.x + 1, hover.y * TS - cam.y + 1, TS - 2, TS - 2); }
     drawMini();
   }
   const MC = { [T.GRASS]: '#4a7c3a', [T.FOREST]: '#2f5a2a', [T.MOUNT]: '#666', [T.WATER]: '#285c92', [T.ROAD]: '#a88a5a', [T.SAND]: '#c8b26c' };
   function drawMini() {
-    const k = 6;
+    const k = MK;
     const zo = {}; for (const o of G.objs) if (o.t === 'fort' || o.t === 'town') zo[o.zone] = o.owner;
     for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) {
       mx.fillStyle = MC[G.tiles[y][x]]; mx.fillRect(x * k, y * k, k, k);
@@ -193,6 +210,7 @@
       mx.fillStyle = o.t === 'fort' ? (o.owner === 0 ? '#9cf' : o.owner === 1 ? '#f88' : '#ffa') : o.t === 'town' ? (o.owner === 0 ? '#4af' : '#f44') : o.t === 'monster' ? '#a33' : o.t === 'mine' ? (o.owner === 0 ? '#4af' : '#ddd') : o.t === 'merchant' ? '#fa0' : '#ee6';
       mx.fillRect(o.x * k, o.y * k, k, k);
     }
+    mx.fillStyle = '#8df'; for (const b of G.boats) mx.fillRect(b.x * k, b.y * k, k, k);
     if (G.eh) { mx.fillStyle = '#f0f'; mx.fillRect(G.eh.x * k - 1, G.eh.y * k - 1, k + 2, k + 2); }
     mx.fillStyle = '#fff'; for (const h of G.heroes) mx.fillRect(h.x * k - 1, h.y * k - 1, k + 2, k + 2);
     mx.strokeStyle = '#fff'; mx.lineWidth = 1; mx.strokeRect(cam.x / TS * k, cam.y / TS * k, VW / TS * k, VH / TS * k);
@@ -204,13 +222,14 @@
     if (!G) return;
     $('res').innerHTML = RES.map(k => `<span title="${k}">${RES_ICON[k]} ${G.res[k]}</span>`).join('');
     const d = G.day - 1;
-    $('date').textContent = `Month ${Math.floor(d / 28) + 1} · Week ${Math.floor(d % 28 / 7) + 1} · Day ${d % 7 + 1}`;
+    $('date').textContent = `Month ${Math.floor(d / 28) + 1} · Week ${Math.floor(d % 28 / 7) + 1} · Day ${d % 7 + 1} · ${DF().icon} ${DF().name}`;
     const h = G.hero;
     const perkTxt = Object.keys(h.perks).filter(k => h.perks[k]).map(k => `${PERKS[k].i}${PERKS[k].n} ${'★'.repeat(h.perks[k])}`).join(' · ');
     $('hero').innerHTML = `<div class="hlist">${G.heroes.map((x, i) => `<button class="hbtn${x === h ? ' on' : ''}" data-h="${i}" title="${x.name} (${x.cls})">${x.icon}</button>`).join('')}</div>
       <h3>${h.icon} ${h.name} <span class="small">${h.cls} — Level ${h.lvl}</span></h3>
       <div class="stats"><span>⚔️ Attack ${h.att}</span><span>🛡 Defense ${h.def}</span><span>✨ Spell Pow ${h.sp}</span><span>📚 Knowledge ${h.kn}</span></div>
       <div class="small">Movement ${h.move}/${maxMove(h)}</div><div class="bar mv"><i style="width:${Math.min(100, h.move / maxMove(h) * 100)}%"></i></div>
+      ${h.boat != null ? '<div class="small">⛵ Sailing — walk onto a shore tile to disembark</div>' : ''}
       <div class="small">Mana ${h.mana}/${maxMana(h)}</div><div class="bar mn"><i style="width:${Math.min(100, h.mana / maxMana(h) * 100)}%"></i></div>
       <div class="small">XP ${h.xp}/${need(h.lvl)}</div><div class="bar xp"><i style="width:${Math.min(100, h.xp / need(h.lvl) * 100)}%"></i></div>
       ${perkTxt ? `<div class="small">${perkTxt}</div>` : ''}
@@ -252,7 +271,7 @@
     if (busy) return;
     if (heroAtTown(h)) return toast('Already in your castle.');
     if (h.mana < PORTAL_COST) return toast(`Town Portal needs ${PORTAL_COST} mana.`);
-    h.mana -= PORTAL_COST; h.x = town().x; h.y = town().y; h.move = Math.min(h.move, 400); G.path = null;
+    h.mana -= PORTAL_COST; h.x = town().x; h.y = town().y; h.boat = null; h.move = Math.min(h.move, 400); G.path = null;
     centerOn(h.x, h.y); renderAll(); toast(`${h.name} teleports home.`);
   }
 
@@ -266,13 +285,15 @@
   function armyList(arr, vague) { return arr.filter(Boolean).map(a => vague ? `${groupLabel(a.n)} ${C[a.t].n}s` : `${a.n} ${C[a.t].n}`).join(', '); }
   function describe(x, y) {
     if (G.eh && G.eh.x === x && G.eh.y === y) return `<b>${G.eh.name}</b> (enemy hero)<br>${armyList(G.eh.army, true)}`;
-    const hs = heroesAt(x, y); if (hs.length) return hs.map(h => `<b>${h.name}</b> (${h.cls} L${h.lvl})`).join('<br>');
+    const hs = heroesAt(x, y); if (hs.length) return hs.map(h => `<b>${h.name}</b> (${h.cls} L${h.lvl})${h.boat != null ? ' ⛵ sailing' : ''}`).join('<br>');
+    if (G.boats.some(b => b.x === x && b.y === y)) return '<b>⛵ Your boat</b><br>Walk onto it from the shore to set sail.';
     const o = objAt(G, x, y);
-    if (!o) return ['Grass', 'Forest (impassable)', 'Mountains (impassable)', 'Water (impassable)', 'Road (fast)', 'Sand (slow)'][G.tiles[y][x]];
+    if (!o) return ['Grass', 'Forest (impassable)', 'Mountains (impassable)', 'Water (needs a boat)', 'Road (fast)', 'Sand (slow)'][G.tiles[y][x]];
     const g = o.guard && o.guard.length ? `<br>Guarded by: ${armyList(o.guard, true)}` : '';
     switch (o.t) {
       case 'town': return o.owner === 0 ? `<b>${o.name}</b> — your castle` : `<b>${o.name}</b> — enemy stronghold${g}<br>Assaulting it is a siege battle.`;
       case 'merchant': return '<b>Wandering Merchant</b><br>Buy missing resources';
+      case 'wreck': return `<b>Shipwreck</b><br>Salvage: ${RES_ICON.gold}${o.gold} + ${RES_ICON[o.res]}${g}`;
       case 'mine': {
         const supplied = o.owner === 0 && zoneOwner(G, G.zone[o.y][o.x]) === 0;
         return `<b>${o.kind[0].toUpperCase() + o.kind.slice(1)} mine</b> (${o.owner === 0 ? 'yours' : 'unclaimed'}) +${MINE_YIELD[o.kind]}/day` +
@@ -312,8 +333,8 @@
     }
     const last = G.path && G.path[G.path.length - 1];
     if (last && last.x === t.x && last.y === t.y) return moveHero();
-    const p = findPath(G, G.hero.x, G.hero.y, t.x, t.y);
-    if (!p || !p.length) { G.path = null; return toast("Can't reach there."); }
+    const p = findPath(G, G.hero.x, G.hero.y, t.x, t.y, false, G.hero.boat != null);
+    if (!p || !p.length) { G.path = null; return toast(G.hero.boat != null ? 'Cannot sail there — disembark on a shore tile.' : "Can't reach there. (Water needs a boat.)"); }
     G.path = p;
   });
   mini.addEventListener('click', (ev) => {
@@ -342,7 +363,16 @@
     for (let i = 0; i < path.length; i++) {
       const s = path[i];
       if (s.cost > h.move) { G.path = path.slice(i); toast('Out of movement — end turn to continue.'); break; }
-      h.move -= s.cost; h.x = s.x; h.y = s.y; centerOn(h.x, h.y); renderAll();
+      h.move -= s.cost;
+      const water = G.tiles[s.y][s.x] === T.WATER;
+      if (h.boat != null) {
+        if (water) { const bt = G.boats.find(b => b.id === h.boat); if (bt) { bt.x = s.x; bt.y = s.y; } }
+        else { h.boat = null; toast(`${h.name} disembarks.`); }
+      } else if (water) {
+        const bt = G.boats.find(b => b.x === s.x && b.y === s.y);
+        if (bt) { h.boat = bt.id; toast(`${h.name} sets sail!`); }
+      }
+      h.x = s.x; h.y = s.y; centerOn(h.x, h.y); renderAll();
       await sleep(70);
       const last = i === path.length - 1, o = objAt(G, s.x, s.y);
       if (G.eh && G.eh.x === s.x && G.eh.y === s.y) { await fightEnemyHero(h, true); break; }
@@ -357,6 +387,12 @@
     G.objs.splice(G.objs.indexOf(o), 1); reindex(G);
   }
   async function interact(o, h) {
+    if (o.t === 'wreck') {
+      if (o.guard && o.guard.length) { if (!(await fight(h, o.guard, { att: 0, def: 0 }, 'Shipwreck guardians'))) return; o.guard = []; }
+      const n = 3 + Math.floor(Math.random() * 4);
+      G.res.gold += o.gold; G.res[o.res] += n; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); renderAll();
+      return showModal(`<h2>🚢 Shipwreck salvaged</h2><p>${h.name}'s crew recovers ${RES_ICON.gold}${o.gold} and ${RES_ICON[o.res]}${n} from the wreck.</p>`);
+    }
     if (o.t === 'merchant') return openMarket(MERCHANT_RATE + ((G.wk && G.wk.rateBonus) || 0), 'Wandering Merchant', false);
     if (o.t === 'town') {
       if (o.owner === 0) { for (const x of heroesAt(o.x, o.y)) x.mana = maxMana(x); return openTown(); }
@@ -411,7 +447,7 @@
     }
   }
   function retreat(h) {
-    h.army = emptyArmy(); h.x = town().x; h.y = town().y; G.path = null;
+    h.army = emptyArmy(); h.x = town().x; h.y = town().y; h.boat = null; G.path = null;
     if (h === G.hero) centerOn(h.x, h.y);
     toast(`${h.name} returns to the castle with no army. Recruit new troops!`);
   }
@@ -486,7 +522,7 @@
   // ---------- town ----------
   let townAnim = null, townLoop = false;
   const LV_COL = ['#7a6a50', '#8c7a58', '#9e8a60', '#b49c62', '#d4b252'];
-  const SLOTS = 10;
+  const SLOTS = 11;
   const TIER_HALL = [null, 0, 0, 1, 2, 3, 4, 5];
   const UP_HALL = { 2: 1, 3: 2, 4: 3, 5: 4 };
   const tierType = (t, tier) => lineType(CASTLE_TIERS[tier - 1], (t.up && t.up[tier]) || 1);
@@ -496,7 +532,8 @@
     if (i < 7) return { built: !!t.b[i + 1], lv: t.up[i + 1] || 1, max: MAX_LV, icon: C[tierType(t, i + 1)].i };
     if (i === 7) return { built: t.b.hall > 0, lv: t.b.hall, max: 5, icon: '🏛️' };
     if (i === 8) return { built: t.b.guild > 0, lv: t.b.guild, max: 3, icon: '🔮' };
-    return { built: !!t.b.market, lv: t.b.market ? 1 : 0, max: 1, icon: '⚖️' };
+    if (i === 9) return { built: !!t.b.market, lv: t.b.market ? 1 : 0, max: 1, icon: '⚖️' };
+    return { built: !!t.b.ship, lv: t.b.ship ? 1 : 0, max: 1, icon: '⚓' };
   }
   function drawTown() {
     const cv = $('tcv');
@@ -512,17 +549,17 @@
     g.textAlign = 'center'; g.textBaseline = 'middle';
     if (townAnim && now - townAnim.t0 > 1600) townAnim = null;
     for (let i = 0; i < SLOTS; i++) {
-      const x = 45 + i * 78, base = 120, s = slotInfo(t, i);
+      const x = 40 + i * 70, base = 120, s = slotInfo(t, i);
       const an = townAnim && townAnim.slot === i ? townAnim : null, p = an ? Math.min(1, (now - an.t0) / 1500) : 1;
       if (!s.built) {
-        g.setLineDash([4, 4]); g.strokeStyle = 'rgba(255,255,255,.35)'; g.strokeRect(x - 31, base - 54, 62, 54); g.setLineDash([]);
+        g.setLineDash([4, 4]); g.strokeStyle = 'rgba(255,255,255,.35)'; g.strokeRect(x - 28, base - 54, 56, 54); g.setLineDash([]);
         g.font = '22px ' + FONT; g.fillStyle = '#fff'; g.globalAlpha = 0.6; g.fillText('🚧', x, base - 27); g.globalAlpha = 1;
         continue;
       }
-      const bw = 62, bh = 54, hgt = an && an.kind === 'build' ? bh * Math.min(1, p * 1.5) : bh;
+      const bw = 56, bh = 54, hgt = an && an.kind === 'build' ? bh * Math.min(1, p * 1.5) : bh;
       g.fillStyle = LV_COL[Math.min(4, Math.max(0, s.lv - 1) * (s.max === 3 ? 2 : 1))]; g.fillRect(x - bw / 2, base - hgt, bw, hgt);
       g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x - bw / 2, base - hgt, 4, hgt);
-      if (hgt >= bh * 0.99) { g.fillStyle = '#6a2c2c'; g.beginPath(); g.moveTo(x - 36, base - bh); g.lineTo(x, base - bh - 20); g.lineTo(x + 36, base - bh); g.closePath(); g.fill(); }
+      if (hgt >= bh * 0.99) { g.fillStyle = '#6a2c2c'; g.beginPath(); g.moveTo(x - 32, base - bh); g.lineTo(x, base - bh - 20); g.lineTo(x + 32, base - bh); g.closePath(); g.fill(); }
       let size = 28;
       if (an && an.kind === 'upgrade') size = 28 * (1 + 0.7 * Math.sin(p * Math.PI));
       const bob = Math.sin(now / 400 + i) * 2;
@@ -569,21 +606,37 @@
   }
 
   function openTavern() {
-    const cards = G.tavern.map(id => { const d = HEROES[id];
+    const premium = G.tavern.length === 0;
+    const ids = premium ? Object.keys(HEROES).filter(id => !G.heroes.some(h => h.id === id)) : G.tavern, price = premium ? HIRE_COST * 2 : HIRE_COST;
+    const cards = ids.map(id => { const d = HEROES[id];
       return `<div class="trow" style="grid-template-columns:36px 1fr auto"><div class="ic">${d.i}</div>
         <div><b>${d.name}</b> <span class="small">${d.cls} (${FACTIONS[d.fac].name})</span><br><span class="small">⚔️${d.att} 🛡${d.def} ✨${d.sp} 📚${d.kn}${d.spells.length ? ' · knows ' + d.spells.map(k => SPELLS[k].n).join(', ') : ''}</span></div>
-        <div class="acts"><button data-hire="${id}">Hire ${RES_ICON.gold}${HIRE_COST}</button></div></div>`; }).join('');
-    $('mbox').innerHTML = `<h2>🍺 Tavern</h2><p class="small">Heroes: ${G.heroes.length}/${MAX_HEROES}. New heroes arrive at the castle without an army — recruit troops and use the exchange to equip them. Heroes level up independently.</p>${cards}
+        <div class="acts"><button data-hire="${id}">Hire ${RES_ICON.gold}${price}</button></div></div>`; }).join('');
+    $('mbox').innerHTML = `<h2>🍺 Tavern</h2><p class="small">Heroes: ${G.heroes.length}/${MAX_HEROES}. New heroes arrive at the castle without an army — recruit troops and use the exchange to equip them. Heroes level up independently. The tavern offers new heroes every week.</p>${premium ? `<p>No heroes are waiting at the tavern right now — mercenary captains from across the realm will serve for <b>double</b> the price (${RES_ICON.gold}${price}).</p>` : ''}${cards}
       <div class="mb"><button class="primary" id="hBack">Back to town</button></div>`;
     $('hBack').onclick = openTown;
     $('mbox').querySelectorAll('[data-hire]').forEach(b => b.onclick = () => {
       if (G.heroes.length >= MAX_HEROES) return toast(`You can command at most ${MAX_HEROES} heroes.`);
-      if (G.res.gold < HIRE_COST) return toast('Not enough gold.');
+      if (G.res.gold < price) return toast('Not enough gold.');
       const d = HEROES[b.dataset.hire], t = town();
-      G.res.gold -= HIRE_COST; G.heroes.push(makeHero(d, t.x, t.y)); learn(d.spells); setActive(G.heroes.length - 1);
-      rollTavern(); toast(`${d.name} joins your cause!`); renderAll(); openTavern();
+      G.res.gold -= price; G.heroes.push(makeHero(d, t.x, t.y)); learn(d.spells); setActive(G.heroes.length - 1);
+      G.tavern = G.tavern.filter(x => x !== d.id); toast(`${d.name} joins your cause!`); renderAll(); openTavern();
     });
     $('modal').classList.remove('hide');
+  }
+
+  function freeWater() {
+    const seen = new Set([G.dock.y * G.W + G.dock.x]), q = [G.dock];
+    while (q.length) {
+      const c = q.shift();
+      if (!G.boats.some(b => b.x === c.x && b.y === c.y) && !objAt(G, c.x, c.y) && !heroesAt(c.x, c.y).length) return c;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = c.x + dx, ny = c.y + dy;
+        if (nx < 0 || ny < 0 || nx >= G.W || ny >= G.H || seen.has(ny * G.W + nx) || G.tiles[ny][nx] !== T.WATER) continue;
+        seen.add(ny * G.W + nx); q.push({ x: nx, y: ny });
+      }
+    }
+    return null;
   }
 
   function openTown() {
@@ -619,6 +672,8 @@
         <div class="acts">${gNext ? `<button data-guild="1" title="${fmtCost(gNext)}">${gl ? 'Upgrade' : 'Build'} ${fmtCost(gNext)}</button>` : '<span class="small">MAX</span>'}</div></div>
       <div class="trow"><div class="ic">⚖️</div><div><b>Marketplace</b><br><span class="small">${t.b.market ? `Buy missing resources at ${Math.round(MARKET_RATE * 100)}% rate.` : `Trade resources — ${fmtCost(MARKET_COST)}`}</span></div>
         <div class="acts">${t.b.market ? '<button data-trade="1">Trade</button>' : '<button data-build="market">Build</button>'}</div></div>
+      <div class="trow"><div class="ic">⚓</div><div><b>Shipyard</b><br><span class="small">${t.b.ship ? `Boats ${G.boats.length}/${MAX_BOATS}. A new boat appears at the port by the bay (${fmtCost(BOAT_COST)} each). Walk a hero onto a boat to sail; collect treasures at sea.` : G.dock ? `Build boats to sail the sea and collect its treasures — ${fmtCost(SHIPYARD_COST)}` : 'There is no coast near this castle.'}</span></div>
+        <div class="acts">${!G.dock ? '' : t.b.ship ? `<button data-boat="1" ${G.boats.length >= MAX_BOATS ? 'disabled' : ''}>⛵ Build boat</button>` : '<button data-build="ship">Build</button>'}</div></div>
       <div class="trow"><div class="ic">🍺</div><div><b>Tavern</b><br><span class="small">Heroes ${G.heroes.length}/${MAX_HEROES}. Hire more heroes and exchange troops between heroes in town.</span></div>
         <div class="acts"><button data-tavern="1">Hire heroes</button>${heroesAt(t.x, t.y).length > 1 ? '<button data-xhero="1">Exchange troops</button>' : ''}</div></div>
       <div class="small" style="margin-top:8px">${RES.map(k => RES_ICON[k] + ' ' + G.res[k]).join('  ')}</div>
@@ -629,10 +684,11 @@
     const again = () => { openTown(); renderAll(); };
     const q = (sel, fn) => $('mbox').querySelectorAll(sel).forEach(fn);
     q('[data-build]', b => b.onclick = () => {
-      const k = b.dataset.build, cost = k === 'market' ? MARKET_COST : DWELL_COST[+k];
+      const k = b.dataset.build, cost = k === 'market' ? MARKET_COST : k === 'ship' ? SHIPYARD_COST : DWELL_COST[+k];
       if (!canAfford(G.res, cost)) return toast('Not enough resources.');
       pay(G.res, cost);
       if (k === 'market') { t.b.market = 1; startTownAnim('build', 9); }
+      else if (k === 'ship') { t.b.ship = 1; startTownAnim('build', 10); }
       else { t.b[k] = 1; t.avail[k] = GROWTH[+k - 1]; startTownAnim('build', +k - 1); }
       again();
     });
@@ -676,6 +732,14 @@
       pay(G.res, c.cost, n); t.avail[tier] -= n; toast(`Recruited ${n} ${c.n}${n > 1 ? 's' : ''}.`);
       again();
     });
+    q('[data-boat]', b => b.onclick = () => {
+      if (G.boats.length >= MAX_BOATS) return toast(`You can own at most ${MAX_BOATS} boats.`);
+      if (!canAfford(G.res, BOAT_COST)) return toast('Not enough resources.');
+      const spot = freeWater();
+      if (!spot) return toast('The port is blocked.');
+      pay(G.res, BOAT_COST); G.boats.push({ id: G.nextBoat++, x: spot.x, y: spot.y });
+      toast(`A boat is launched at (${spot.x}, ${spot.y}). Walk a hero onto it to sail.`); again();
+    });
     q('[data-trade]', b => b.onclick = () => openMarket(MARKET_RATE + ((G.wk && G.wk.rateBonus) || 0), 'Marketplace', true));
     q('[data-tavern]', b => b.onclick = openTavern);
     q('[data-xhero]', b => b.onclick = () => {
@@ -710,22 +774,24 @@
     const e = eTown(); G.ehWave++;
     const w = G.ehWave, ti = factionTiers(G.efaction), hd = FACTIONS[G.efaction].heroes[0];
     G.eh = { name: hd[0], icon: CLASSES[hd[1]].i, x: e.x - 2, y: e.y + 2, att: 4 + w, def: 4 + w, sp: 2, kn: 2,
-      army: [{ t: ti[0], n: 10 + w * 10 }, { t: ti[1], n: 5 + w * 4 }, { t: ti[2], n: 2 + w * 3 }, w > 1 ? { t: ti[3], n: w * 2 } : null, w > 2 ? { t: ti[4], n: w * 2 } : null].filter(Boolean) };
+      army: [{ t: ti[0], n: 10 + w * 10 }, { t: ti[1], n: 5 + w * 4 }, { t: ti[2], n: 2 + w * 3 }, w > 1 ? { t: ti[3], n: w * 2 } : null, w > 2 ? { t: ti[4], n: w * 2 } : null].filter(Boolean)
+        .map(a => ({ ...a, n: Math.max(1, Math.round(a.n * DF().ehMul)) })) };
     toast(`${G.eh.name} emerges from the enemy stronghold!`);
   }
   async function enemyTurn() {
     const eForts = G.objs.filter(o => o.t === 'fort' && o.owner === 1).length;
-    if (G.day >= 8 && !G.eh) { G.ehTimer = Math.max(0, G.ehTimer - 1 - eForts); if (G.ehTimer <= 0) spawnEnemyHero(); return; }
+    if (G.day >= DF().ehDay && !G.eh) { G.ehTimer = Math.max(0, G.ehTimer - 1 - eForts); if (G.ehTimer <= 0) spawnEnemyHero(); return; }
     if (!G.eh) return;
     const eh = G.eh, tw = town();
-    let target = tw;
-    const mine = G.objs.filter(o => o.t === 'fort' && o.owner === 0);
+    const mine = G.objs.filter(o => o.t === 'fort' && o.owner === 0).sort((a, b) => dist(eh, a) - dist(eh, b));
     const near = G.heroes.reduce((a, b) => dist(eh, a) <= dist(eh, b) ? a : b);
-    if (dist(eh, near) < 12) target = near;
-    else if (mine.length) target = mine.reduce((a, b) => dist(eh, a) <= dist(eh, b) ? a : b);
-    const path = findPath(G, eh.x, eh.y, target.x, target.y, true);
+    const cands = [];
+    if (dist(eh, near) < 12) cands.push(near);
+    cands.push(...mine, tw);
+    let target = null, path = null;
+    for (const c of cands) { const p = findPath(G, eh.x, eh.y, c.x, c.y, true); if (p) { target = c; path = p; break; } }
     if (!path) return;
-    let left = 1000;
+    let left = DF().ehMove;
     for (const s of path) {
       if (s.cost > left) break;
       left -= s.cost; eh.x = s.x; eh.y = s.y; await sleep(45);
@@ -799,7 +865,7 @@
       if (o.t === 'mine' && o.owner === 0 && zoneOwner(G, G.zone[o.y][o.x]) === 0) gain[o.kind] += MINE_YIELD[o.kind] * ((G.wk && G.wk.mineMul) || 1);
       if (o.t === 'fort' && o.owner === 0) gain.gold += FORT_INCOME;
     }
-    RES.forEach(k => G.res[k] += gain[k]);
+    RES.forEach(k => { gain[k] = Math.round(gain[k] * DF().income); G.res[k] += gain[k]; });
     const parts = RES.filter(k => gain[k]).map(k => `+${gain[k]}${RES_ICON[k]}`);
     if ((G.day - 1) % 7 === 0) {
       CASTLE_TIERS.forEach((id, i) => { if (t.b[i + 1]) t.avail[i + 1] = (t.avail[i + 1] || 0) + GROWTH[i]; });
@@ -810,7 +876,7 @@
       }
       rollTavern();
       toast('A new week begins — dwellings replenish, forts raise militia, new heroes arrive at the tavern!');
-      if (G.eh) { const m = 1.15 + 0.1 * G.objs.filter(o => o.t === 'fort' && o.owner === 1).length; G.eh.army.forEach(a => a.n = Math.ceil(a.n * m)); }
+      if (G.eh) { const m = DF().ehGrow + 0.1 * G.objs.filter(o => o.t === 'fort' && o.owner === 1).length; G.eh.army.forEach(a => a.n = Math.ceil(a.n * m)); }
     }
     toast(`Day ${G.day}${parts.length ? ' · ' + parts.join(' ') : ''}`);
     renderAll();
@@ -827,7 +893,7 @@
   async function endGame(win, why) {
     G.over = true;
     try { localStorage.removeItem(SAVE); } catch (e) { /* ignore */ }
-    await showModal(win ? `<h2>🏆 Victory!</h2><p>You conquered the enemy stronghold on day ${G.day}. The realm is saved!</p>` : `<h2>💀 Defeat</h2><p>${why || 'Your hero has fallen.'}</p>`, ['Main menu']);
+    await showModal(win ? `<h2>🏆 Victory!</h2><p>You conquered the enemy stronghold on day ${G.day} on ${DF().name} difficulty. The realm is saved!</p>` : `<h2>💀 Defeat</h2><p>${why || 'Your hero has fallen.'}</p>`, ['Main menu']);
     $('title').classList.remove('hide'); refreshTitle();
   }
 
@@ -835,20 +901,42 @@
   const HELP = `<h2>How to Play</h2><p><b>Goal:</b> defeat the enemy stronghold in the north-east and capture it. Don't let the enemy hero take your castle.</p>
     <p><b>Map:</b> click a tile to preview the path (green = reachable today, red = next turn), click again to walk. Click another hero to select it (Tab cycles). Monsters facing an army ${FLEE_RATIO}× stronger offer to flee; with the Charisma perk they can join you instead. Walk onto resources to grab them; mines give daily income; monsters, mines and artifacts are guarded. Merchants ⛺ sell missing resources.<br>
     Keys: arrows/WASD scroll · H center hero · Space go · E end turn · T town · Tab next hero.</p>
+    <p><b>Sea:</b> build a Shipyard in town, then boats at the port by the bay. Walk a hero onto a boat to sail; collect floating treasures, salvage shipwrecks, fight sea monsters, and disembark on any shore tile. Pick the map type, size and seed when starting a game.</p>
     <p><b>Events:</b> every new week brings a weekly event (double growth for a creature, plague, bountiful harvest, merchant caravans, heroic training...) and most days a random event may strike — treasure, bandits, mercenaries, storms, rumors.</p>
     <p><b>Territory:</b> the map is split into zones, each ruled by a fort. Capture a fort to own the zone: +${FORT_INCOME} gold/day, your mines there pay, +${MILITIA} militia/week. <b>Station troops in forts</b> — the enemy hero raids undefended forts.</p>
     <p><b>Town:</b> Town Hall levels 1-5 raise income and unlock dwellings (tiers 3-7) and creature upgrades (up to 5 levels). Mage Guild teaches spells, the Marketplace trades resources, the Tavern hires up to ${MAX_HEROES} heroes.</p>
     <p><b>Battle:</b> click a green hex to move, click an enemy to attack (archers shoot, flyers ignore obstacles). Your hero stands beside the field: cast one spell per round and make one Hero Strike per round. Castle assaults are <b>sieges</b>: break the gate or walls (your catapult helps), beware arrow towers and the moat; flyers can cross the walls. Level-ups let you pick one of two perks.</p>`;
   function refreshTitle() { $('tCont').disabled = !localStorage.getItem(SAVE); }
-  function showFactionSelect() {
-    const cards = Object.entries(FACTIONS).map(([k, f]) => `<div class="card" data-f="${k}"><div class="big">${f.icon}</div><b>${f.name}</b><div class="small">${f.blurb}</div>
-      <div class="crow">${factionTiers(k).map(id => `<span title="${C[id].n} → ${C[lineType(id, 2)].n}">${C[id].i}</span>`).join('')}</div></div>`).join('');
-    $('mbox').innerHTML = `<h2>Choose your castle</h2><div class="grid">${cards}</div><div class="mb"><button id="sBack">Back</button></div>`;
+  function showDifficultySelect() {
+    const cards = Object.entries(DIFFICULTY).map(([k, d]) => `<div class="card" data-d="${k}"><div class="big">${d.icon}</div><b>${d.name}</b><div class="small">${d.desc}</div>
+      <div class="small">Start: ${RES_ICON.gold}${d.gold} · guards ×${d.neutral} · income ×${d.income}<br>Enemy hero: day ${d.ehDay}, army ×${d.ehMul}</div></div>`).join('');
+    $('mbox').innerHTML = `<h2>Choose difficulty</h2><div class="grid two">${cards}</div><div class="mb"><button id="sBack">Back</button></div>`;
     $('sBack').onclick = () => $('modal').classList.add('hide');
-    $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => showHeroSelect(c.dataset.f));
+    $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => showMapSelect(c.dataset.d));
     $('modal').classList.remove('hide');
   }
-  function showHeroSelect(f) {
+  function showMapSelect(diff, st = { preset: 'plains', size: 'medium', seed: '' }) {
+    const cards = Object.entries(MAPS).map(([k, m]) => `<div class="card${st.preset === k ? ' on' : ''}" data-m="${k}"><div class="big">${m.icon}</div><b>${m.name}</b><div class="small">${m.desc}</div></div>`).join('');
+    const sizes = Object.entries(SIZES).map(([k, s]) => `<button class="${st.size === k ? 'primary' : ''}" data-s="${k}">${s.name} (${s.w}×${s.h})</button>`).join(' ');
+    $('mbox').innerHTML = `<h2>Choose your map <span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid two">${cards}</div>
+      <p>Size: ${sizes}</p><p>Seed: <input id="mSeed" placeholder="empty = random map" value="${st.seed}" style="width:230px;background:#120d08;color:#f1e6c4;border:1px solid #6b4f24;padding:4px"> <span class="small">Share a seed to replay the same map.</span></p>
+      <div class="mb"><button id="sBack">Back</button><button class="primary" id="sNext">Next: castle</button></div>`;
+    const keep = () => { st.seed = $('mSeed').value; };
+    $('mbox').querySelectorAll('[data-m]').forEach(c => c.onclick = () => { keep(); st.preset = c.dataset.m; showMapSelect(diff, st); });
+    $('mbox').querySelectorAll('[data-s]').forEach(b => b.onclick = () => { keep(); st.size = b.dataset.s; showMapSelect(diff, st); });
+    $('sBack').onclick = showDifficultySelect;
+    $('sNext').onclick = () => { keep(); showFactionSelect(diff, { ...st }); };
+    $('modal').classList.remove('hide');
+  }
+  function showFactionSelect(diff = 'normal', map = {}) {
+    const cards = Object.entries(FACTIONS).map(([k, f]) => `<div class="card" data-f="${k}"><div class="big">${f.icon}</div><b>${f.name}</b><div class="small">${f.blurb}</div>
+      <div class="crow">${factionTiers(k).map(id => `<span title="${C[id].n} → ${C[lineType(id, 2)].n}">${C[id].i}</span>`).join('')}</div></div>`).join('');
+    $('mbox').innerHTML = `<h2>Choose your castle <span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid">${cards}</div><div class="mb"><button id="sBack">Back</button></div>`;
+    $('sBack').onclick = () => showMapSelect(diff, map.preset ? map : undefined);
+    $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => showHeroSelect(c.dataset.f, diff, map));
+    $('modal').classList.remove('hide');
+  }
+  function showHeroSelect(f, diff = 'normal', map = {}) {
     const ti = factionTiers(f);
     const cards = FACTIONS[f].heroes.map(([n]) => { const d = HEROES[n];
       return `<div class="card" data-hid="${n}"><div class="big">${d.i}</div><b>${d.name}</b><div class="small">${d.cls}</div>
@@ -856,10 +944,10 @@
         <div class="small">Army: ${ti.slice(0, 3).map(id => C[id].i).join(' ')}</div></div>`; }).join('');
     $('mbox').innerHTML = `<h2>${FACTIONS[f].icon} ${FACTIONS[f].name} — choose your hero</h2><div class="grid two">${cards}</div>
       <div class="small">Your rival will command a different castle. Fight them across zones, forts and sieges.</div><div class="mb"><button id="sBack">Back</button></div>`;
-    $('sBack').onclick = showFactionSelect;
-    $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => { $('modal').classList.add('hide'); $('title').classList.add('hide'); newGame(f, c.dataset.hid); });
+    $('sBack').onclick = () => showFactionSelect(diff, map);
+    $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => { $('modal').classList.add('hide'); $('title').classList.add('hide'); newGame(f, c.dataset.hid, diff, map); });
   }
-  $('tNew').onclick = showFactionSelect;
+  $('tNew').onclick = showDifficultySelect;
   $('tCont').onclick = () => { if (load()) $('title').classList.add('hide'); };
   $('tHelp').onclick = () => showModal(HELP);
   $('bHelp').onclick = () => showModal(HELP);

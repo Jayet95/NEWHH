@@ -199,6 +199,7 @@ const Battle = (() => {
 
   function newRound() {
     B.round++;
+    if (B.round > 60) { log('Stalemate — the attackers withdraw.'); finish(false, false); return; }
     for (const s of alive()) { s.ret = true; s.waited = false; }
     B.queue = alive().sort((a, b) => speedOf(b) - speedOf(a) || a.side - b.side);
     B.waitQ = []; B.strikeUsed = false;

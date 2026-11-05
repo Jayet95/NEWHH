@@ -61,6 +61,7 @@ button.primary { background: linear-gradient(#8a6a1c, #5c4410); border-color: va
 .grid.two { grid-template-columns: repeat(2, 1fr); }
 .card { background: #1b140d; border: 2px solid var(--edge); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; }
 .card:hover { border-color: var(--gold); background: #2e2214; }
+.card.on { border-color: var(--gold); background: #3a2a14; }
 .card .big { font-size: 38px; } .card .crow { font-size: 20px; margin-top: 6px; letter-spacing: 3px; }
 select { background: #120d08; color: var(--txt); border: 1px solid var(--edge); padding: 4px; font: inherit; }
 #modal.hide { display: none !important; }

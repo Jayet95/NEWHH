@@ -33,7 +33,8 @@ function genMap(seed, ef = 'necropolis', diff = 'normal', mo = {}) {
   const DM = DIFFICULTY[diff] || DIFFICULTY.normal;
   const MP = MAPS[mo.preset] || MAPS.plains, SZ = SIZES[mo.size] || SIZES.medium;
   const R = rng(seed), W = SZ.w, H = SZ.h, sc = (W * H) / 1120;
-  const n1 = noise(R, W, H, 6), n2 = noise(R, W, H, 3);
+  const fs = Math.max(1, Math.pow(sc, 0.3));
+  const n1 = noise(R, W, H, 6 * fs), n2 = noise(R, W, H, 3 * fs);
   const tiles = [];
   for (let y = 0; y < H; y++) {
     tiles[y] = [];
@@ -141,9 +142,10 @@ function genMap(seed, ef = 'necropolis', diff = 'normal', mo = {}) {
 
   objs[0].zone = 0; objs[1].zone = 1;
   const seeds = [{ x: P.x, y: P.y, id: 0 }, { x: E.x, y: E.y, id: 1 }];
-  const fortNames = ['Mistvale Keep', 'Ironhold Bastion', 'Sunspire Outpost', 'Grimwatch Tower'];
-  const spacing = Math.max(7, Math.round(10 * Math.sqrt(sc)));
-  for (let i = 0; i < 4; i++) {
+  const fortNames = ['Mistvale Keep', 'Ironhold Bastion', 'Sunspire Outpost', 'Grimwatch Tower', 'Stormhaven', 'Ravenmoor Hold', 'Dawnspire Fort', 'Blackfen Redoubt', 'Emberwatch', 'Frostgate', 'Goldcrest Bastion', 'Shadowvale Keep'];
+  const spacing = Math.max(7, Math.round(9 * Math.pow(sc, 0.35)));
+  const nForts = Math.min(12, Math.max(4, Math.round(4 * Math.sqrt(sc))));
+  for (let i = 0; i < nForts; i++) {
     let c = null;
     for (let tries = 0; tries < 400 && !c; tries++) {
       const t = cand[Math.floor(R() * cand.length)];
@@ -164,12 +166,14 @@ function genMap(seed, ef = 'necropolis', diff = 'normal', mo = {}) {
     }
   }
 
-  const mineKinds = ['gold', 'gold', 'gold', 'wood', 'wood', 'ore', 'ore', 'mercury', 'sulfur', 'crystal', 'gems'].slice(0, Math.max(8, Math.round(11 * Math.sqrt(sc))));
+  const kindsBase = ['gold', 'gold', 'gold', 'wood', 'wood', 'ore', 'ore', 'mercury', 'sulfur', 'crystal', 'gems'];
+  const nMines = Math.max(8, Math.round(11 * Math.pow(sc, 0.8)));
+  const mineKinds = Array.from({ length: nMines }, (_, i) => kindsBase[i % kindsBase.length]);
   for (const k of mineKinds) { const c = pick(); if (!c) break; objs.push({ t: 'mine', kind: k, owner: null, x: c.x, y: c.y, guard: [guard(c, 0.8)] }); }
-  for (let i = 0, n = sc < 0.8 ? 2 : 3; i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'merchant', x: c.x, y: c.y }); }
+  for (let i = 0, n = sc < 0.8 ? 2 : Math.round(3 * Math.sqrt(sc)); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'merchant', x: c.x, y: c.y }); }
   for (let i = 0, n = Math.round(20 * sc); i < n; i++) { const c = pick(); if (!c) break; const k = RES[Math.floor(R() * RES.length)]; objs.push({ t: 'pile', kind: k, amt: k === 'gold' ? 500 + 250 * Math.floor(R() * 5) : 3 + Math.floor(R() * 6), x: c.x, y: c.y }); }
   for (let i = 0, n = Math.round(5 * sc); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'chest', x: c.x, y: c.y, gold: 1000 + 500 * Math.floor(R() * 4) }); }
-  for (let i = 0; i < LAND_ARTS; i++) { const c = pick(); if (c) objs.push({ t: 'art', art: i, x: c.x, y: c.y, guard: [guard(c, 1.1)] }); }
+  for (let i = 0, n = Math.round(LAND_ARTS * Math.sqrt(sc)); i < n; i++) { const c = pick(); if (c) objs.push({ t: 'art', art: i % LAND_ARTS, x: c.x, y: c.y, guard: [guard(c, 1.1)] }); }
   for (let i = 0, n = Math.round(28 * sc * MP.density); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'monster', x: c.x, y: c.y, guard: [guard(c)] }); }
 
   // ---- the sea: nearest bay tile to the castle is the dock; collectibles float in the connected water ----
@@ -185,12 +189,12 @@ function genMap(seed, ef = 'necropolis', diff = 'normal', mo = {}) {
     }
     let scand = sea.filter(c => dist(c, dock) > 2);
     const spick = () => { if (!scand.length) return null; const c = scand[Math.floor(R() * scand.length)]; scand = scand.filter(o => dist(o, c) > 1); return c; };
-    const nSea = Math.max(1, Math.round(Math.min(1.4, sea.length / 120)));
+    const nSea = Math.max(1, Math.round(sea.length / 110));
     for (let i = 0; i < 6 * nSea; i++) { const c = spick(); if (!c) break; const k = RES[Math.floor(R() * RES.length)]; objs.push({ t: 'pile', sea: true, kind: k, amt: k === 'gold' ? 1000 + 500 * Math.floor(R() * 4) : 4 + Math.floor(R() * 6), x: c.x, y: c.y }); }
     for (let i = 0; i < 3 * nSea; i++) { const c = spick(); if (!c) break; objs.push({ t: 'chest', sea: true, x: c.x, y: c.y, gold: 1500 + 500 * Math.floor(R() * 4) }); }
     for (let i = 0; i < 2 * nSea; i++) { const c = spick(); if (!c) break; objs.push({ t: 'wreck', x: c.x, y: c.y, gold: 1500 + 500 * Math.floor(R() * 4), res: RES[1 + Math.floor(R() * (RES.length - 1))], guard: [seaGuard(c, 0.8)] }); }
     for (let i = 0; i < 3 * nSea; i++) { const c = spick(); if (!c) break; objs.push({ t: 'monster', sea: true, x: c.x, y: c.y, guard: [seaGuard(c)] }); }
-    for (let i = 0; i < 2; i++) { const c = spick(); if (c) objs.push({ t: 'art', sea: true, art: LAND_ARTS + i, x: c.x, y: c.y, guard: [seaGuard(c, 1.3)] }); }
+    for (let i = 0; i < Math.min(4, 1 + nSea); i++) { const c = spick(); if (c) objs.push({ t: 'art', sea: true, art: LAND_ARTS + (i % (ARTIFACTS.length - LAND_ARTS)), x: c.x, y: c.y, guard: [seaGuard(c, 1.3)] }); }
   }
 
   return { W, H, tiles, objs, P, E, zone, dock };

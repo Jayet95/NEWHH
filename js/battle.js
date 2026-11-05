@@ -28,6 +28,8 @@ const Battle = (() => {
 
   const alive = (side) => B.stacks.filter(s => !s.dead && (side === undefined || s.side === side));
   const stackAt = (c, r) => B.stacks.find(s => !s.dead && s.c === c && s.r === r);
+  const COARSE = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false;
+  const sfx = (n) => { if (typeof Sfx !== 'undefined') Sfx.play(n); };
   const perk = (id) => (B.hero && B.hero.perks && B.hero.perks[id]) || 0;
   const speedOf = (s) => Math.max(1, C[s.t].s + (s.haste ? 3 : 0) - (s.slow ? 3 : 0) + (s.side === 0 ? Math.min(3, perk('leadership')) : 0));
   const HERO_POS = [{ x: 38, y: 310 }, { x: 922, y: 310 }];
@@ -76,13 +78,13 @@ const Battle = (() => {
     st.hp -= dmg;
     const p = hexPx(st.c, st.r);
     B.fx.push({ x: p.x, y: p.y - 20, txt: '-' + dmg, col: '#ffd24a', t0: performance.now() });
-    st.flash = performance.now();
+    st.flash = performance.now(); sfx(st.hp <= 0 ? 'crash' : 'hit');
     log(`${label} the ${STRUCT[st.k].n}: ${dmg} dmg (${Math.max(0, st.hp)}/${st.max}).`);
     if (st.hp <= 0) { B.walls.delete(key(st.c, st.r)); log(`💥 The ${STRUCT[st.k].n} is destroyed!`); }
   }
   function hit(target, dmg, label) {
     if (target.side === 0) dmg = Math.max(1, Math.floor(dmg * (1 - 0.07 * perk('armorer'))));
-    const killed = applyDmg(target, dmg);
+    const killed = applyDmg(target, dmg); sfx('hit');
     target.flash = performance.now();
     if (target.side === 1) B.xp += killed * C[target.t].hp;
     const p = hexPx(target.c, target.r);
@@ -168,7 +170,7 @@ const Battle = (() => {
     await sleep(300);
   }
   async function doStructShoot(s, st) {
-    s.ammo--;
+    s.ammo--; sfx('shoot');
     B.shot = { a: { c: s.c, r: s.r }, b: { c: st.c, r: st.r }, t0: performance.now() };
     await sleep(240);
     hitStruct(st, structDmg(s, true), `${C[s.t].n} shoots`);
@@ -183,7 +185,7 @@ const Battle = (() => {
     B.cw = cw;
   }
   async function doShoot(s, e) {
-    s.ammo--;
+    s.ammo--; sfx('shoot');
     B.shot = { a: { c: s.c, r: s.r }, b: { c: e.c, r: e.r }, t0: performance.now() };
     await sleep(240);
     hit(e, calcDmg(s, e, false), `${C[s.t].n} shoots`);
@@ -235,6 +237,7 @@ const Battle = (() => {
     B.reach = computeReach(s);
     const ai = s.side === 1 || B.auto;
     B.input = !ai;
+    if (!ai) sfx('turn');
     refreshButtons();
     if (ai) await runAI(s);
   }
@@ -301,6 +304,10 @@ const Battle = (() => {
   function onClick(ev) {
     if (!B || B.over || !B.input || B.busy) return;
     const h = mouseHex(ev); if (!h) return;
+    if (COARSE) { // touch: first tap previews, second tap on the same hex confirms
+      if (!(B.pend && B.pend.c === h.c && B.pend.r === h.r)) { B.pend = h; B.hover = h; if (!B.tapHint) { B.tapHint = true; toast('Tap the same hex again to confirm'); } return; }
+      B.pend = null;
+    }
     const s = B.cur, t = stackAt(h.c, h.r);
     if (B.spell === '__strike') { heroStrike(t); return; }
     if (B.spell) { castSpell(B.spell, t); return; }
@@ -329,7 +336,7 @@ const Battle = (() => {
     const sp = SPELLS[k];
     if (!t || (sp.tgt === 'enemy') !== (t.side === 1)) return toast('Invalid target.');
     if (B.hero.mana < sp.cost) return toast('Not enough mana.');
-    B.hero.mana -= sp.cost; B.castUsed = true; B.spell = null;
+    B.hero.mana -= sp.cost; B.castUsed = true; B.spell = null; sfx('spell');
     const p = hexPx(t.c, t.r), P = B.hero.sp, sd = (x) => Math.floor(x * (1 + 0.15 * perk('sorcery')));
     B.shot = { ax: HERO_POS[0].x, ay: HERO_POS[0].y, b: { c: t.c, r: t.r }, t0: performance.now(), col: sp.tgt === 'enemy' ? '#ff9a4a' : '#8affb0' };
     B.heroFlash = [performance.now(), 0];
@@ -399,6 +406,12 @@ const Battle = (() => {
     cv.addEventListener('click', onClick);
     cv.addEventListener('mousemove', onMove);
     cv.addEventListener('contextmenu', (e) => { e.preventDefault(); if (B) B.spell = null; });
+    document.addEventListener('keydown', (e) => {
+      if (!B || B.over || e.ctrlKey || e.metaKey || e.altKey) return;
+      const k = e.key.toLowerCase(), map = { w: 'bWait', d: 'bDef', s: 'bSpell', h: 'bHero', a: 'bAuto' };
+      if (k === 'escape') { B.spell = null; $('spells').classList.add('hide'); return; }
+      if (map[k] && !$(map[k]).disabled) { e.preventDefault(); $(map[k]).onclick(); }
+    });
     $('bWait').onclick = () => B && B.cur && !B.cur.waited && playerAct(async () => { B.cur.waited = true; B.waitQ.push(B.cur); log(`${C[B.cur.t].n} waits.`); });
     $('bDef').onclick = () => B && playerAct(async () => { B.cur.defb = true; log(`${C[B.cur.t].n} defends.`); });
     $('bSpell').onclick = () => B && B.input && openSpells();
@@ -498,9 +511,32 @@ const Battle = (() => {
       ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeText(f.txt, f.x, f.y - k * 30); ctx.fillText(f.txt, f.x, f.y - k * 30);
       ctx.globalAlpha = 1;
     }
+    // highlight enemies the active stack can reach / shoot
+    if (input && B.cur && !B.spell) {
+      for (const e of alive(1)) {
+        if (!(canShoot(B.cur) || meleeSpot(B.cur, e, B.reach))) continue;
+        const p = hexPx(e.c, e.r);
+        ctx.setLineDash([5, 4]); hexPath(p.x, p.y, HR - 3); ctx.strokeStyle = 'rgba(255,110,90,.95)'; ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+    // spell / strike targeting hint
+    if (B.spell) {
+      const ally = B.spell !== '__strike' && SPELLS[B.spell].tgt === 'ally';
+      for (const s of alive(ally ? 0 : 1)) { const p = hexPx(s.c, s.r); hexPath(p.x, p.y, HR - 3); ctx.strokeStyle = ally ? 'rgba(120,255,170,.95)' : 'rgba(255,200,80,.95)'; ctx.lineWidth = 3; ctx.stroke(); }
+    }
     drawQueue();
+    drawTurnPill(now);
     drawInfo(hov);
     requestAnimationFrame(draw);
+  }
+  function drawTurnPill(now) {
+    if (!B.cur) return;
+    const mine = B.cur.side === 0, auto = B.auto, txt = auto ? '⏩ AUTO' : mine ? '⚔ YOUR TURN' : '… ENEMY TURN';
+    const w = 130, x = 960 - w - 12, y = 12, pulse = mine && B.input ? 0.75 + 0.25 * Math.sin(now / 250) : 1;
+    ctx.globalAlpha = pulse; ctx.fillStyle = mine ? '#2a5a2a' : '#6a2a2a'; ctx.fillRect(x, y, w, 28);
+    ctx.strokeStyle = mine ? '#8aff8a' : '#ff9a8a'; ctx.lineWidth = 2; ctx.strokeRect(x, y, w, 28);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, x + w / 2, y + 15);
+    ctx.globalAlpha = 1;
   }
   function drawQueue() {
     const order = [];
@@ -540,7 +576,7 @@ const Battle = (() => {
   // ------- setup / finish -------
   function finish(win, fled) {
     if (B.over) return;
-    B.over = true;
+    B.over = true; sfx(win ? 'win' : fled ? 'click' : 'lose');
     const surv = B.armyIn.map((a, i) => { if (!a) return null; const st = B.stacks.find(s => s.side === 0 && s.slot === i); return st && !st.dead ? st.n : 0; });
     const lost = B.armyIn.map((a, i) => a ? a.n - (surv[i] || 0) : 0).reduce((p, v) => p + v, 0);
     const res = { win, fled, survivors: surv, xp: win ? Math.floor(B.xp) : 0, mana: B.hero.mana };

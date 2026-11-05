@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#150f09">
+<meta name="mobile-web-app-capable" content="yes">
 <title>Heroes of Might &amp; Magic — JS Edition</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -10,10 +12,12 @@
 <div id="app">
   <header id="top">
     <div id="res"></div>
+    <div id="income" class="chip" title="Expected daily income"></div>
     <div id="date"></div>
     <div class="btns">
-      <button id="bTown" title="Open town (T)">🏰 Town</button>
-      <button id="bEnd" class="primary" title="End turn (E)">⏭ End Turn</button>
+      <button id="bTown" title="Open town (T)">🏰 Town <kbd>T</kbd></button>
+      <button id="bEnd" class="primary" title="End turn (E)">⏭ End Turn <kbd>E</kbd></button>
+      <button id="bSnd" title="Sound on/off">🔊</button>
       <button id="bSave" title="Save game">💾</button>
       <button id="bHelp" title="Help">❓</button>
     </div>
@@ -22,7 +26,9 @@
     <div id="stage">
       <canvas id="map" width="960" height="640"></canvas>
       <canvas id="bat" width="960" height="640"></canvas>
+      <div id="zoomctl"><button id="zIn" title="Zoom in (+)">＋</button><button id="zOut" title="Zoom out (-)">－</button><button id="zHome" title="Center on hero (H)">🎯</button></div>
       <div id="tip" class="hide"></div>
+      <div id="banner"></div>
       <div id="toast"></div>
     </div>
     <aside id="side">
@@ -33,15 +39,15 @@
       <div id="batui">
         <h3 id="btitle">Battle</h3>
         <div class="row">
-          <button id="bWait">⏳ Wait</button>
-          <button id="bDef">🛡 Defend</button>
-          <button id="bSpell">📖 Spells</button>
+          <button id="bWait" title="Wait (W)">⏳ Wait <kbd>W</kbd></button>
+          <button id="bDef" title="Defend (D)">🛡 Defend <kbd>D</kbd></button>
+          <button id="bSpell" title="Spellbook (S)">📖 Spells <kbd>S</kbd></button>
         </div>
         <div class="row">
-          <button id="bHero">🗡 Hero Strike</button>
+          <button id="bHero" title="Hero Strike (H)">🗡 Hero Strike <kbd>H</kbd></button>
         </div>
         <div class="row">
-          <button id="bAuto">⏩ Auto</button>
+          <button id="bAuto" title="Auto-battle (A)">⏩ Auto</button>
           <button id="bFlee">🏳 Retreat</button>
           <span id="bManaB" class="pill"></span>
         </div>
@@ -50,6 +56,12 @@
       </div>
     </aside>
   </div>
+  <nav id="mbar">
+    <button id="mHero" title="Next hero">🏇 Hero</button>
+    <button id="mTown">🏰 Town</button>
+    <button id="mEnd" class="primary">⏭ End Turn</button>
+    <button id="mMenu">☰</button>
+  </nav>
   <div id="modal" class="hide"><div id="mbox"></div></div>
   <div id="title">
     <div class="titlebox">
@@ -63,6 +75,7 @@
     </div>
   </div>
 </div>
+<script src="js/sfx.js"></script>
 <script src="js/data.js"></script>
 <script src="js/map.js"></script>
 <script src="js/battle.js"></script>

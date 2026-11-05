@@ -38,7 +38,11 @@ const MAPS = {
   isles:    { name: 'Sunken Isles', icon: '🏝️', desc: 'Much water and a wide sea: boats and sea treasures matter.', water: 0.42, mount: 0.78, forest: 0.62, bay: 1.5, density: 1 },
   steppe:   { name: 'Wild Steppe', icon: '🌾', desc: 'Open plains with few obstacles and many wandering monsters.', water: 0.18, mount: 0.82, forest: 0.72, bay: 0.6, density: 1.3 },
 };
-const SIZES = { small: { name: 'Small', w: 32, h: 22 }, medium: { name: 'Medium', w: 40, h: 28 }, large: { name: 'Large', w: 52, h: 36 } };
+// mv: movement/enemy-march multiplier so big maps stay playable
+const SIZES = {
+  small: { name: 'Small', w: 32, h: 22, mv: 1 }, medium: { name: 'Medium', w: 40, h: 28, mv: 1 }, large: { name: 'Large', w: 60, h: 42, mv: 1.25 },
+  huge: { name: 'Huge', w: 90, h: 64, mv: 1.6 }, giant: { name: 'Giant', w: 128, h: 90, mv: 2 },
+};
 const SHIPYARD_COST = { gold: 2000, wood: 20 }, BOAT_COST = { gold: 1000, wood: 10 }, MAX_BOATS = 2;
 
 // ---------- the 9 castles: 7 tiers each ----------

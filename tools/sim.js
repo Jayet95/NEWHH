@@ -18,7 +18,7 @@ function makeEnv() {
     performance: { now: () => (vt += 40) },
     setTimeout: (f) => { setImmediate(f); },
     requestAnimationFrame: (cb) => { if (cb.name === 'draw') return; setImmediate(() => cb(vt)); },
-    document: { getElementById: (id) => els[id] || (els[id] = mkEl()), createElement: () => mkEl(), body: { classList: { add() {}, remove() {} } } },
+    document: { getElementById: (id) => els[id] || (els[id] = mkEl()), createElement: () => mkEl(), addEventListener() {}, body: { classList: { add() {}, remove() {} } } },
   };
   sb.window = sb; sb.showModal = () => Promise.resolve(0); sb.toast = () => {};
   vm.createContext(sb);

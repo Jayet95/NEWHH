@@ -2,7 +2,9 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-  const TS = 32, VW = 960, VH = 640, FONT = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+  const TS = 32, FONT = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+  const COARSE = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  let VW = 960, VH = 640, Z = (COARSE || window.innerWidth < 700) ? 1.5 : 1;
   const SAVE = 'h3js_save_v4';
   const MOVE_PER_DAY = 1700;
   const FLEE_RATIO = 3;
@@ -28,7 +30,8 @@
   const eTown = () => G.objs.find(o => o.t === 'town' && o.owner === 1);
   const armyCount = (h) => h.army.reduce((s, a) => s + (a ? a.n : 0), 0);
   const maxMana = (h) => h.kn * 10 + 15 * perk(h, 'wisdom');
-  const maxMove = (h) => Math.round(MOVE_PER_DAY * (1 + 0.1 * perk(h, 'logistics')));
+  const sizeMv = () => (G && SIZES[G.size] && SIZES[G.size].mv) || 1;
+  const maxMove = (h) => Math.round(MOVE_PER_DAY * sizeMv() * (1 + 0.1 * perk(h, 'logistics')));
   const need = (l) => 150 * l * l;
   const heroesAt = (x, y) => G.heroes.filter(h => h.x === x && h.y === y);
   const heroAtTown = (h) => h.x === town().x && h.y === town().y;
@@ -36,6 +39,15 @@
   const setActive = (i) => { G.sel = i; G.hero = G.heroes[i]; };
   const townHero = () => { const at = heroesAt(town().x, town().y); return at.includes(G.hero) ? G.hero : at[0] || null; };
   const emptyArmy = () => [null, null, null, null, null, null, null];
+  const sfx = (n) => { if (typeof Sfx !== 'undefined') Sfx.play(n); };
+  const fmtN = (n) => n >= 100000 ? Math.round(n / 1000) + 'k' : n >= 10000 ? (n / 1000).toFixed(1) + 'k' : String(n);
+  function banner(text, sub) {
+    const b = $('banner'); b.innerHTML = `<b>${text}</b>${sub ? `<span>${sub}</span>` : ''}`;
+    b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
+  }
+  document.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('button') && !e.target.closest('#bat')) sfx('click'); });
+  $('bSnd').onclick = () => { const on = Sfx.toggle(); $('bSnd').textContent = on ? '🔊' : '🔇'; };
+  $('bSnd').textContent = Sfx.on ? '🔊' : '🔇';
   const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
   function addToArmy(h, t, n) {
@@ -85,6 +97,7 @@
     t.avail = { 1: GROWTH[0], 2: GROWTH[1] };
     const def = HEROES[heroId], h = makeHero(def, m.P.x, m.P.y), ti = factionTiers(faction);
     h.army = [{ t: ti[0], n: 20 }, { t: ti[1], n: 10 }, { t: ti[2], n: 5 }, null, null, null, null];
+    h.move = maxMove(h);
     G.heroes.push(h); setActive(0); learn(def.spells); rollTavern();
     reindex(G); buildTerrain(); sizeMini(); centerOn(h.x, h.y); renderAll();
     toast(`${MAPS[preset].name} (${SIZES[size].name}, seed ${seed}) · ${D.name}: capture the ${FACTIONS[ef].name} stronghold in the NE to win. Good luck, ${h.name}!`);
@@ -117,11 +130,29 @@
       if (t === T.MOUNT) c.fillText('⛰️', px + 16, py + 17);
     }
   }
-  let MK = 6;
-  function sizeMini() { MK = Math.max(3, Math.floor(240 / G.W)); mini.width = G.W * MK; mini.height = G.H * MK; }
-  function centerOn(x, y) {
-    cam.x = Math.max(0, Math.min(G.W * TS - VW, x * TS + TS / 2 - VW / 2));
-    cam.y = Math.max(0, Math.min(G.H * TS - VH, y * TS + TS / 2 - VH / 2));
+  let MK = 6, miniTerr = null, miniCache = null, miniSig = '';
+  function sizeMini() {
+    MK = Math.max(3, Math.floor(240 / G.W)); mini.width = G.W * MK; mini.height = G.H * MK; miniSig = '';
+    miniTerr = document.createElement('canvas'); miniTerr.width = mini.width; miniTerr.height = mini.height;
+    const t = miniTerr.getContext('2d');
+    for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) { t.fillStyle = MC[G.tiles[y][x]]; t.fillRect(x * MK, y * MK, MK, MK); }
+    miniCache = document.createElement('canvas'); miniCache.width = mini.width; miniCache.height = mini.height;
+  }
+  function clampCam() {
+    cam.x = G.W * TS <= VW ? -(VW - G.W * TS) / 2 : Math.max(0, Math.min(G.W * TS - VW, cam.x));
+    cam.y = G.H * TS <= VH ? -(VH - G.H * TS) / 2 : Math.max(0, Math.min(G.H * TS - VH, cam.y));
+  }
+  function centerOn(x, y) { resizeMap(); cam.x = x * TS + TS / 2 - VW / 2; cam.y = y * TS + TS / 2 - VH / 2; clampCam(); }
+  function resizeMap() {
+    const w = cmap.clientWidth, h = cmap.clientHeight; if (w < 50 || h < 50) return;
+    if (cmap.width === w && cmap.height === h && VW === w / Z) return;
+    const mx0 = cam.x + VW / 2, my0 = cam.y + VH / 2;
+    cmap.width = w; cmap.height = h; VW = w / Z; VH = h / Z;
+    if (G) { cam.x = mx0 - VW / 2; cam.y = my0 - VH / 2; clampCam(); }
+  }
+  function setZoom(nz, ax, ay) {
+    nz = Math.max(0.3, Math.min(3, nz)); const wx = ax / Z + cam.x, wy = ay / Z + cam.y; Z = nz; resizeMap();
+    cam.x = wx - ax / Z; cam.y = wy - ay / Z; clampCam();
   }
 
   function objIcon(o) {
@@ -139,14 +170,15 @@
   }
   function draw() {
     if (!G) return;
-    cx.fillStyle = '#000'; cx.fillRect(0, 0, VW, VH);
+    cx.setTransform(1, 0, 0, 1, 0, 0); cx.fillStyle = '#000'; cx.fillRect(0, 0, cmap.width, cmap.height); cx.setTransform(Z, 0, 0, Z, 0, 0);
+    cx.imageSmoothingEnabled = Z < 1.4;
     cx.drawImage(terrain, cam.x, cam.y, VW, VH, 0, 0, VW, VH);
-    const x0 = Math.floor(cam.x / TS), y0 = Math.floor(cam.y / TS);
+    const x0 = Math.floor(cam.x / TS), y0 = Math.floor(cam.y / TS), vx = Math.ceil(VW / TS) + 2, vy = Math.ceil(VH / TS) + 2;
     cx.textAlign = 'center'; cx.textBaseline = 'middle';
     const ZC = { 0: 'rgba(60,130,255,.20)', 1: 'rgba(230,60,60,.20)' };
     cx.lineWidth = 2; cx.strokeStyle = 'rgba(255,255,255,.45)';
     const zo = {}; for (const o of G.objs) if (o.t === 'fort' || o.t === 'town') zo[o.zone] = o.owner;
-    for (let y = Math.max(0, y0); y < Math.min(G.H, y0 + 22); y++) for (let x = Math.max(0, x0); x < Math.min(G.W, x0 + 31); x++) {
+    for (let y = Math.max(0, y0); y < Math.min(G.H, y0 + vy); y++) for (let x = Math.max(0, x0); x < Math.min(G.W, x0 + vx); x++) {
       const z = G.zone[y][x], ow = zo[z], px = x * TS - cam.x, py = y * TS - cam.y;
       if (ow !== null && ow !== undefined && G.tiles[y][x] !== T.WATER) { cx.fillStyle = ZC[ow]; cx.fillRect(px, py, TS, TS); }
       if (x + 1 < G.W && G.zone[y][x + 1] !== z) { cx.beginPath(); cx.moveTo(px + TS, py); cx.lineTo(px + TS, py + TS); cx.stroke(); }
@@ -160,9 +192,14 @@
         cx.beginPath(); cx.arc(px, py, i === G.path.length - 1 ? 7 : 4, 0, 7);
         cx.fillStyle = ok ? 'rgba(140,255,140,.9)' : 'rgba(255,110,90,.9)'; cx.fill();
       });
+      const total = G.path.reduce((s, p) => s + p.cost, 0), days = total <= G.hero.move ? 0 : Math.ceil((total - G.hero.move) / maxMove(G.hero));
+      const end = G.path[G.path.length - 1], lx = end.x * TS - cam.x + TS / 2, ly = end.y * TS - cam.y - 6, txt = days ? `${days + 1} days — click to go` : '✓ today — click to go';
+      cx.font = 'bold 11px sans-serif'; const tw = cx.measureText(txt).width + 12;
+      cx.fillStyle = days ? 'rgba(120,30,20,.9)' : 'rgba(20,80,30,.9)'; cx.fillRect(lx - tw / 2, ly - 9, tw, 18);
+      cx.fillStyle = '#fff'; cx.fillText(txt, lx, ly);
     }
     for (const o of G.objs) {
-      if (o.x < x0 - 1 || o.x > x0 + 31 || o.y < y0 - 1 || o.y > y0 + 21) continue;
+      if (o.x < x0 - 1 || o.x > x0 + vx || o.y < y0 - 1 || o.y > y0 + vy) continue;
       const px = o.x * TS - cam.x + TS / 2, py = o.y * TS - cam.y + TS / 2;
       if (o.t === 'monster' || o.t === 'art' || o.t === 'mine' || o.t === 'wreck') {
         cx.beginPath(); cx.arc(px, py, 15, 0, 7);
@@ -177,6 +214,10 @@
       }
       if (o.t === 'mine') { cx.beginPath(); cx.arc(px + 12, py - 12, 5, 0, 7); cx.fillStyle = o.owner === 0 ? '#3a8aff' : '#999'; cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke(); }
       if (o.t === 'town') { cx.beginPath(); cx.arc(px + 16, py - 18, 6, 0, 7); cx.fillStyle = o.owner === 0 ? '#3a8aff' : '#e03a3a'; cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke(); }
+      if (o.t === 'town' || o.t === 'fort') {
+        cx.font = 'bold 11px sans-serif'; cx.lineWidth = 3; cx.strokeStyle = '#000'; cx.fillStyle = o.owner === 0 ? '#bcd8ff' : o.owner === 1 ? '#ffb3a8' : '#f3e7bd';
+        cx.strokeText(o.name, px, py - 27); cx.fillText(o.name, px, py - 27);
+      }
     }
     for (const b of G.boats) {
       const px = b.x * TS - cam.x + TS / 2, py = b.y * TS - cam.y + TS / 2;
@@ -201,11 +242,16 @@
   function drawMini() {
     const k = MK;
     const zo = {}; for (const o of G.objs) if (o.t === 'fort' || o.t === 'town') zo[o.zone] = o.owner;
-    for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) {
-      mx.fillStyle = MC[G.tiles[y][x]]; mx.fillRect(x * k, y * k, k, k);
-      const ow = zo[G.zone[y][x]];
-      if (ow !== null && ow !== undefined) { mx.fillStyle = ow === 0 ? 'rgba(60,130,255,.35)' : 'rgba(230,60,60,.35)'; mx.fillRect(x * k, y * k, k, k); }
+    const sig = Object.keys(zo).map(z => zo[z]).join(',');
+    if (sig !== miniSig) {
+      miniSig = sig;
+      const c = miniCache.getContext('2d'); c.drawImage(miniTerr, 0, 0);
+      for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) {
+        const ow = zo[G.zone[y][x]];
+        if (ow !== null && ow !== undefined) { c.fillStyle = ow === 0 ? 'rgba(60,130,255,.35)' : 'rgba(230,60,60,.35)'; c.fillRect(x * k, y * k, k, k); }
+      }
     }
+    mx.drawImage(miniCache, 0, 0);
     for (const o of G.objs) {
       mx.fillStyle = o.t === 'fort' ? (o.owner === 0 ? '#9cf' : o.owner === 1 ? '#f88' : '#ffa') : o.t === 'town' ? (o.owner === 0 ? '#4af' : '#f44') : o.t === 'monster' ? '#a33' : o.t === 'mine' ? (o.owner === 0 ? '#4af' : '#ddd') : o.t === 'merchant' ? '#fa0' : '#ee6';
       mx.fillRect(o.x * k, o.y * k, k, k);
@@ -215,12 +261,20 @@
     mx.fillStyle = '#fff'; for (const h of G.heroes) mx.fillRect(h.x * k - 1, h.y * k - 1, k + 2, k + 2);
     mx.strokeStyle = '#fff'; mx.lineWidth = 1; mx.strokeRect(cam.x / TS * k, cam.y / TS * k, VW / TS * k, VH / TS * k);
   }
-  function loop() { if (G && !document.body.classList.contains('inbattle')) draw(); requestAnimationFrame(loop); }
+  function loop() {
+    if (G && !document.body.classList.contains('inbattle')) {
+      if (cmap.clientWidth && (cmap.clientWidth !== cmap.width || cmap.clientHeight !== cmap.height)) resizeMap();
+      draw();
+    }
+    requestAnimationFrame(loop);
+  }
 
   // ---------- UI panels ----------
   function renderAll() {
     if (!G) return;
-    $('res').innerHTML = RES.map(k => `<span title="${k}">${RES_ICON[k]} ${G.res[k]}</span>`).join('');
+    const gn = computeGain();
+    $('res').innerHTML = RES.map(k => `<span class="chip" title="${k[0].toUpperCase() + k.slice(1)}: ${G.res[k]}${gn[k] ? ` (+${gn[k]}/day)` : ''}">${RES_ICON[k]} <b>${fmtN(G.res[k])}</b></span>`).join('');
+    $('income').innerHTML = `📈 ${RES.filter(k => gn[k]).map(k => `+${fmtN(gn[k])}${RES_ICON[k]}`).join(' ') || 'no income'}<small>/day</small>`;
     const d = G.day - 1;
     $('date').textContent = `Month ${Math.floor(d / 28) + 1} · Week ${Math.floor(d % 28 / 7) + 1} · Day ${d % 7 + 1} · ${DF().icon} ${DF().name}`;
     const h = G.hero;
@@ -278,7 +332,7 @@
   // ---------- map input ----------
   function tileFromEvent(ev) {
     const r = cmap.getBoundingClientRect();
-    const px = (ev.clientX - r.left) * VW / r.width + cam.x, py = (ev.clientY - r.top) * VH / r.height + cam.y;
+    const px = (ev.clientX - r.left) * (cmap.width / r.width) / Z + cam.x, py = (ev.clientY - r.top) * (cmap.height / r.height) / Z + cam.y;
     const x = Math.floor(px / TS), y = Math.floor(py / TS);
     return x >= 0 && y >= 0 && x < G.W && y < G.H ? { x, y } : null;
   }
@@ -309,9 +363,15 @@
       case 'monster': return `Monsters: ${armyList(o.guard, true)}`;
     }
   }
-  cmap.addEventListener('mousemove', (ev) => {
+  function updateHover(ev) {
     if (!G) return;
     hover = tileFromEvent(ev);
+    if (!hover) cmap.style.cursor = 'default';
+    else {
+      const o = objAt(G, hover.x, hover.y), tt = G.tiles[hover.y][hover.x];
+      const blocked = tt === T.FOREST || tt === T.MOUNT || (tt === T.WATER && G.hero.boat == null && !G.boats.some(b => b.x === hover.x && b.y === hover.y));
+      cmap.style.cursor = (o || heroesAt(hover.x, hover.y).length || (G.eh && G.eh.x === hover.x && G.eh.y === hover.y)) ? 'pointer' : blocked ? 'not-allowed' : 'crosshair';
+    }
     const tip = $('tip');
     if (hover) {
       tip.innerHTML = describe(hover.x, hover.y);
@@ -319,9 +379,48 @@
       tip.style.left = Math.min(ev.clientX - r.left + 14, r.width - 270) + 'px'; tip.style.top = (ev.clientY - r.top + 14) + 'px';
       tip.classList.remove('hide');
     } else tip.classList.add('hide');
-  });
+  }
+  cmap.addEventListener('mousemove', updateHover);
   cmap.addEventListener('mouseleave', () => { hover = null; $('tip').classList.add('hide'); });
+  // drag to pan, pinch / wheel / buttons to zoom
+  const ptrs = new Map(); let drag = null, pinch = null, suppress = false;
+  const pdist = () => { const a = [...ptrs.values()]; return Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); };
+  cmap.addEventListener('pointerdown', (e) => {
+    if (!G) return;
+    try { cmap.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (e.pointerType !== 'mouse') updateHover(e);
+    if (ptrs.size === 1) drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, moved: false };
+    else if (ptrs.size === 2) { pinch = { d: pdist(), z: Z }; drag = null; suppress = true; }
+  });
+  cmap.addEventListener('pointermove', (e) => {
+    if (!ptrs.has(e.pointerId)) return;
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && ptrs.size === 2) {
+      const r = cmap.getBoundingClientRect(), a = [...ptrs.values()];
+      setZoom(pinch.z * pdist() / pinch.d, (a[0].x + a[1].x) / 2 - r.left, (a[0].y + a[1].y) / 2 - r.top); suppress = true;
+    } else if (drag) {
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) > 7) { drag.moved = true; $('tip').classList.add('hide'); }
+      if (drag.moved) { cam.x = drag.cx - dx / Z; cam.y = drag.cy - dy / Z; clampCam(); suppress = true; }
+    }
+  });
+  const endPtr = (e) => {
+    ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null;
+    if (ptrs.size === 0) { drag = null; setTimeout(() => { suppress = false; }, 0); }
+    else if (ptrs.size === 1) { const p = [...ptrs.values()][0]; drag = { x: p.x, y: p.y, cx: cam.x, cy: cam.y, moved: true }; }
+  };
+  cmap.addEventListener('pointerup', endPtr); cmap.addEventListener('pointercancel', endPtr);
+  cmap.addEventListener('wheel', (e) => {
+    if (!G) return; e.preventDefault();
+    const r = cmap.getBoundingClientRect(); setZoom(Z * (e.deltaY < 0 ? 1.12 : 1 / 1.12), e.clientX - r.left, e.clientY - r.top);
+  }, { passive: false });
+  const zoomMid = (f) => setZoom(Z * f, cmap.width / 2, cmap.height / 2);
+  $('zIn').onclick = () => zoomMid(1.25); $('zOut').onclick = () => zoomMid(0.8);
+  $('zHome').onclick = () => { if (G) centerOn(G.hero.x, G.hero.y); };
+  window.addEventListener('resize', resizeMap); window.addEventListener('orientationchange', () => setTimeout(resizeMap, 200));
   cmap.addEventListener('click', (ev) => {
+    if (suppress) return;
     if (!G || busy || G.over) return;
     const t = tileFromEvent(ev); if (!t) return;
     const here = heroesAt(t.x, t.y);
@@ -344,10 +443,12 @@
   document.addEventListener('keydown', (e) => {
     if (!G || document.body.classList.contains('inbattle') || !$('modal').classList.contains('hide') || !$('title').classList.contains('hide')) return;
     const k = e.key.toLowerCase(), s = TS * 2;
-    if (k === 'arrowleft' || k === 'a') cam.x = Math.max(0, cam.x - s);
-    else if (k === 'arrowright' || k === 'd') cam.x = Math.min(G.W * TS - VW, cam.x + s);
-    else if (k === 'arrowup' || k === 'w') cam.y = Math.max(0, cam.y - s);
-    else if (k === 'arrowdown' || k === 's') cam.y = Math.min(G.H * TS - VH, cam.y + s);
+    if (k === 'arrowleft' || k === 'a') { cam.x -= s; clampCam(); }
+    else if (k === 'arrowright' || k === 'd') { cam.x += s; clampCam(); }
+    else if (k === 'arrowup' || k === 'w') { cam.y -= s; clampCam(); }
+    else if (k === 'arrowdown' || k === 's') { cam.y += s; clampCam(); }
+    else if (k === '+' || k === '=') zoomMid(1.25);
+    else if (k === '-') zoomMid(0.8);
     else if (k === 'e') endTurn();
     else if (k === 't') openTown();
     else if (k === 'h') centerOn(G.hero.x, G.hero.y);
@@ -372,7 +473,7 @@
         const bt = G.boats.find(b => b.x === s.x && b.y === s.y);
         if (bt) { h.boat = bt.id; toast(`${h.name} sets sail!`); }
       }
-      h.x = s.x; h.y = s.y; centerOn(h.x, h.y); renderAll();
+      h.x = s.x; h.y = s.y; centerOn(h.x, h.y); renderAll(); sfx('step');
       await sleep(70);
       const last = i === path.length - 1, o = objAt(G, s.x, s.y);
       if (G.eh && G.eh.x === s.x && G.eh.y === s.y) { await fightEnemyHero(h, true); break; }
@@ -382,6 +483,7 @@
     busy = false; renderAll();
   }
   function collect(o) {
+    sfx('coin');
     if (o.t === 'pile') { G.res[o.kind] += o.amt; toast(`Collected ${o.amt} ${RES_ICON[o.kind]} ${o.kind}.`); }
     else { G.res.gold += o.gold; toast(`The chest holds ${o.gold} 🪙 gold!`); }
     G.objs.splice(G.objs.indexOf(o), 1); reindex(G);
@@ -466,7 +568,7 @@
   async function gainXp(h, xp) {
     h.xp += xp;
     while (h.xp >= need(h.lvl)) {
-      h.xp -= need(h.lvl); h.lvl++;
+      h.xp -= need(h.lvl); h.lvl++; sfx('level');
       const r = Math.random(), st = r < .3 ? 'att' : r < .6 ? 'def' : r < .8 ? 'sp' : 'kn';
       h[st]++;
       const statName = { att: 'Attack', def: 'Defense', sp: 'Spell Power', kn: 'Knowledge' }[st];
@@ -527,7 +629,7 @@
   const UP_HALL = { 2: 1, 3: 2, 4: 3, 5: 4 };
   const tierType = (t, tier) => lineType(CASTLE_TIERS[tier - 1], (t.up && t.up[tier]) || 1);
   const starStr = (lv, max = MAX_LV) => '★'.repeat(lv) + '☆'.repeat(max - lv);
-  function startTownAnim(kind, slot) { townAnim = { kind, slot, t0: performance.now() }; }
+  function startTownAnim(kind, slot) { townAnim = { kind, slot, t0: performance.now() }; sfx(kind === 'upgrade' ? 'level' : 'build'); }
   function slotInfo(t, i) {
     if (i < 7) return { built: !!t.b[i + 1], lv: t.up[i + 1] || 1, max: MAX_LV, icon: C[tierType(t, i + 1)].i };
     if (i === 7) return { built: t.b.hall > 0, lv: t.b.hall, max: 5, icon: '🏛️' };
@@ -791,7 +893,7 @@
     let target = null, path = null;
     for (const c of cands) { const p = findPath(G, eh.x, eh.y, c.x, c.y, true); if (p) { target = c; path = p; break; } }
     if (!path) return;
-    let left = DF().ehMove;
+    let left = Math.round(DF().ehMove * sizeMv());
     for (const s of path) {
       if (s.cost > left) break;
       left -= s.cost; eh.x = s.x; eh.y = s.y; await sleep(45);
@@ -813,6 +915,18 @@
     }
     toast(`Enemy hero is ${dist(eh, target)} tiles from ${target.cls ? target.name : target.name || 'your castle'}.`);
   }
+  function computeGain() {
+    const t = town(), gain = Object.fromEntries(RES.map(k => [k, 0]));
+    if (t.b.hall) gain.gold += HALL_LEVELS[t.b.hall].inc;
+    for (const h of G.heroes) gain.gold += 300 * perk(h, 'estates');
+    for (const o of G.objs) {
+      if (o.t === 'mine' && o.owner === 0 && zoneOwner(G, G.zone[o.y][o.x]) === 0) gain[o.kind] += MINE_YIELD[o.kind] * ((G.wk && G.wk.mineMul) || 1);
+      if (o.t === 'fort' && o.owner === 0) gain.gold += FORT_INCOME;
+    }
+    RES.forEach(k => { gain[k] = Math.round(gain[k] * DF().income); });
+    return gain;
+  }
+
   // ---------- events ----------
   function rollWeekEvent() {
     const t = town();
@@ -858,14 +972,8 @@
     let wev = null;
     if (newWeek) { G.wk = {}; wev = rollWeekEvent(); }
     for (const h of G.heroes) { h.move = maxMove(h); h.mana = Math.min(maxMana(h), h.mana + 4); if (heroAtTown(h)) h.mana = maxMana(h); }
-    const gain = Object.fromEntries(RES.map(k => [k, 0]));
-    if (t.b.hall) gain.gold += HALL_LEVELS[t.b.hall].inc;
-    for (const h of G.heroes) gain.gold += 300 * perk(h, 'estates');
-    for (const o of G.objs) {
-      if (o.t === 'mine' && o.owner === 0 && zoneOwner(G, G.zone[o.y][o.x]) === 0) gain[o.kind] += MINE_YIELD[o.kind] * ((G.wk && G.wk.mineMul) || 1);
-      if (o.t === 'fort' && o.owner === 0) gain.gold += FORT_INCOME;
-    }
-    RES.forEach(k => { gain[k] = Math.round(gain[k] * DF().income); G.res[k] += gain[k]; });
+    const gain = computeGain();
+    RES.forEach(k => { G.res[k] += gain[k]; });
     const parts = RES.filter(k => gain[k]).map(k => `+${gain[k]}${RES_ICON[k]}`);
     if ((G.day - 1) % 7 === 0) {
       CASTLE_TIERS.forEach((id, i) => { if (t.b[i + 1]) t.avail[i + 1] = (t.avail[i + 1] || 0) + GROWTH[i]; });
@@ -878,7 +986,8 @@
       toast('A new week begins — dwellings replenish, forts raise militia, new heroes arrive at the tavern!');
       if (G.eh) { const m = DF().ehGrow + 0.1 * G.objs.filter(o => o.t === 'fort' && o.owner === 1).length; G.eh.army.forEach(a => a.n = Math.ceil(a.n * m)); }
     }
-    toast(`Day ${G.day}${parts.length ? ' · ' + parts.join(' ') : ''}`);
+    banner(newWeek ? `Week ${Math.floor((G.day - 1) % 28 / 7) + 1} begins` : `Day ${(G.day - 1) % 7 + 1}`, parts.join(' '));
+    sfx('day');
     renderAll();
     if (wev) {
       await showModal(`<h2>${wev.icon} ${wev.title}</h2><p class="small">A new week begins!</p><p>${wev.text}</p>`);
@@ -891,7 +1000,7 @@
     try { localStorage.setItem(SAVE, saveJSON()); } catch (e) { /* ignore */ }
   }
   async function endGame(win, why) {
-    G.over = true;
+    G.over = true; sfx(win ? 'win' : 'lose');
     try { localStorage.removeItem(SAVE); } catch (e) { /* ignore */ }
     await showModal(win ? `<h2>🏆 Victory!</h2><p>You conquered the enemy stronghold on day ${G.day} on ${DF().name} difficulty. The realm is saved!</p>` : `<h2>💀 Defeat</h2><p>${why || 'Your hero has fallen.'}</p>`, ['Main menu']);
     $('title').classList.remove('hide'); refreshTitle();
@@ -900,7 +1009,8 @@
   // ---------- title / selection / help ----------
   const HELP = `<h2>How to Play</h2><p><b>Goal:</b> defeat the enemy stronghold in the north-east and capture it. Don't let the enemy hero take your castle.</p>
     <p><b>Map:</b> click a tile to preview the path (green = reachable today, red = next turn), click again to walk. Click another hero to select it (Tab cycles). Monsters facing an army ${FLEE_RATIO}× stronger offer to flee; with the Charisma perk they can join you instead. Walk onto resources to grab them; mines give daily income; monsters, mines and artifacts are guarded. Merchants ⛺ sell missing resources.<br>
-    Keys: arrows/WASD scroll · H center hero · Space go · E end turn · T town · Tab next hero.</p>
+    Keys: arrows/WASD scroll · +/- zoom · H center hero · Space go · E end turn · T town · Tab next hero. Drag the map to pan, mouse wheel / pinch to zoom.<br>
+    <b>On a phone:</b> drag to pan, pinch to zoom, tap a tile to preview the path and tap it again to go; in battle, tap a hex twice to confirm. Use the bottom bar for End Turn, Town and heroes.</p>
     <p><b>Sea:</b> build a Shipyard in town, then boats at the port by the bay. Walk a hero onto a boat to sail; collect floating treasures, salvage shipwrecks, fight sea monsters, and disembark on any shore tile. Pick the map type, size and seed when starting a game.</p>
     <p><b>Events:</b> every new week brings a weekly event (double growth for a creature, plague, bountiful harvest, merchant caravans, heroic training...) and most days a random event may strike — treasure, bandits, mercenaries, storms, rumors.</p>
     <p><b>Territory:</b> the map is split into zones, each ruled by a fort. Capture a fort to own the zone: +${FORT_INCOME} gold/day, your mines there pay, +${MILITIA} militia/week. <b>Station troops in forts</b> — the enemy hero raids undefended forts.</p>
@@ -954,9 +1064,18 @@
   $('bSave').onclick = () => G && !busy && save();
   $('bEnd').onclick = endTurn;
   $('bTown').onclick = () => G && !busy && openTown();
+  function fitZoom() { if (!G) return; setZoom(Math.min(cmap.width / (G.W * TS), cmap.height / (G.H * TS)), 0, 0); clampCam(); }
+  $('mEnd').onclick = endTurn;
+  $('mTown').onclick = () => G && !busy && openTown();
+  $('mHero').onclick = () => { if (G && !busy) { setActive((G.sel + 1) % G.heroes.length); G.path = null; centerOn(G.hero.x, G.hero.y); renderAll(); toast(`${G.hero.name} selected`); } };
+  $('mMenu').onclick = async () => {
+    if (!G || busy) return;
+    const i = await showModal('<h2>Menu</h2><p class="small">Drag to pan, pinch to zoom, tap a tile to preview the path and tap it again to go.</p>', ['Close', '💾 Save game', Sfx.on ? '🔇 Sound off' : '🔊 Sound on', '🗺 Zoom to fit', '❓ Help']);
+    if (i === 1) save(); else if (i === 2) { Sfx.toggle(); $('bSnd').textContent = Sfx.on ? '🔊' : '🔇'; } else if (i === 3) fitZoom(); else if (i === 4) showModal(HELP);
+  };
 
   refreshTitle();
   requestAnimationFrame(loop);
   window.__G = () => G;
-  window.__dbg = { centerOn, interact, renderAll, newGame, fight, gainXp, openTown };
+  window.__dbg = { centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
 })();

@@ -1065,6 +1065,7 @@
       });
       // drag & drop (finger or mouse): pick a stack up and drop it on any slot — empty = move, same creature = merge, other = swap
       let drag = null, ghost = null;
+      $('mbox').ondragstart = (e) => e.preventDefault();
       const slotAt = (x, y) => { const el = document.elementFromPoint(x, y), s = el && el.closest ? el.closest('.slot') : null; return s && s.dataset.r ? s : null; };
       const clearDrop = () => $('mbox').querySelectorAll('.slot.drop').forEach(e => e.classList.remove('drop'));
       $('mbox').querySelectorAll('.slot').forEach(b => {

@@ -322,8 +322,8 @@ const Art = (() => {
     });
   }
   const dataUrl = (key, cv) => urlCache[key] || (urlCache[key] = cv.toDataURL());
-  const pic = (id, px = 40) => `<img class="pic" width="${px}" height="${px}" alt="" src="${dataUrl('c' + id, portraitCanvas(id))}">`;
-  const heroPic = (icon, col, px = 36, pid) => `<img class="pic round" width="${px}" height="${px}" alt="" src="${dataUrl('h' + icon + col + (pid || ''), heroCanvas(icon, col, 72, pid))}">`;
+  const pic = (id, px = 40) => `<img class="pic" draggable="false" width="${px}" height="${px}" alt="" src="${dataUrl('c' + id, portraitCanvas(id))}">`;
+  const heroPic = (icon, col, px = 36, pid) => `<img class="pic round" draggable="false" width="${px}" height="${px}" alt="" src="${dataUrl('h' + icon + col + (pid || ''), heroCanvas(icon, col, 72, pid))}">`;
 
   // swap the emoji resource icons used throughout the HTML UI for painted ones
   const RES_EMOJI = Object.assign({}, RES_ICON);

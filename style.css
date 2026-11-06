@@ -340,3 +340,6 @@ body.lefty #zoomctl { right: auto; left: 8px; }
 
 .swatch { width: 30px; height: 30px; min-height: 0 !important; padding: 0; border-radius: 50%; border: 2px solid #000; margin: 0 3px 3px 0; }
 .swatch.on { outline: 3px solid var(--gold); outline-offset: 1px; }
+
+.townpic { width: 100%; max-width: 130px; border-radius: 10px; border: 2px solid var(--edge-l); box-shadow: var(--shadow); }
+#loadmsg { margin: 0 0 6px; min-height: 1em; color: var(--mut); }

@@ -659,11 +659,21 @@ const Battle = (() => {
     }
     const stacks = alive().sort((a, b) => a.py - b.py);
     for (const s of stacks) {
+      const fighting = !!(s.anim && now - s.anim.t0 < s.anim.dur), defending = !!(s.hurt && now - s.hurt < 320);
       const off = animOff(s, now), p = { x: s.px + off.x, y: s.py + off.y }, flash = now - (s.flash || 0) < 220;
+      const pst = fighting ? 'fighting' : defending ? 'defending' : 'idle', pb = String(s.t).replace(/_\d$/, ''), pu = /_\d$/.test(String(s.t)) ? '_up' : '', pd = s.side === 0 ? 'right' : 'left';
+      const pose = typeof Assets !== 'undefined' ? Assets.get('poses/' + pd + '/' + pst + '/' + pb + pu, 'poses/' + pd + '/idle/' + pb + pu, 'poses/' + pd + '/idle/' + pb) : null;
+      if (pose) {
+        const kk = Math.min(66 / pose.height, 72 / pose.width), pw = pose.width * kk, ph = pose.height * kk, fy = p.y + 22;
+        ctx.beginPath(); ctx.ellipse(p.x, fy, 21, 7.5, 0, 0, 7); ctx.fillStyle = flash ? 'rgba(255,110,90,.6)' : 'rgba(0,0,0,.38)'; ctx.fill();
+        ctx.lineWidth = s === B.cur ? 3 : 2; ctx.strokeStyle = s === B.cur ? '#ffd24a' : (s.side === 0 ? '#4a8bff' : '#e0504a'); ctx.stroke();
+        ctx.save(); ctx.translate(p.x, fy); ctx.rotate(off.rot * 0.4); if (flash) ctx.globalAlpha = 0.88; ctx.drawImage(pose, -pw / 2, -ph, pw, ph); ctx.restore();
+      } else {
       ctx.beginPath(); ctx.arc(p.x, p.y + 4, HR * 0.72, 0, 7);
       ctx.fillStyle = flash ? '#ff8a7a' : (s.side === 0 ? '#2a4f8a' : '#8a2a2a'); ctx.fill();
       ctx.lineWidth = s === B.cur ? 4 : 2; ctx.strokeStyle = s === B.cur ? '#ffd24a' : '#111'; ctx.stroke();
       { const sz = HR * 1.28; ctx.save(); ctx.translate(p.x, p.y + 3); ctx.rotate(off.rot); if (s.side === 1) ctx.scale(-1, 1); ctx.drawImage(Art.portraitCanvas(s.t), -sz / 2, -sz / 2, sz, sz); ctx.restore(); }
+      }
       const lab = String(s.n), w = Math.max(24, lab.length * 9 + 8);
       ctx.fillStyle = '#000c'; ctx.fillRect(p.x + 4, p.y + 14, w, 16);
       ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(lab, p.x + 4 + w / 2, p.y + 23);
@@ -839,7 +849,18 @@ const Battle = (() => {
     }, 400);
   }
 
-  function run(opts) {
+  // battle poses are loaded on demand before the fight starts (6 small images per creature type)
+  async function preloadPoses(opts) {
+    if (typeof Assets === 'undefined') return;
+    const ids = new Set(); [...(opts.army || []), ...(opts.enemy || [])].forEach(x => { if (x) ids.add(String(x.t)); });
+    const list = []; ids.forEach(t => { const bb = t.replace(/_\d$/, ''), u = /_\d$/.test(t) ? '_up' : ''; for (const d of ['left', 'right']) for (const st of ['idle', 'fighting', 'defending']) list.push('poses/' + d + '/' + st + '/' + bb + u); });
+    await Promise.race([Assets.need(list), new Promise(r => setTimeout(r, 5000))]);
+  }
+  async function run(opts) {
+    try { await preloadPoses(opts); } catch (e) { /* ignore */ }
+    return run0(opts);
+  }
+  function run0(opts) {
     cv = $('bat'); ctx = cv.getContext('2d'); bind(); if (typeof Sfx !== 'undefined') Sfx.mood('battle');
     return new Promise(resolve => {
       const hero = { att: opts.hero.att, def: opts.hero.def, sp: opts.hero.sp, mana: opts.hero.mana, spells: opts.hero.spells || [],

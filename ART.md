@@ -4,6 +4,14 @@ Put images in the `art/` folder using these names (PNG or WebP, transparent back
 
 A name with an upgrade suffix (`castle1_3`) wins over the base name (`castle1`); if you only supply the base, every upgrade level uses it (the game still adds its glow and stars).
 
+## The imported art pack (what is in art/ today)
+Produced by `node tools/import_assets.js "<path to the pack src/assets>"` (small WebP files). Every file is optional: anything missing keeps the painted-in-code art.
+- `portraits/<id>.webp` and `portraits/<id>_up.webp` — square creature paintings used in the frames (base and upgraded picture)
+- `poses/<left|right>/<idle|fighting|defending>/<id>[_up].webp` — battle sprites (right = your side, left = the enemy), loaded when a fight starts
+- `heroes/<name>.webp` — hero portraits; `mounted/<name>_<north|east|south|west>.webp` — the hero on the adventure map
+- `objects/…`, `terrain/…` (ground textures plus tree and mountain overlays), `icons/res_*`, `flags/<colour>.webp` (the eight player flags)
+- `ui/title.webp`, `ui/castle_select.webp`, `ui/hero_select.webp`, `ui/town_<castle>.webp` — screen backgrounds and castle pictures
+
 ## Creatures — `art/creatures/<id>.png`
 256×256, the figure facing right, feet at the bottom edge, no frame (the game adds the rarity frame, stars and wings marks).
 
@@ -97,59 +105,149 @@ Only if you want a different picture for upgraded versions.
 256×256 bust portrait (the game crops it into a round medallion).
 
 - `heroes/Orrin  — Knight, Castle`
-- `heroes/Rion  — Cleric, Castle`
 - `heroes/Valeska  — Knight, Castle`
-- `heroes/Gelu  — Ranger, Castle`
+- `heroes/Edric  — Knight, Castle`
+- `heroes/Sylvia  — Knight, Castle`
+- `heroes/Lord Haart  — Knight, Castle`
+- `heroes/Sorsha  — Knight, Castle`
+- `heroes/Christian  — Knight, Castle`
+- `heroes/Tyris  — Knight, Castle`
+- `heroes/Rion  — Cleric, Castle`
+- `heroes/Adela  — Cleric, Castle`
+- `heroes/Cuthbert  — Cleric, Castle`
+- `heroes/Adelaide  — Cleric, Castle`
 - `heroes/Ingham  — Cleric, Castle`
-- `heroes/Roland  — Knight, Castle`
+- `heroes/Sanya  — Cleric, Castle`
+- `heroes/Loynis  — Cleric, Castle`
+- `heroes/Caitlin  — Cleric, Castle`
 - `heroes/Mephala  — Ranger, Rampart`
-- `heroes/Ufretin  — Druid, Rampart`
+- `heroes/Ufretin  — Ranger, Rampart`
 - `heroes/Jenova  — Ranger, Rampart`
-- `heroes/Kyrre  — Druid, Rampart`
-- `heroes/Gem  — Druid, Rampart`
+- `heroes/Ryland  — Ranger, Rampart`
 - `heroes/Thorgrim  — Ranger, Rampart`
+- `heroes/Ivor  — Ranger, Rampart`
+- `heroes/Clancy  — Ranger, Rampart`
+- `heroes/Kyrre  — Ranger, Rampart`
+- `heroes/Coronius  — Druid, Rampart`
+- `heroes/Uland  — Druid, Rampart`
+- `heroes/Elleshar  — Druid, Rampart`
+- `heroes/Gem  — Druid, Rampart`
+- `heroes/Malcom  — Druid, Rampart`
+- `heroes/Melodia  — Druid, Rampart`
+- `heroes/Alagar  — Druid, Rampart`
+- `heroes/Aeris  — Druid, Rampart`
+- `heroes/Piquedram  — Alchemist, Tower`
+- `heroes/Thane  — Alchemist, Tower`
+- `heroes/Josephine  — Alchemist, Tower`
+- `heroes/Neela  — Alchemist, Tower`
+- `heroes/Torosar  — Alchemist, Tower`
+- `heroes/Fafner  — Alchemist, Tower`
+- `heroes/Rissa  — Alchemist, Tower`
+- `heroes/Iona  — Alchemist, Tower`
+- `heroes/Astral  — Wizard, Tower`
+- `heroes/Halon  — Wizard, Tower`
+- `heroes/Serena  — Wizard, Tower`
+- `heroes/Daremyth  — Wizard, Tower`
+- `heroes/Theodorus  — Wizard, Tower`
 - `heroes/Solmyr  — Wizard, Tower`
 - `heroes/Cyra  — Wizard, Tower`
-- `heroes/Dessa  — Wizard, Tower`
-- `heroes/Iona  — Wizard, Tower`
-- `heroes/Neela  — Wizard, Tower`
 - `heroes/Aine  — Wizard, Tower`
-- `heroes/Xeron  — Demoniac, Inferno`
-- `heroes/Calh  — Heretic, Inferno`
-- `heroes/Fiona  — Heretic, Inferno`
+- `heroes/Fiona  — Demoniac, Inferno`
 - `heroes/Rashka  — Demoniac, Inferno`
 - `heroes/Marius  — Demoniac, Inferno`
-- `heroes/Ignatius  — Heretic, Inferno`
-- `heroes/Sandro  — Necromancer, Necropolis`
+- `heroes/Ignatius  — Demoniac, Inferno`
+- `heroes/Octavia  — Demoniac, Inferno`
+- `heroes/Calh  — Demoniac, Inferno`
+- `heroes/Pyre  — Demoniac, Inferno`
+- `heroes/Nymus  — Demoniac, Inferno`
+- `heroes/Ayden  — Heretic, Inferno`
+- `heroes/Xyron  — Heretic, Inferno`
+- `heroes/Axsis  — Heretic, Inferno`
+- `heroes/Olema  — Heretic, Inferno`
+- `heroes/Calid  — Heretic, Inferno`
+- `heroes/Ash  — Heretic, Inferno`
+- `heroes/Zydar  — Heretic, Inferno`
+- `heroes/Xarfax  — Heretic, Inferno`
 - `heroes/Straker  — Death Knight, Necropolis`
-- `heroes/Vokial  — Necromancer, Necropolis`
+- `heroes/Vokial  — Death Knight, Necropolis`
 - `heroes/Moandor  — Death Knight, Necropolis`
-- `heroes/Charna  — Necromancer, Necropolis`
+- `heroes/Charna  — Death Knight, Necropolis`
 - `heroes/Tamika  — Death Knight, Necropolis`
-- `heroes/Mutare  — Overlord, Dungeon`
-- `heroes/Sephinroth  — Warlock, Dungeon`
-- `heroes/Jeddite  — Overlord, Dungeon`
-- `heroes/Shiva  — Warlock, Dungeon`
+- `heroes/Isra  — Death Knight, Necropolis`
+- `heroes/Clavius  — Death Knight, Necropolis`
+- `heroes/Galthran  — Death Knight, Necropolis`
+- `heroes/Septienna  — Necromancer, Necropolis`
+- `heroes/Aislinn  — Necromancer, Necropolis`
+- `heroes/Sandro  — Necromancer, Necropolis`
+- `heroes/Nimbus  — Necromancer, Necropolis`
+- `heroes/Thant  — Necromancer, Necropolis`
+- `heroes/Xsi  — Necromancer, Necropolis`
+- `heroes/Vidomina  — Necromancer, Necropolis`
+- `heroes/Nagash  — Necromancer, Necropolis`
+- `heroes/Lorelei  — Overlord, Dungeon`
+- `heroes/Arlach  — Overlord, Dungeon`
+- `heroes/Dace  — Overlord, Dungeon`
 - `heroes/Ajit  — Overlord, Dungeon`
-- `heroes/Dace  — Warlock, Dungeon`
-- `heroes/Crag Hack  — Barbarian, Stronghold`
-- `heroes/Gretchin  — Battle Mage, Stronghold`
-- `heroes/Gird  — Barbarian, Stronghold`
+- `heroes/Damacon  — Overlord, Dungeon`
+- `heroes/Gunnar  — Overlord, Dungeon`
+- `heroes/Synca  — Overlord, Dungeon`
+- `heroes/Shakti  — Overlord, Dungeon`
+- `heroes/Alamar  — Warlock, Dungeon`
+- `heroes/Jaegar  — Warlock, Dungeon`
+- `heroes/Malekith  — Warlock, Dungeon`
+- `heroes/Jeddite  — Warlock, Dungeon`
+- `heroes/Geon  — Warlock, Dungeon`
+- `heroes/Deemer  — Warlock, Dungeon`
+- `heroes/Sephinroth  — Warlock, Dungeon`
+- `heroes/Darkstorm  — Warlock, Dungeon`
 - `heroes/Yog  — Barbarian, Stronghold`
-- `heroes/Zydar  — Battle Mage, Stronghold`
+- `heroes/Gurnisson  — Barbarian, Stronghold`
+- `heroes/Jabarkas  — Barbarian, Stronghold`
+- `heroes/Shiva  — Barbarian, Stronghold`
+- `heroes/Gretchin  — Barbarian, Stronghold`
+- `heroes/Krellion  — Barbarian, Stronghold`
+- `heroes/Crag Hack  — Barbarian, Stronghold`
 - `heroes/Tyraxor  — Barbarian, Stronghold`
+- `heroes/Gird  — Battle Mage, Stronghold`
+- `heroes/Vey  — Battle Mage, Stronghold`
+- `heroes/Dessa  — Battle Mage, Stronghold`
+- `heroes/Terek  — Battle Mage, Stronghold`
+- `heroes/Zubin  — Battle Mage, Stronghold`
+- `heroes/Gundula  — Battle Mage, Stronghold`
+- `heroes/Oris  — Battle Mage, Stronghold`
+- `heroes/Saurug  — Battle Mage, Stronghold`
+- `heroes/Bron  — Beastmaster, Fortress`
+- `heroes/Drakon  — Beastmaster, Fortress`
+- `heroes/Wystan  — Beastmaster, Fortress`
 - `heroes/Tazar  — Beastmaster, Fortress`
-- `heroes/Wystan  — Witch, Fortress`
-- `heroes/Alamar  — Beastmaster, Fortress`
-- `heroes/Ranloo  — Witch, Fortress`
+- `heroes/Alkin  — Beastmaster, Fortress`
 - `heroes/Korbac  — Beastmaster, Fortress`
+- `heroes/Gerwulf  — Beastmaster, Fortress`
+- `heroes/Broghild  — Beastmaster, Fortress`
+- `heroes/Mirlanda  — Witch, Fortress`
+- `heroes/Rosic  — Witch, Fortress`
+- `heroes/Voy  — Witch, Fortress`
 - `heroes/Verdish  — Witch, Fortress`
+- `heroes/Merist  — Witch, Fortress`
+- `heroes/Styg  — Witch, Fortress`
+- `heroes/Andra  — Witch, Fortress`
+- `heroes/Tiva  — Witch, Fortress`
 - `heroes/Pasis  — Planeswalker, Conflux`
-- `heroes/Thane  — Elementalist, Conflux`
+- `heroes/Thunar  — Planeswalker, Conflux`
+- `heroes/Ignissa  — Planeswalker, Conflux`
+- `heroes/Lacus  — Planeswalker, Conflux`
+- `heroes/Monere  — Planeswalker, Conflux`
+- `heroes/Erdamon  — Planeswalker, Conflux`
+- `heroes/Fiur  — Planeswalker, Conflux`
+- `heroes/Kalt  — Planeswalker, Conflux`
 - `heroes/Luna  — Elementalist, Conflux`
-- `heroes/Ciele  — Planeswalker, Conflux`
-- `heroes/Grindan  — Planeswalker, Conflux`
-- `heroes/Fafner  — Elementalist, Conflux`
+- `heroes/Brissa  — Elementalist, Conflux`
+- `heroes/Ciele  — Elementalist, Conflux`
+- `heroes/Labetha  — Elementalist, Conflux`
+- `heroes/Inteus  — Elementalist, Conflux`
+- `heroes/Aenain  — Elementalist, Conflux`
+- `heroes/Gelare  — Elementalist, Conflux`
+- `heroes/Grindan  — Elementalist, Conflux`
 
 ## Town buildings — `art/buildings/…`
 256×288 (a little taller than wide), building standing on the bottom edge, transparent background. Name patterns, most specific wins: `<castle>_<kind>_<level>`, `<kind>_<level>`, `<castle>_<kind>`, `<kind>`.

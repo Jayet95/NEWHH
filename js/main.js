@@ -209,6 +209,7 @@
     try {
       const s = localStorage.getItem(key); if (!s) return false;
       G = JSON.parse(s); if (!G.zone || !G.heroes || !G.ais) return false;
+      G.tavern = (G.tavern || []).filter(id => HEROES[id]);
       G.path = null; G.boats = G.boats || []; setFaction(G.faction); setActive(Math.min(G.sel, G.heroes.length - 1));
       initFog(); reindex(G); buildTerrain(); sizeMini(); centerOn(G.hero.x, G.hero.y); renderAll(); return true;
     } catch (e) { return false; }
@@ -220,6 +221,7 @@
     terrain = document.createElement('canvas'); terrain.width = Math.ceil((G.W + 0.5) * TS); terrain.height = Math.ceil(G.H * RH + HR * 0.5);
     const c = terrain.getContext('2d');
     for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) Art.tile(c, G.tiles[y][x], x, y, G);
+    for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) Art.tileOverlay(c, G.tiles[y][x], x, y);
   }
   // ---------- fog of war ----------
   let vis = null, fogDirty = true, miniFog = null;
@@ -302,12 +304,24 @@
   const threatLine = (x, y) => { const t = threatAt(x, y); return t ? `<br>⚔ <b style="color:${t.col}">${t.label}</b> <span class="small">— your army is ${t.ratio >= 10 ? '10+' : t.ratio.toFixed(1)}× ${t.ratio >= 1 ? 'stronger' : 'as strong'}; expect to lose ≈${Math.round(t.loss * 100)}% of it</span>` : ''; };
   // waving flag in the owner's colour (allies get a white fringe)
   function drawFlag(px, py, col, rel, sc = 1) {
+    const pal = PALETTE.find(q => q[1] === col), fim = pal ? Assets.get('flags/' + pal[0].toLowerCase()) : null;
+    if (fim) { const fh = 26 * sc, fw = fim.width * fh / fim.height; cx.drawImage(fim, px - fw * 0.22, py + 7 * sc - fh, fw, fh); return; }
     const t = performance.now() / 260, w = Math.sin(t + px * 0.07) * 1.6 * sc;
     cx.save(); cx.translate(px, py); cx.scale(sc, sc);
     cx.strokeStyle = '#2b2218'; cx.lineWidth = 1.7; cx.lineCap = 'round'; cx.beginPath(); cx.moveTo(0, 6); cx.lineTo(0, -13); cx.stroke();
     cx.beginPath(); cx.moveTo(0.5, -13); cx.quadraticCurveTo(6, -14 + w, 12, -10.5 + w); cx.quadraticCurveTo(7, -8.5 - w * 0.5, 12, -5.5 + w * 0.6); cx.lineTo(0.5, -5); cx.closePath();
     cx.fillStyle = col; cx.fill(); cx.lineWidth = 1.1; cx.strokeStyle = rel === 'ally' ? '#fff' : '#140a04'; cx.stroke();
     cx.restore();
+  }
+  const dirOf = (ax, ay, bx, by) => { const dx = hcx(bx, by) - hcx(ax, ay), dy = hcy(by) - hcy(ay); return Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 'east' : 'west') : (dy > 0 ? 'south' : 'north'); };
+  // mounted hero sprite from the art pack (4 directions, loaded on first use); returns false when there is none
+  function drawMounted(h, px, py, ring, col, rel) {
+    const dirs = ['north', 'east', 'south', 'west'];
+    if (!h._nd) { h._nd = 1; Assets.need(dirs.map(d => 'mounted/' + h.pid + '_' + d)); }
+    const im = Assets.get('mounted/' + h.pid + '_' + (h.dir || 'south')); if (!im) return false;
+    const k = Math.min(46 / im.height, 50 / im.width), w = im.width * k, hh = im.height * k;
+    cx.beginPath(); cx.ellipse(px, py + 14, 14, 5.5, 0, 0, 7); cx.fillStyle = 'rgba(0,0,0,.35)'; cx.fill(); cx.lineWidth = ring ? 3 : 2; cx.strokeStyle = ring ? '#ffd24a' : col; cx.stroke();
+    cx.drawImage(im, px - w / 2, py + 15 - hh, w, hh); drawFlag(px + 13, py + 2, col, rel, 0.8); return true;
   }
   const relOf = (o) => o === 0 ? 'me' : o === null || o === undefined ? 'none' : allyOfPlayer(o) ? 'ally' : 'enemy';
   function objIcon(o) {
@@ -402,12 +416,14 @@
     for (const ai of G.ais) for (const eh of ai.heroes) {
       if (!isVis(eh.x, eh.y)) continue;
       const px = hcx(eh.x, eh.y) - cam.x, py = hcy(eh.y) - cam.y;
+      if (drawMounted(eh, px, py, false, ownCol(ai.id), relOf(ai.id))) continue;
       cx.beginPath(); cx.arc(px, py, 15, 0, 7); cx.fillStyle = ownCol(ai.id); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 2; cx.stroke();
       cx.drawImage(Art.heroCanvas(eh.icon, ownCol(ai.id), 72, eh.pid), px - 13, py - 13, 26, 26); drawFlag(px + 11, py - 6, ownCol(ai.id), relOf(ai.id), 0.8);
     }
     G.heroes.forEach((h, i) => {
       const px = hcx(h.x, h.y) - cam.x + (G.heroes.filter((o, j) => j < i && o.x === h.x && o.y === h.y).length * 6), py = hcy(h.y) - cam.y;
       const rr = h.boat != null ? 11 : 15;
+      if (h.boat == null && drawMounted(h, px, py, h === G.hero, ownCol(0), 'me')) return;
       cx.beginPath(); cx.arc(px, py - (h.boat != null ? 6 : 0), rr, 0, 7); cx.fillStyle = '#2a5fb0'; cx.fill();
       cx.strokeStyle = h === G.hero ? '#ffd24a' : '#fff'; cx.lineWidth = h === G.hero ? 3 : 1.5; cx.stroke();
       { const hs = h.boat != null ? 18 : 26; cx.drawImage(Art.heroCanvas(h.icon, ownCol(0), 72, h.pid), px - hs / 2, py - (h.boat != null ? 6 : 0) - hs / 2, hs, hs); drawFlag(px + 11, py - 6 - (h.boat != null ? 6 : 0), ownCol(0), 'me', 0.8); }
@@ -724,7 +740,7 @@
         const bt = G.boats.find(b => b.x === s.x && b.y === s.y);
         if (bt) { h.boat = bt.id; Ach.event('sail'); toast(`${h.name} sets sail!`); }
       }
-      h.x = s.x; h.y = s.y; (G.flags = G.flags || {}).moved = true; centerOn(h.x, h.y); renderAll(); sfx('step');
+      h.dir = dirOf(h.x, h.y, s.x, s.y); h.x = s.x; h.y = s.y; (G.flags = G.flags || {}).moved = true; centerOn(h.x, h.y); renderAll(); sfx('step');
       await sleep(70);
       const last = i === path.length - 1, o = objAt(G, s.x, s.y);
       const eh = aiHeroAt(s.x, s.y);
@@ -1634,7 +1650,7 @@
     for (let i = 0; i < path.length; i++) {
       const s = path[i];
       if (s.cost > h.move) return true;
-      h.move -= s.cost; h.x = s.x; h.y = s.y;
+      h.move -= s.cost; h.dir = dirOf(h.x, h.y, s.x, s.y); h.x = s.x; h.y = s.y;
       const ph = isAlly(ai.id, 0) ? [] : heroesAt(s.x, s.y);
       if (ph.length) {
         const d = ph.reduce((a, b) => armyCount(a) >= armyCount(b) ? a : b);
@@ -1876,9 +1892,9 @@
     $('modal').classList.remove('hide');
   }
   function showFactionSelect(diff = 'normal', map = {}) {
-    const cards = Object.entries(FACTIONS).map(([k, f]) => `<div class="card" data-f="${k}"><div class="big">${f.icon}</div><b>${f.name}</b><div class="small">${f.blurb}</div>
+    const cards = Object.entries(FACTIONS).map(([k, f]) => `<div class="card" data-f="${k}"><div class="big">${Assets.url('ui/town_' + k) ? `<img class="townpic" src="${Assets.url('ui/town_' + k)}" alt="">` : f.icon}</div><b>${f.name}</b><div class="small">${f.blurb}</div>
       <div class="crow">${factionTiers(k).map(id => `<span title="${C[id].n} → ${C[lineType(id, 2)].n}">${Art.pic(id, 28)}</span>`).join('')}</div></div>`).join('');
-    $('mbox').innerHTML = `<h2>Choose your castle <span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid">${cards}</div><div class="mb"><button id="sBack">Back</button></div>`;
+    $('mbox').innerHTML = `<span data-bg="castle_select"></span><h2>Choose your castle <span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid">${cards}</div><div class="mb"><button id="sBack">Back</button></div>`;
     $('sBack').onclick = () => showMapSelect(diff, map.preset ? map : undefined);
     $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => showHeroSelect(c.dataset.f, diff, map));
     $('modal').classList.remove('hide');
@@ -1889,7 +1905,7 @@
       return `<div class="card" data-hid="${n}"><div class="big">${Art.heroPic(d.i, ownCol(0), 64, d.id)}</div><b>${d.name}</b><div class="small">${d.cls}${d.sk ? ' · ' + PERKS[d.sk].i + ' ' + PERKS[d.sk].n : ''}</div>
         <div class="small">⚔️${d.att} 🛡${d.def} ✨${d.sp} 📚${d.kn}</div><div class="small">Spells: ${[...START_SPELLS, ...d.spells].map(k => SPELLS[k].i).join(' ')}</div>
         <div class="small">Army: ${ti.slice(0, 3).map(id => Art.pic(id, 26)).join(' ')}</div></div>`; }).join('');
-    $('mbox').innerHTML = `<h2>${FACTIONS[f].icon} ${FACTIONS[f].name} — choose your hero</h2><div class="grid">${cards}</div>
+    $('mbox').innerHTML = `<span data-bg="hero_select"></span><h2>${FACTIONS[f].icon} ${FACTIONS[f].name} — choose your hero</h2><div class="grid">${cards}</div>
       <div class="small">Your rival will command a different castle. Fight them across zones, forts and sieges.</div><div class="mb"><button id="sBack">Back</button></div>`;
     $('sBack').onclick = () => showFactionSelect(diff, map);
     $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => { $('modal').classList.add('hide'); $('title').classList.add('hide'); newGame(f, c.dataset.hid, diff, map); });
@@ -1943,6 +1959,9 @@
     const logo = Assets.get('ui/logo'); if (logo) { const h1 = document.querySelector('#title h1'); if (h1) h1.innerHTML = `<img src="${logo.src}" alt="Day &amp; Night" style="max-width:100%;max-height:150px">`; }
     if (G) { buildTerrain(); renderAll(); }
   });
+  document.addEventListener('assets-progress', (e) => { const d = e.detail, el = $('loadmsg'); if (el) el.textContent = d.done >= d.total ? '' : 'Loading art… ' + Math.round(100 * d.done / d.total) + '%'; });
+  // some screens carry a data-bg marker: the picture behind the dialog comes from art/ui/<name>
+  new MutationObserver(() => { const mk = $('mbox').querySelector('[data-bg]'), u = mk && Assets.url('ui/' + mk.dataset.bg); $('mbox').style.backgroundImage = u ? 'linear-gradient(rgba(14,9,4,.72), rgba(14,9,4,.86)), url(' + u + ')' : ''; $('mbox').style.backgroundSize = 'cover'; $('mbox').style.backgroundPosition = 'center'; }).observe($('mbox'), { childList: true });
   // ==== UI SCREENS ====
   const modalOpen = (html) => { $('mbox').innerHTML = html; $('modal').classList.remove('hide'); };
   const closeModal = () => { $('modal').classList.add('hide'); renderAll(); };

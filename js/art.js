@@ -279,7 +279,9 @@ const Art = (() => {
       ell(g, S * .5, S * .8, S * .3, S * .07, 'rgba(0,0,0,.45)');
       if (c.fly) { g.strokeStyle = 'rgba(255,255,255,.28)'; g.lineWidth = S * .035; g.beginPath(); g.arc(S * .2, S * .45, S * .22, -1.2, 1.0); g.moveTo(S * .8 + S * .22 * Math.cos(2.1), S * .45); g.arc(S * .8, S * .45, S * .22, Math.PI - 1.0, Math.PI + 1.2); g.stroke(); }
       g.restore();
-      g.font = Math.round(S * .56) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = 'rgba(0,0,0,.65)'; g.shadowBlur = S * .06; g.shadowOffsetY = S * .03; g.fillStyle = '#fff'; g.fillText(c.i, S * .5, S * .47); g.shadowColor = 'transparent';
+      const fig = typeof Figures !== 'undefined' ? Figures.sprite(id) : null;
+      if (fig) g.drawImage(fig, S * .09, S * .05, S * .82, S * .82);
+      else { g.font = Math.round(S * .56) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = 'rgba(0,0,0,.65)'; g.shadowBlur = S * .06; g.shadowOffsetY = S * .03; g.fillStyle = '#fff'; g.fillText(c.i, S * .5, S * .47); g.shadowColor = 'transparent'; }
       for (const [x, y] of [[S * .13, S * .13], [S * .87, S * .13], [S * .13, S * .87], [S * .87, S * .87]]) { g.beginPath(); g.arc(x, y, S * .028, 0, 7); g.fillStyle = m[0]; g.fill(); }
       const n = Math.min(4, lv - 1); for (let k = 0; k < n; k++) star(g, S * .5 + (k - (n - 1) / 2) * S * .15, S * .87, S * .068);
       if (c.shoot) { g.strokeStyle = '#ffe27a'; g.lineWidth = S * .03; g.beginPath(); g.arc(S * .86, S * .5, S * .12, -1.2, 1.2); g.stroke(); }

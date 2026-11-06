@@ -402,7 +402,7 @@
       if (o.t === 'monster') {
         const mt = o.guard[0].t, mb = mt.replace(/_\d$/, ''), mu = /_\d$/.test(mt) ? '_up' : '', ms = 'poses/left/idle/' + mb + mu;
         const pimg = typeof Assets !== 'undefined' ? Assets.get(ms, 'poses/left/idle/' + mb) : null;
-        if (pimg) { const k = Math.min(36 / pimg.height, 34 / pimg.width), w = pimg.width * k, h = pimg.height * k; cx.drawImage(pimg, px - w / 2, py + 14 - h, w, h); }
+        if (pimg) { const k = Math.min(50 / pimg.height, 44 / pimg.width), w = pimg.width * k, h = pimg.height * k; cx.drawImage(pimg, px - w / 2, py + 14 - h, w, h); }
         else {
           cx.drawImage(Art.portraitCanvas(mt), px - 15, py - 15, 30, 30);
           if (typeof Assets !== 'undefined' && Assets.has(ms) && !monNeed.has(ms)) { monNeed.add(ms); Assets.need([ms, 'poses/left/idle/' + mb]).then(() => draw()); }

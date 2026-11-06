@@ -207,7 +207,7 @@ const Art = (() => {
   function obj(o, fac) {
     if (typeof Assets !== 'undefined') {
       const f2 = fac || o.fac || '', kd = o.kind ? '_' + o.kind : '';
-      const names = [o.t + kd + (o.t === 'town' || o.t === 'dwelling' ? '_' + f2 : ''), o.t + kd, o.t].map(n => 'objects/' + n);
+      const names = [...(o.t === 'dwelling' ? ['dwelling_' + (o.cid || (o.fac + o.tier))] : []), o.t + kd + (o.t === 'town' || o.t === 'dwelling' ? '_' + f2 : ''), o.t + kd, o.t].map(n => 'objects/' + n);
       const ai = Assets.get(...names);
       if (ai) return spriteCache['A|' + names[0]] || (spriteCache['A|' + names[0]] = mk(128, 128, (g) => contain(g, ai, 128, 128)));
     }

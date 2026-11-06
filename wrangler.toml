@@ -1,3 +1,6 @@
 name = "heroes3-js"
 compatibility_date = "2025-01-01"
-pages_build_output_dir = "dist"
+
+# Static game bundle produced by `node tools/build.js`
+[assets]
+directory = "./dist"

@@ -313,6 +313,11 @@
     cx.fillStyle = col; cx.fill(); cx.lineWidth = 1.1; cx.strokeStyle = rel === 'ally' ? '#fff' : '#140a04'; cx.stroke();
     cx.restore();
   }
+  // banner carried by a hero: a pole held at the side rising above the head, the flag flying from its top
+  function drawBanner(px, py, col, rel) {
+    cx.strokeStyle = '#2b2218'; cx.lineWidth = 2; cx.lineCap = 'round'; cx.beginPath(); cx.moveTo(px + 12, py + 10); cx.lineTo(px + 12, py - 30); cx.stroke();
+    drawFlag(px + 12, py - 14, col, rel, 1);
+  }
   const dirOf = (ax, ay, bx, by) => { const dx = hcx(bx, by) - hcx(ax, ay), dy = hcy(by) - hcy(ay); return Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 'east' : 'west') : (dy > 0 ? 'south' : 'north'); };
   // mounted hero sprite from the art pack (4 directions, loaded on first use); returns false when there is none
   function drawMounted(h, px, py, ring, col, rel) {
@@ -321,7 +326,7 @@
     const im = Assets.get('mounted/' + h.pid + '_' + (h.dir || 'south')); if (!im) return false;
     const k = Math.min(46 / im.height, 50 / im.width), w = im.width * k, hh = im.height * k;
     cx.beginPath(); cx.ellipse(px, py + 14, 14, 5.5, 0, 0, 7); cx.fillStyle = 'rgba(0,0,0,.35)'; cx.fill(); cx.lineWidth = ring ? 3 : 2; cx.strokeStyle = ring ? '#ffd24a' : col; cx.stroke();
-    cx.drawImage(im, px - w / 2, py + 15 - hh, w, hh); drawFlag(px + 13, py + 2, col, rel, 0.8); return true;
+    cx.drawImage(im, px - w / 2, py + 15 - hh, w, hh); drawBanner(px, py, col, rel); return true;
   }
   const relOf = (o) => o === 0 ? 'me' : o === null || o === undefined ? 'none' : allyOfPlayer(o) ? 'ally' : 'enemy';
   function objIcon(o) {
@@ -433,7 +438,7 @@
       const px = hcx(eh.x, eh.y) - cam.x, py = hcy(eh.y) - cam.y;
       if (drawMounted(eh, px, py, false, ownCol(ai.id), relOf(ai.id))) continue;
       cx.beginPath(); cx.arc(px, py, 15, 0, 7); cx.fillStyle = ownCol(ai.id); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 2; cx.stroke();
-      cx.drawImage(Art.heroCanvas(eh.icon, ownCol(ai.id), 72, eh.pid), px - 13, py - 13, 26, 26); drawFlag(px + 11, py - 6, ownCol(ai.id), relOf(ai.id), 0.8);
+      cx.drawImage(Art.heroCanvas(eh.icon, ownCol(ai.id), 72, eh.pid), px - 13, py - 13, 26, 26); drawBanner(px, py, ownCol(ai.id), relOf(ai.id));
     }
     G.heroes.forEach((h, i) => {
       const px = hcx(h.x, h.y) - cam.x + (G.heroes.filter((o, j) => j < i && o.x === h.x && o.y === h.y).length * 6), py = hcy(h.y) - cam.y;
@@ -441,7 +446,7 @@
       if (h.boat == null && drawMounted(h, px, py, h === G.hero, ownCol(0), 'me')) return;
       cx.beginPath(); cx.arc(px, py - (h.boat != null ? 6 : 0), rr, 0, 7); cx.fillStyle = '#2a5fb0'; cx.fill();
       cx.strokeStyle = h === G.hero ? '#ffd24a' : '#fff'; cx.lineWidth = h === G.hero ? 3 : 1.5; cx.stroke();
-      { const hs = h.boat != null ? 18 : 26; cx.drawImage(Art.heroCanvas(h.icon, ownCol(0), 72, h.pid), px - hs / 2, py - (h.boat != null ? 6 : 0) - hs / 2, hs, hs); drawFlag(px + 11, py - 6 - (h.boat != null ? 6 : 0), ownCol(0), 'me', 0.8); }
+      { const hs = h.boat != null ? 18 : 26; cx.drawImage(Art.heroCanvas(h.icon, ownCol(0), 72, h.pid), px - hs / 2, py - (h.boat != null ? 6 : 0) - hs / 2, hs, hs); drawBanner(px, py - (h.boat != null ? 6 : 0), ownCol(0), 'me'); }
     });
     if (fogOn()) {
       for (let y = Math.max(0, y0); y < Math.min(G.H, y0 + vy); y++) for (let x = Math.max(0, x0); x < Math.min(G.W, x0 + vx); x++) {

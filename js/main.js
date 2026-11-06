@@ -352,7 +352,7 @@
       case 'monster': return C[o.guard[0].t].i;
     }
   }
-  const monNeed = new Set();
+  const monNeed = new Set(), fpFar = {};
   function draw() {
     if (!G) return;
     cx.setTransform(1, 0, 0, 1, 0, 0); cx.fillStyle = '#000'; cx.fillRect(0, 0, cmap.width, cmap.height); cx.setTransform(Z, 0, 0, Z, 0, 0);
@@ -373,11 +373,14 @@
       // pirate-map trail: a dotted route (cream while the hero can still reach it today, red beyond) ending in a big red X
       let prev = { x: G.hero.x, y: G.hero.y };
       cx.lineCap = 'round';
-      const fp = Assets.get('markers/footprints');
+      const fp0 = Assets.get('markers/footprints');
+      // footprints are coloured by the day the hero gets there: gold = today, blue = day 2, red = day 3 or later
+      const tintFp = (col) => { if (!fpFar[col]) { const c = document.createElement('canvas'); c.width = fp0.width; c.height = fp0.height; const x = c.getContext('2d'); x.drawImage(fp0, 0, 0); x.globalCompositeOperation = 'source-atop'; x.fillStyle = col; x.fillRect(0, 0, c.width, c.height); fpFar[col] = c; } return fpFar[col]; };
+      let cum = 0; const mm = Math.max(1, maxMove(G.hero));
       G.path.forEach((s) => {
-        left -= s.cost; const ok = left >= 0;
+        left -= s.cost; const ok = left >= 0; cum += s.cost; const dayN = cum <= G.hero.move ? 1 : 1 + Math.ceil((cum - G.hero.move) / mm); const fp = !fp0 || dayN === 1 ? fp0 : tintFp(dayN === 2 ? 'rgba(60,150,255,.8)' : 'rgba(235,45,35,.8)');
         const ax = hcx(prev.x, prev.y) - cam.x, ay = hcy(prev.y) - cam.y, bx = hcx(s.x, s.y) - cam.x, by = hcy(s.y) - cam.y;
-        if (fp) { const ang = Math.atan2(by - ay, bx - ax), fw = 21, fh = fp.height * fw / fp.width; cx.save(); cx.translate(bx, by); cx.rotate(ang + Math.PI / 2); cx.globalAlpha = ok ? 1 : 0.55; cx.shadowColor = 'rgba(0,0,0,.9)'; cx.shadowBlur = 5; cx.drawImage(fp, -fw / 2, -fh / 2, fw, fh); cx.shadowBlur = 0; cx.shadowColor = 'transparent'; cx.drawImage(fp, -fw / 2, -fh / 2, fw, fh); cx.restore(); prev = s; return; }
+        if (fp) { const ang = Math.atan2(by - ay, bx - ax), fw = 21, fh = fp.height * fw / fp.width; cx.save(); cx.translate(bx, by); cx.rotate(ang + Math.PI / 2); cx.globalAlpha = 1; cx.shadowColor = 'rgba(0,0,0,.9)'; cx.shadowBlur = 5; cx.drawImage(fp, -fw / 2, -fh / 2, fw, fh); cx.shadowBlur = 0; cx.shadowColor = 'transparent'; cx.drawImage(fp, -fw / 2, -fh / 2, fw, fh); cx.restore(); prev = s; return; }
         cx.setLineDash([0.1, 7]);
         cx.beginPath(); cx.moveTo(ax, ay); cx.lineTo(bx, by);
         cx.lineWidth = 6.5; cx.strokeStyle = 'rgba(25,12,0,.8)'; cx.stroke();

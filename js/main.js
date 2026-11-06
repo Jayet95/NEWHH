@@ -614,6 +614,7 @@
   mini.addEventListener('click', (ev) => {
     if (!G) return; const r = mini.getBoundingClientRect();
     centerOn((ev.clientX - r.left) / r.width * G.W, (ev.clientY - r.top) / r.height * G.H);
+    if (!$('modal').classList.contains('hide')) $('modal').classList.add('hide');
   });
   document.addEventListener('keydown', (e) => {
     if (!G || document.body.classList.contains('inbattle') || !$('modal').classList.contains('hide') || !$('title').classList.contains('hide')) return;
@@ -1586,7 +1587,22 @@
   function fitZoom() { if (!G) return; setZoom(Math.min(cmap.width / ((G.W + 0.5) * TS), cmap.height / (G.H * RH + HR * 0.5)), 0, 0); clampCam(); }
   $('mEnd').onclick = endTurn;
   $('mTown').onclick = () => G && !busy && openTown();
-  $('mHero').onclick = () => { if (G && !busy) { setActive((G.sel + 1) % G.heroes.length); G.path = null; centerOn(G.hero.x, G.hero.y); renderAll(); toast(`${G.hero.name} selected`); } };
+  // phone action bar: the side panels open as sheets (the real elements are moved into the dialog and back, so they stay live)
+  let sheetBack = null;
+  const sheetOpen = (title, els) => {
+    if (!G || busy) return;
+    if (sheetBack) sheetBack();
+    $('mbox').innerHTML = `<h2>${title}</h2><div id="sheetBody"></div><div class="mb"><button class="primary" id="shClose">Close</button></div>`;
+    els.forEach(e => $('sheetBody').appendChild(e));
+    sheetBack = () => { sheetBack = null; els.forEach(e => $('side').appendChild(e)); };
+    $('modal').classList.remove('hide'); $('shClose').onclick = () => $('modal').classList.add('hide');
+  };
+  new MutationObserver(() => { if (sheetBack && !$('sheetBody')) sheetBack(); }).observe($('mbox'), { childList: true });
+  new MutationObserver(() => { if (sheetBack && $('modal').classList.contains('hide')) sheetBack(); }).observe($('modal'), { attributes: true, attributeFilter: ['class'] });
+  $('mHero').onclick = () => sheetOpen('🏇 Hero', [$('hero')]);
+  $('mArmy').onclick = () => G && sheetOpen(`⚔️ ${G.hero.name} — Army`, [$('army')]);
+  $('mGear').onclick = () => G && !busy && openEquip(G.hero);
+  $('mLand').onclick = () => sheetOpen('🗺️ Territory', [$('mini'), $('terr')]);
   $('mMenu').onclick = async () => {
     if (!G || busy) return;
     const i = await showModal('<h2>Menu</h2><p class="small">Drag to pan, pinch to zoom, tap a tile to preview the path and tap it again to go.</p>', ['Close', '💾 Save game', Sfx.on ? '🔇 Sound off' : '🔊 Sound on', '🗺 Zoom to fit', '❓ Help', '🚪 Main menu']);

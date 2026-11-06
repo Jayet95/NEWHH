@@ -33,6 +33,7 @@ async function fight(env, a, b, opts = {}) {
   const army = a.map(x => ({ ...x })); while (army.length < 7) army.push(null);
   const p = env.Battle.run({ hero: Object.assign({ att: 0, def: 0, sp: 0, mana: 0, spells: [], perks: {}, name: 'A', icon: 'A' }, opts.hero || {}),
     army, enemy: b.map(x => ({ ...x })), eStats: Object.assign({ att: 0, def: 0 }, opts.eStats || {}), title: 'sim', siege: opts.siege || null, canRetreat: false });
+  for (let i = 0; i < 5; i++) await new Promise(r => setImmediate(r));   // Battle.run first awaits its art preload, then binds and starts
   env.els.bAuto.onclick();
   return p;
 }

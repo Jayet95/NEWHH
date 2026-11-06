@@ -1069,7 +1069,7 @@
     const th = townHero(t), here = !!th, mt = myTowns(), coastal = !!G.dock && t === mt[0];
     const tabs = mt.length > 1 ? `<div class="hlist">${mt.map((x, i) => `<button class="hbtn${x === t ? ' on' : ''}" data-tab="${i}" title="${x.name}">${FACTIONS[x.fac].icon}</button>`).join('')}</div>` : '';
     let html = `${tabs}<h2>🏰 ${t.name} <span class="small">${FACTIONS[t.fac].name} · ${t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Settlement'}</span></h2><canvas id="tcv" width="780" height="150" style="width:100%;border-radius:6px;border:1px solid #6b4f24"></canvas>
-      <div class="small">${here ? `${th.name} is in town — recruits join the army.` : '⚠ No hero in this town; bring a hero to recruit or upgrade troops (or garrison it).'} Higher Town Hall levels unlock new dwellings and creature upgrades.</div>`;
+      <div class="small">${here ? `${th.name} is in town — recruits join the hero's army.` : 'No hero in this town — recruits join the town garrison (a hero can pick them up later).'} Higher Town Hall levels unlock new dwellings and creature upgrades.</div>`;
     tiersOf(t).forEach((id, i) => {
       const tier = i + 1, lv = t.up[tier], c = C[lineType(id, lv)], built = t.b[tier], av = t.avail[tier] || 0;
       const needHall = TIER_HALL[tier], locked = t.b.hall < needHall;
@@ -1172,11 +1172,10 @@
     });
     q('[data-buy]', b => b.onclick = () => {
       const tier = +b.dataset.buy, type = tierType(t, tier), c = C[type];
-      if (!here) return toast('A hero must be in the castle.');
       let n = Math.min(parseInt($('n' + tier).value) || 0, t.avail[tier] || 0);
       while (n > 0 && !canAfford(G.res, Object.fromEntries(Object.entries(c.cost).map(([k, v]) => [k, v * n])))) n--;
       if (n <= 0) return toast('Cannot recruit (resources or availability).');
-      if (!addToArmy(th, type, n)) return toast('No free army slot.');
+      if (!addToArmy(th || { army: t.garrison }, type, n)) return toast(here ? 'No free army slot.' : 'The garrison is full.');
       pay(G.res, c.cost, n); t.avail[tier] -= n; toast(`Recruited ${n} ${c.n}${n > 1 ? 's' : ''}.`);
       again();
     });

@@ -115,16 +115,25 @@ const TownArt = (() => {
   // ---- the full town panorama ----
   function scene(g, t, now, anim, info, W, H) {
     const hue = hueOf(t.fac), fort = t.fort || 0, hallLv = (t.b && t.b.hall) || 0;
+    const bgi = typeof Assets !== 'undefined' ? Assets.get('ui/town_' + t.fac) : null;
+    if (bgi) {
+      const kk = Math.max(W / bgi.width, H / bgi.height), dw = bgi.width * kk, dh = bgi.height * kk;
+      g.drawImage(bgi, (W - dw) / 2, -dh * 0.16, dw, dh);
+      const shade = g.createLinearGradient(0, H * 0.45, 0, H); shade.addColorStop(0, 'rgba(10,6,2,0)'); shade.addColorStop(1, 'rgba(10,6,2,.7)'); g.fillStyle = shade; g.fillRect(0, 0, W, H);
+    } else {
     const sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#26386a'); sky.addColorStop(0.55, '#b9855a'); sky.addColorStop(1, '#e0a868'); g.fillStyle = sky; g.fillRect(0, 0, W, H);
     g.fillStyle = 'rgba(255,255,255,.7)'; for (let i = 0; i < 18; i++) g.fillRect((i * 97) % W, (i * 31) % 50, 1.5, 1.5);
     g.fillStyle = hsl(hue, 18, 26); poly(g, [[0, 120], [60, 60], [120, 100], [200, 50], [290, 105], [380, 66], [470, 108], [560, 58], [650, 100], [720, 70], [780, 112], [780, 130], [0, 130]], g.fillStyle, null);
     g.fillStyle = hsl(hue, 20, 34); poly(g, [[0, 130], [90, 96], [190, 124], [320, 90], [430, 126], [540, 94], [660, 124], [780, 100], [780, 140], [0, 140]], g.fillStyle, null);
     // the keep of the castle: grows with the Town Hall
     const ks = 44 + hallLv * 12; g.drawImage(Art.obj({ t: 'town', owner: 0 }, t.fac), W / 2 - ks / 2, 122 - ks + 8, ks, ks);
+    }
     const gy = H - 38;
     drawFort(g, W, gy - 24, fort);
+    if (bgi) g.globalAlpha = 0.45;
     g.fillStyle = lin(g, gy, H, '#6a9a4a', '#365a28'); g.fillRect(0, gy, W, H - gy);
     g.fillStyle = 'rgba(190,160,110,.55)'; g.fillRect(0, gy + 18, W, 10);
+    g.globalAlpha = 1;
     const base = gy + 30;
     g.textAlign = 'center'; g.textBaseline = 'middle';
     for (let i = 0; i < 11; i++) {

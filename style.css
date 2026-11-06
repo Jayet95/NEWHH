@@ -343,3 +343,13 @@ body.lefty #zoomctl { right: auto; left: 8px; }
 
 .townpic { width: 100%; max-width: 130px; border-radius: 10px; border: 2px solid var(--edge-l); box-shadow: var(--shadow); }
 #loadmsg { margin: 0 0 6px; min-height: 1em; color: var(--mut); }
+
+/* ---------- interface skin from the art pack (only when art/ui/*.webp exist; body.skin is set by the game) ---------- */
+body.skin button:not(.slot):not(.hbtn):not(.swatch):not(.seg button):not(#zoomctl button):not(.ttab) { border: 11px solid transparent; border-image: url(art/ui/btn_normal.webp) 34 52 fill / 11px 17px stretch; background: none; box-shadow: none; padding: 4px 10px; min-height: 40px; color: #f3e7c6; text-shadow: 0 1px 2px #000; }
+body.skin button.primary:not(.slot):not(.seg button):not(#zoomctl button) { border-image-source: url(art/ui/btn_pressed.webp) !important; color: #2a1a06 !important; text-shadow: 0 1px 0 rgba(255, 240, 190, .5); font-weight: bold; }
+body.skin button:disabled { border-image-source: url(art/ui/btn_disabled.webp) !important; color: #9a9a9a; opacity: .75; }
+body.skin button:hover:not(:disabled):not(.slot):not(.seg button) { filter: brightness(1.18); }
+body.skin #top, body.skin #mres { border: 12px solid transparent; border-image: url(art/ui/frame_toolbar.webp) 26 fill / 12px stretch; background: none; box-shadow: none; }
+body.skin #mbox { border: 22px solid transparent; border-image: url(art/ui/frame_scroll.webp) 90 / 22px stretch; background-clip: padding-box; box-shadow: 0 10px 40px rgba(0, 0, 0, .8); }
+body.skin #zoomctl button { border: 0; background: url(art/ui/frame_command.webp) center / 100% 100% no-repeat; box-shadow: none; color: #f3e7c6; font-size: 20px; text-shadow: 0 1px 2px #000; }
+body.skin .seg button { border-radius: 0; }

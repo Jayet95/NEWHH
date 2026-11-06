@@ -610,34 +610,67 @@ const Battle = (() => {
   }
   function emoji(t, x, y, size) { ctx.font = size + 'px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t, x, y); }
 
+  // ---- battlefield pictures from the art pack: textured ground (grass, dirt inside castle walls, water in the moat), walls, gate, towers, mines ----
+  const SIEGE_LAYOUT = ['wall', 'wall', 'tower', 'wall', 'wall', 'gate', 'wall', 'wall', 'tower', 'wall', 'wall'];
+  const texCache = {};
+  function flatTex(name, crop) {
+    const k = name + crop.join(','); if (texCache[k] !== undefined) return texCache[k];
+    const im = typeof Assets !== 'undefined' ? Assets.get(name) : null; if (!im) return texCache[k] = null;
+    const c = document.createElement('canvas'); c.width = c.height = 256; c.getContext('2d').drawImage(im, im.width * crop[0], im.height * crop[1], im.width * crop[2], im.height * crop[3], 0, 0, 256, 256); return texCache[k] = c;
+  }
+  function buildBoard() {
+    const grass = flatTex('battle/grass', [0.3, 0.26, 0.4, 0.2]), dirt = flatTex('battle/dirt', [0.3, 0.26, 0.4, 0.2]), water = flatTex('terrain/water', [0, 0, 1, 1]);
+    if (!grass) return null;
+    const c = document.createElement('canvas'); c.width = 960; c.height = 640; const g = c.getContext('2d');
+    g.fillStyle = '#33502b'; g.fillRect(0, 0, 960, 640);
+    for (let r = 0; r < BH; r++) for (let col = 0; col < BW; col++) {
+      const p = hexPx(col, r), inside = B.siege && (B.siege.dside === 1 ? col > B.cw : col < B.cw), moat = B.siege && B.moat.has(key(col, r));
+      const tex = moat && water ? water : (inside || (!B.siege && ((col * 7 + r * 3) % 11 === 0))) && dirt ? dirt : grass;
+      const sw = 96, sx = ((col * 37 + r * 91) % 7) / 7 * (256 - sw), sy = ((col * 53 + r * 29) % 7) / 7 * (256 - sw);
+      g.save(); hexPath2(g, p.x, p.y, HR + 0.6); g.clip(); g.drawImage(tex, sx, sy, sw, sw, p.x - HW / 2 - 1, p.y - HR - 1, HW + 2, HR * 2 + 2); g.restore();
+    }
+    return c;
+  }
+  function hexPath2(g, x, y, r) { g.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 180 * (60 * i - 30); i ? g.lineTo(x + r * Math.cos(a), y + r * Math.sin(a)) : g.moveTo(x + r * Math.cos(a), y + r * Math.sin(a)); } g.closePath(); }
+  const sprite = (img, x, y, w) => { const h = img.height * w / img.width; ctx.drawImage(img, x - w / 2, y - h + 24, w, h); };
+  function structSprite(st, p) {
+    if (typeof Assets === 'undefined') return false;
+    const frac = st.hp / st.max;
+    const img = st.k === 'wall' ? Assets.get(frac > 0.6 ? 'battle/wall_intact' : 'battle/wall_damaged') : st.k === 'gate' ? Assets.get('battle/gate_closed') : Assets.get(frac > 0.5 ? 'battle/tower' : 'battle/tower_damaged');
+    if (!img) return false;
+    sprite(img, p.x, p.y, st.k === 'tower' ? 52 : 70); return true;
+  }
   function draw() {
     if (!B) return;
     const now = performance.now();
-    const g = ctx.createLinearGradient(0, 0, 0, 640);
-    g.addColorStop(0, '#2f4a2a'); g.addColorStop(1, '#46663a');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, 960, 640);
+    if (B._board === undefined && typeof Assets !== 'undefined') B._board = buildBoard();
+    if (B._board) ctx.drawImage(B._board, 0, 0);
+    else { const g = ctx.createLinearGradient(0, 0, 0, 640); g.addColorStop(0, '#2f4a2a'); g.addColorStop(1, '#46663a'); ctx.fillStyle = g; ctx.fillRect(0, 0, 960, 640); }
     const hov = B.hover, input = B.input && B.cur && B.cur.side === 0 && !B.busy;
     for (let r = 0; r < BH; r++) for (let c = 0; c < BW; c++) {
       const p = hexPx(c, r), k = key(c, r);
       hexPath(p.x, p.y, HR - 1);
       ctx.fillStyle = (c + r) % 2 ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.08)'; ctx.fill();
-      if (B.siege) {
+      if (B.siege && !B._board) {
         const inside = B.siege.dside === 1 ? c > B.cw : c < B.cw;
         if (inside) { ctx.fillStyle = 'rgba(170,130,80,.30)'; ctx.fill(); }
         if (B.moat.has(k)) { ctx.fillStyle = 'rgba(40,120,200,.65)'; ctx.fill(); }
       }
       if (input && B.reach.has(k) && !B.spell) { ctx.fillStyle = 'rgba(120,255,120,.22)'; ctx.fill(); }
-      ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1; ctx.stroke();
-      if (B.obs.has(k)) { ctx.fillStyle = '#fff'; emoji(B.obs.get(k), p.x, p.y, 30); }
-      if (B.siege && B.moat.has(k)) { ctx.fillStyle = 'rgba(255,255,255,.5)'; emoji('≈', p.x, p.y, 20); }
-      if (B.siege && B.mines && B.mines.has(k) && B.siege.dside === 0) { ctx.fillStyle = '#fff'; emoji('💣', p.x, p.y + 2, 18); }
+      ctx.strokeStyle = B._board ? 'rgba(0,0,0,.22)' : 'rgba(0,0,0,.35)'; ctx.lineWidth = 1; ctx.stroke();
+      if (B.obs.has(k)) { const oe = B.obs.get(k), oi = typeof Assets !== 'undefined' ? Assets.get(oe === '🌲' ? 'terrain/forest_overlay' : (oe === '🪨' || oe === '⛰️') ? 'terrain/mountain_overlay' : '') : null; if (oi) sprite(oi, p.x, p.y, oe === '🌲' ? 44 : 40); else { ctx.fillStyle = '#fff'; emoji(oe, p.x, p.y, 30); } }
+      if (B.siege && B.moat.has(k) && !B._board) { ctx.fillStyle = 'rgba(255,255,255,.5)'; emoji('≈', p.x, p.y, 20); }
+      if (B.siege && B.mines && B.mines.has(k) && B.siege.dside === 0) { const mi = typeof Assets !== 'undefined' ? Assets.get('battle/mine_dormant') : null; if (mi) sprite(mi, p.x, p.y + 6, 34); else { ctx.fillStyle = '#fff'; emoji('💣', p.x, p.y + 2, 18); } }
+      if (B.siege && c === B.cw && !structAt(c, r) && typeof Assets !== 'undefined') { const kk = SIEGE_LAYOUT[r], di = Assets.get(kk === 'gate' ? 'battle/gate_open' : kk === 'tower' ? 'battle/tower_damaged' : 'battle/wall_breached'); if (di) sprite(di, p.x, p.y, kk === 'tower' ? 52 : 70); }
       if (B.spell === '__mine' && freeMineHex(c, r)) { hexPath(p.x, p.y, HR - 4); ctx.strokeStyle = 'rgba(255,200,80,.8)'; ctx.lineWidth = 2; ctx.stroke(); }
       const st = structAt(c, r);
       if (st) {
+        if (!structSprite(st, p)) {
         hexPath(p.x, p.y, HR - 1);
         ctx.fillStyle = now - (st.flash || 0) < 220 ? '#ffcf7a' : '#8b8478'; ctx.fill();
         ctx.strokeStyle = '#2a2520'; ctx.lineWidth = 2; ctx.stroke();
         ctx.fillStyle = '#fff'; emoji(STRUCT[st.k].i, p.x, p.y - 2, st.k === 'wall' ? 24 : 28);
+        } else if (now - (st.flash || 0) < 220) { hexPath(p.x, p.y, HR - 1); ctx.fillStyle = 'rgba(255,210,120,.45)'; ctx.fill(); }
         ctx.fillStyle = '#300'; ctx.fillRect(p.x - 16, p.y + 15, 32, 5);
         ctx.fillStyle = st.hp / st.max > 0.5 ? '#5c5' : st.hp / st.max > 0.25 ? '#ec4' : '#e55'; ctx.fillRect(p.x - 16, p.y + 15, 32 * Math.max(0, st.hp) / st.max, 5);
       }

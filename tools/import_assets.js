@@ -59,7 +59,7 @@ job(find('interface', 'Main Menu Background'), path.join(OUT, 'ui', 'title.webp'
 job(find('interface', 'Castle Selection Background'), path.join(OUT, 'ui', 'castle_select.webp'), { w: 1280, h: 726, q: 62 });
 job(find('interface', 'Hero Selection Background'), path.join(OUT, 'ui', 'hero_select.webp'), { w: 1280, h: 726, q: 62 });
 job(find('interface', 'Adventure Screen Concept'), path.join(OUT, 'ui', 'adventure.webp'), { w: 1280, h: 726, q: 62 });
-for (const f of fs.readdirSync(path.join(SRC, 'h3'))) { const b = f.replace(/\.jpg$/, ''); if (['castle', 'rampart', 'tower', 'inferno', 'necropolis', 'dungeon', 'stronghold', 'fortress', 'conflux'].includes(b)) job(path.join(SRC, 'h3', f), path.join(OUT, 'ui', 'town_' + b + '.webp'), { w: 480, h: 480, q: 70 }); }
+for (const f of fs.readdirSync(path.join(SRC, 'h3'))) { const mt = /^town-([a-z]+).jpg$/.exec(f); if (mt) job(path.join(SRC, 'h3', f), path.join(OUT, 'ui', 'town_' + mt[1] + '.webp'), { w: 640, h: 640, q: 72 }); }
 job(find('game-icons', 'Android Game Icon'), path.join(ROOT, 'assets', 'icon-source.png'), { w: 1024, h: 1024, fmt: 'png' });
 
 (async () => {

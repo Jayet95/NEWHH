@@ -1939,6 +1939,15 @@
   "ui/frame_toolbar.webp",
   "ui/frame_town.webp",
   "ui/hero_select.webp",
-  "ui/title.webp"
+  "ui/title.webp",
+  "ui/town_castle.webp",
+  "ui/town_conflux.webp",
+  "ui/town_dungeon.webp",
+  "ui/town_fortress.webp",
+  "ui/town_inferno.webp",
+  "ui/town_necropolis.webp",
+  "ui/town_rampart.webp",
+  "ui/town_stronghold.webp",
+  "ui/town_tower.webp"
  ]
 }

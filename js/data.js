@@ -207,6 +207,16 @@ const ABIL = {
   for (const id in ABIL) { const [b, u] = ABIL[id]; for (let L = 1; L <= MAX_LV; L++) C[lineType(id, L)].ab = L >= 2 ? merge(b, u) : b.slice(); }
   C.troll.ab = ['regen']; C.dragon.ab = ['breath', 'res:0.5']; C.golem.ab = ['mindless', 'res:0.5']; C.naga.ab = ['noRet'];
 })();
+// ---------- Dragon Lair exclusives: not recruitable in any castle, only at a lair someone has first conquered ----------
+const LAIR = ['faerie', 'rustd', 'crystald', 'azured'];
+const LAIR_GROWTH = { faerie: 2, rustd: 2, crystald: 1, azured: 1 };
+Object.assign(C, {
+  faerie:   { n: 'Faerie Dragon',  i: '🐲', a: 18, d: 18, lo: 20, hi: 30, hp: 170, s: 15, fly: 1, v: 2500,  lair: 1, cost: { gold: 2200, gems: 2 },    ab: ['res:0.5'] },
+  rustd:    { n: 'Rust Dragon',    i: '🐲', a: 21, d: 21, lo: 40, hi: 50, hp: 190, s: 10, fly: 1, v: 5200,  lair: 1, cost: { gold: 3400, sulfur: 2 },  ab: ['breath', 'res:0.5'] },
+  crystald: { n: 'Crystal Dragon', i: '🐲', a: 22, d: 22, lo: 40, hi: 55, hp: 200, s: 11, fly: 1, v: 6200,  lair: 1, cost: { gold: 4000, crystal: 3 }, ab: ['res:0.75'] },
+  azured:   { n: 'Azure Dragon',   i: '🐲', a: 27, d: 27, lo: 70, hi: 80, hp: 300, s: 12, fly: 1, v: 10500, lair: 1, cost: { gold: 8000, gems: 4 },    ab: ['breath', 'res:0.75'] },
+});
+
 const ABILITY_INFO = {
   dshot: 'shoots twice', dstrike: 'strikes twice', unlimRet: 'unlimited retaliation', noRet: 'no enemy retaliation', joust: 'jousting: +5% damage per hex moved',
   hate: 'hates a rival creature: double damage', drain: 'life drain', splash: 'splash damage to neighbours', cloud: 'death cloud on living neighbours',

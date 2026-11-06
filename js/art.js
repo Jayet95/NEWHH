@@ -119,6 +119,17 @@ const Art = (() => {
       g.beginPath(); g.arc(32, 32, 10, 0, 7); g.fillStyle = lin(g, 22, 22, 42, 42, hsl(hue, 90, 80), hsl(hue, 80, 38)); g.fill(); g.strokeStyle = 'rgba(0,0,0,.5)'; g.lineWidth = 1.5; g.stroke();
       g.fillStyle = 'rgba(255,255,255,.8)'; g.beginPath(); g.arc(28, 28, 3, 0, 7); g.fill();
     },
+    lair(g) {
+      shadow(g, 32, 57, 29, 5);
+      g.beginPath(); g.moveTo(2, 58); g.lineTo(14, 26); g.lineTo(24, 32); g.lineTo(36, 6); g.lineTo(46, 26); g.lineTo(52, 22); g.lineTo(62, 58); g.closePath(); g.fillStyle = lin(g, 0, 6, 0, 58, '#6a5f52', '#2e2923'); g.fill(); g.strokeStyle = '#14100c'; g.lineWidth = 1.6; g.stroke();
+      poly(g, [[36, 6], [31, 16], [34, 14], [37, 19], [40, 13], [43, 17]], '#f2f6fb');
+      g.beginPath(); g.moveTo(16, 58); g.lineTo(16, 44); g.quadraticCurveTo(32, 26, 48, 44); g.lineTo(48, 58); g.closePath(); g.fillStyle = '#0b0605'; g.fill(); g.strokeStyle = '#3a1a0c'; g.lineWidth = 2; g.stroke();
+      for (const x of [26, 38]) { g.beginPath(); g.ellipse(x, 44, 3.2, 2, 0, 0, 7); g.fillStyle = '#ff3a1a'; g.fill(); g.beginPath(); g.ellipse(x, 44, .8, 2, 0, 0, 7); g.fillStyle = '#220'; g.fill(); }
+      for (let i = 0; i < 4; i++) { poly(g, [[24 + i * 5, 52], [25.5 + i * 5, 56], [27 + i * 5, 52]], '#f3ecd8'); }
+      for (const [x, y, r] of [[8, 56, 5], [13, 54, 4], [5, 53, 3]]) { ell(g, x, y, r, r * .5, '#e3b840'); }
+      ell(g, 56, 55, 5, 2.6, '#e3b840'); ell(g, 52, 56, 3, 1.6, '#c8921c');
+      poly(g, [[50, 16], [56, 9], [62, 14], [57, 13]], '#c0301c'); poly(g, [[50, 16], [46, 10], [53, 13]], '#8a1c10');
+    },
     merchant(g) {
       shadow(g, 32, 56, 26, 5);
       poly(g, [[6, 54], [58, 54], [32, 12]], '#f0e6d2', '#3a2812');
@@ -263,14 +274,26 @@ const Art = (() => {
   // ---------- portraits: framed plates for creatures and medallions for heroes ----------
   const FONT = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
   const rr = (g, x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
-  const METAL = { 1: ['#f0b886', '#a8683a', '#4e2c12'], 2: ['#f7fafd', '#9aa4b2', '#454c58'], 4: ['#fff3b0', '#d19a1e', '#6b4a08'] };
+  // rarity = castle tier (1-7) for castle creatures, by value for neutrals; lair dragons are Divine. Upgrade level shows as stars + glow.
+  const RARITY = [
+    { n: 'Common', m: ['#f0b886', '#a8683a', '#4e2c12'] }, { n: 'Uncommon', m: ['#c4f5a8', '#4aa04a', '#1c4a1c'] },
+    { n: 'Rare', m: ['#b0d8ff', '#3a7ad0', '#12306a'] }, { n: 'Epic', m: ['#e4c0ff', '#8a4ad0', '#3a146a'] },
+    { n: 'Legendary', m: ['#fff3b0', '#d19a1e', '#6b4a08'] }, { n: 'Mythic', m: ['#ffc4a4', '#e0552a', '#6a1a08'] },
+    { n: 'Ancient', m: ['#ffffff', '#a8c8e8', '#3a5a8a'] }, { n: 'Divine', m: ['#7af0ff', '#c58aff', '#ff7ac8'] },
+  ];
+  function rarityIdx(id) {
+    const c = C[id] || {}; if (c.lair) return 7;
+    const t = String(id).match(/^[a-z]+(\d)/); if (t) return Math.min(6, +t[1] - 1);
+    const v = c.v || 0; return v < 120 ? 0 : v < 300 ? 1 : v < 700 ? 2 : v < 1200 ? 3 : v < 2500 ? 4 : v < 5000 ? 5 : 6;
+  }
+  const rarity = (id) => RARITY[rarityIdx(id)];
   const star = (g, x, y, r) => { g.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? r * .45 : r; g.lineTo(x + Math.cos(a) * rad, y + Math.sin(a) * rad); } g.closePath(); g.fillStyle = '#ffe27a'; g.fill(); g.strokeStyle = '#5c430b'; g.lineWidth = .8; g.stroke(); };
   const portCache = {}, heroCache = {}, urlCache = {};
   function portraitCanvas(id, S = 72) {
     const key = id + '|' + S; if (portCache[key]) return portCache[key];
     const c = C[id] || { i: '❓', lv: 1 };
     return portCache[key] = mk(S, S, (g) => {
-      const fac = String(id).replace(/\d.*$/, ''), hue = facHue(fac), lv = c.lv || 1, m = METAL[lv >= 4 ? 4 : lv >= 2 ? 2 : 1], hh = hue === null ? 28 : hue, sat = hue === null ? 14 : 48;
+      const fac = String(id).replace(/\d.*$/, ''), hue = facHue(fac), lv = c.lv || 1, m = RARITY[rarityIdx(id)].m, hh = hue === null ? 28 : hue, sat = hue === null ? 14 : 48;
       rr(g, 1, 1, S - 2, S - 2, S * .17); g.fillStyle = lin(g, 0, 0, S, S, m[0], m[2]); g.fill(); g.strokeStyle = '#140c04'; g.lineWidth = 1.5; g.stroke();
       const i0 = S * .075; rr(g, i0, i0, S - 2 * i0, S - 2 * i0, S * .12);
       const bg = g.createRadialGradient(S * .38, S * .3, 2, S * .5, S * .55, S * .68); bg.addColorStop(0, hsl(hh, sat, 46)); bg.addColorStop(1, hsl(hh, sat + 6, 13)); g.fillStyle = bg; g.fill();
@@ -334,5 +357,5 @@ const Art = (() => {
     return curCache[name] = 'url(' + c.toDataURL() + ') ' + hot + ', ' + (name === 'no' ? 'not-allowed' : name === 'sword' ? 'crosshair' : 'pointer');
   }
 
-  return { tile, hexPath, hexPt, HR, cursor, portraitCanvas, heroCanvas, pic, heroPic, obj, boat: boatC, resImg, resCanvas, RES_EMOJI, fmtCostTxt, facHue };
+  return { tile, hexPath, hexPt, HR, cursor, rarity, portraitCanvas, heroCanvas, pic, heroPic, obj, boat: boatC, resImg, resCanvas, RES_EMOJI, fmtCostTxt, facHue };
 })();

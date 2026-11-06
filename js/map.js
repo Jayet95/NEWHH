@@ -221,6 +221,11 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
     const c = pick(); if (!c) break; const d = depthOf(c), tier = 1 + Math.min(3, Math.floor(R() * (2 + d * 3)));
     objs.push({ t: 'dwelling', fac: facKeys2[Math.floor(R() * facKeys2.length)], tier, owner: null, avail: GROWTH[tier - 1], x: c.x, y: c.y, guard: [guard(c, 0.9)] });
   }
+  for (let i = 0, n = Math.max(1, Math.round(1.1 * Math.sqrt(sc))); i < n; i++) { // dragon lairs: only reachable by beating a dragon horde
+    let c = null; for (let t = 0; t < 8; t++) { const k = pick(); if (!k) break; c = k; if (depthOf(k) > 0.5) break; }
+    if (!c) break; const d = depthOf(c);
+    objs.push({ t: 'lair', owner: null, x: c.x, y: c.y, avail: Object.assign({}, LAIR_GROWTH), guard: [{ t: 'dragon', n: Math.max(3, Math.round((2 + d * 6) * DM.neutral)) }] });
+  }
   for (let i = 0, n = Math.round(5 * sc); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'resobj', kind: ['windmill', 'waterwheel', 'garden'][Math.floor(R() * 3)], week: -1, x: c.x, y: c.y }); }
   for (let i = 0, n = Math.round(2 * sc); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'stone', used: {}, x: c.x, y: c.y }); }
   for (let i = 0, n = Math.round(2 * sc); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'shrine', spell: spellKeys[Math.floor(R() * spellKeys.length)], used: {}, x: c.x, y: c.y }); }

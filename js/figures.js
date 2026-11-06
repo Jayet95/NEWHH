@@ -139,7 +139,7 @@ const Figures = (() => {
   }
   function dragon(g, s) {
     const c = s.col || GREEN; ground(g, 20);
-    wings(g, 'bat', 30, 30, 27, s.wingC || K(c, 4) && [c[0], c[1], c[2] + 4], 1);
+    wings(g, s.wt || 'bat', 30, 30, 27, s.wingC || K(c, 4) && [c[0], c[1], c[2] + 4], 1);
     line(g, [[14, 40], [6, 46], [4, 38]], K(c, -10), 5); pl(g, [[2, 36], [6, 38], [3, 42]], K(c, -10) && [c[0], c[1], c[2] - 10]);
     if (!s.wyvern) { limb(g, 24, 46, 22, 57, 6.2, [c[0], c[1], c[2] - 8]); }
     limb(g, 36, 46, 38, 57, 6.2, [c[0], c[1], c[2] - 8]);
@@ -293,18 +293,42 @@ const Figures = (() => {
     fortress7: { b: 'hy' },
     conflux1: { b: 'h', size: .52, ar: [300, 50, 62], wings: 'butterfly', wingC: [300, 55, 66], sk: SKIN },
     conflux2: { b: 'el', kind: 'air' }, conflux3: { b: 'el', kind: 'water' }, conflux4: { b: 'el', kind: 'fire' }, conflux5: { b: 'el', kind: 'earth' }, conflux6: { b: 'el', kind: 'psy' },
+    faerie: { b: 'd', col: [300, 55, 62], wt: 'butterfly', wingC: [300, 50, 72], size: .86 },
+    rustd: { b: 'd', col: [22, 60, 36], wingC: [22, 40, 26] },
+    crystald: { b: 'd', col: [185, 55, 66], wingC: [185, 50, 80] },
+    azured: { b: 'd', col: [205, 78, 48], wingC: [205, 60, 36] },
     conflux7: { b: 'bi', col: [25, 90, 50], fire: true, wingC: [20, 90, 52] },
   };
   const ALIAS = { stronghold1: 'goblin', stronghold2: 'wolf', stronghold3: 'orc', stronghold4: 'ogre', tower3: 'tower3' };
   const ARCH = { h: humanoid, q: quad, d: dragon, s: serp, bi: bird, i: insect, e: eyeball, k: kraken, sh: shark, hy: hydra, el: elem };
   const cache = {};
-  function sprite(id) {
-    const base = String(id).replace(/_\d$/, ''), key = base;
-    if (cache[key]) return cache[key];
-    const spec = FIG[ALIAS[base] || base]; if (!spec) return null;
+  const baseCache = {};
+  function baseSprite(base) {
+    if (baseCache[base] !== undefined) return baseCache[base];
+    const spec = FIG[ALIAS[base] || base]; if (!spec) return baseCache[base] = null;
     const cv = document.createElement('canvas'); cv.width = cv.height = 128; const g = cv.getContext('2d'); g.scale(2, 2);
-    try { ARCH[spec.b](g, spec); } catch (e) { return cache[key] = null; }
-    return cache[key] = cv;
+    try {
+      if (spec.size && spec.b !== 'h') { g.translate(32, 58); g.scale(spec.size, spec.size); g.translate(-32, -58); }
+      ARCH[spec.b](g, spec);
+    } catch (e) { return baseCache[base] = null; }
+    return baseCache[base] = cv;
+  }
+  // upgrades (_2.._5) reuse the base art with a growing glow, size and sparkles so they read as elite versions
+  const GLOW = [null, null, '#cfe8ff', '#ffd24a', '#ff9a2a', '#d58aff'];
+  function sprite(id) {
+    id = String(id); if (cache[id] !== undefined) return cache[id];
+    const base = id.replace(/_\d$/, ''), m = /_(\d)$/.exec(id), lv = m ? +m[1] : 1, cv = baseSprite(base);
+    if (!cv || lv < 2) return cache[id] = cv;
+    const out = document.createElement('canvas'); out.width = out.height = 128; const g = out.getContext('2d'), sc = 1 + 0.03 * (lv - 1);
+    g.translate(64, 76); g.scale(sc, sc); g.translate(-64, -76);
+    g.shadowColor = GLOW[lv]; g.shadowBlur = 5 + 4 * lv; g.drawImage(cv, 0, 0);
+    g.shadowBlur = 0; g.shadowColor = 'transparent';
+    try { g.filter = 'saturate(' + (1 + 0.1 * (lv - 1)) + ') brightness(' + (1 + 0.03 * (lv - 1)) + ')'; } catch (e) { /* ignore */ }
+    g.drawImage(cv, 0, 0); g.filter = 'none';
+    g.setTransform(2, 0, 0, 2, 0, 0);
+    const sp = [[50, 10], [8, 18], [55, 34], [6, 40], [32, 4]];
+    for (let i = 0; i < Math.min(sp.length, lv - 1 + (lv > 3 ? 1 : 0)); i++) sparkle(g, sp[i][0], sp[i][1], 3.2 + (i % 2), GLOW[lv]);
+    return cache[id] = out;
   }
   // how a creature fights: melee = slash | stab | smash | claw | gaze, shoot = arrow | orb | fire | ball | rock | gaze
   const styleCache = {};

@@ -264,6 +264,7 @@
       case 'fort': return '🏯';
       case 'merchant': return '⛺';
       case 'wreck': return '🚢';
+      case 'lair': return '🐲';
       case 'spring': return '⛲';
       case 'dwelling': return C[factionTiers(o.fac)[o.tier - 1]].i;
       case 'resobj': return { windmill: '🌬️', waterwheel: '🎡', garden: '🌻' }[o.kind];
@@ -297,12 +298,20 @@
     }
     if (G.path) {
       let left = G.hero.move;
-      G.path.forEach((s, i) => {
+      // pirate-map trail: a dotted route (cream while the hero can still reach it today, red beyond) ending in a big red X
+      let prev = { x: G.hero.x, y: G.hero.y };
+      cx.lineCap = 'round';
+      G.path.forEach((s) => {
         left -= s.cost; const ok = left >= 0;
-        const px = hcx(s.x, s.y) - cam.x, py = hcy(s.y) - cam.y;
-        cx.beginPath(); cx.arc(px, py, i === G.path.length - 1 ? 7 : 4, 0, 7);
-        cx.fillStyle = ok ? 'rgba(140,255,140,.9)' : 'rgba(255,110,90,.9)'; cx.fill();
+        const ax = hcx(prev.x, prev.y) - cam.x, ay = hcy(prev.y) - cam.y, bx = hcx(s.x, s.y) - cam.x, by = hcy(s.y) - cam.y;
+        cx.setLineDash([0.1, 7]);
+        cx.beginPath(); cx.moveTo(ax, ay); cx.lineTo(bx, by);
+        cx.lineWidth = 6.5; cx.strokeStyle = 'rgba(25,12,0,.8)'; cx.stroke();
+        cx.lineWidth = 3.6; cx.strokeStyle = ok ? '#fff2c4' : '#ff8a70'; cx.stroke();
+        cx.setLineDash([]); prev = s;
       });
+      { const e = G.path[G.path.length - 1], ex = hcx(e.x, e.y) - cam.x, ey = hcy(e.y) - cam.y, r = 9;
+        for (const [w, col] of [[8.5, 'rgba(25,12,0,.9)'], [5, '#e0281c']]) { cx.lineWidth = w; cx.strokeStyle = col; cx.beginPath(); cx.moveTo(ex - r, ey - r); cx.lineTo(ex + r, ey + r); cx.moveTo(ex + r, ey - r); cx.lineTo(ex - r, ey + r); cx.stroke(); } }
       const total = G.path.reduce((s, p) => s + p.cost, 0), days = total <= G.hero.move ? 0 : Math.ceil((total - G.hero.move) / maxMove(G.hero));
       const end = G.path[G.path.length - 1], lx = hcx(end.x, end.y) - cam.x, ly = hcy(end.y) - cam.y - 22, txt = days ? `${days + 1} days — click to go` : '✓ today — click to go';
       cx.font = 'bold 11px sans-serif'; const tw = cx.measureText(txt).width + 12;
@@ -319,14 +328,14 @@
       }
       if (o.t === 'monster') cx.drawImage(Art.portraitCanvas(o.guard[0].t), px - 15, py - 15, 30, 30);
       const spr = o.t === 'monster' ? null : Art.obj(o, o.fac);
-      if (spr) { const sz = o.t === 'town' ? 50 : o.t === 'fort' ? 44 : o.t === 'pile' ? 30 : 38; cx.drawImage(spr, px - sz / 2, py - sz / 2 - (o.t === 'town' ? 5 : 2), sz, sz); }
+      if (spr) { const sz = o.t === 'town' ? 50 : o.t === 'fort' || o.t === 'lair' ? 46 : o.t === 'pile' ? 30 : 38; cx.drawImage(spr, px - sz / 2, py - sz / 2 - (o.t === 'town' ? 5 : 2), sz, sz); }
       else if (o.t !== 'monster') { cx.font = `26px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(objIcon(o), px, py + 1); }
       if (o.t === 'fort') {
         cx.beginPath(); cx.arc(px + 14, py - 16, 6, 0, 7); cx.fillStyle = ownCol(o.owner); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke();
         const gn = o.garrison.reduce((s, a) => s + (a ? a.n : 0), 0);
         if (o.owner === 0 && gn) { cx.font = 'bold 11px sans-serif'; cx.fillStyle = '#000b'; cx.fillRect(px - 14, py + 10, 28, 13); cx.fillStyle = '#fff'; cx.fillText(gn, px, py + 17); }
       }
-      if (o.t === 'mine' || o.t === 'dwelling') { cx.beginPath(); cx.arc(px + 12, py - 12, 5, 0, 7); cx.fillStyle = ownCol(o.owner); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke(); }
+      if (o.t === 'mine' || o.t === 'dwelling' || o.t === 'lair') { cx.beginPath(); cx.arc(px + 12, py - 12, 5, 0, 7); cx.fillStyle = ownCol(o.owner); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke(); }
       if (o.t === 'town') { cx.beginPath(); cx.arc(px + 16, py - 18, 6, 0, 7); cx.fillStyle = ownCol(o.owner); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke(); }
       if (o.t === 'town' || o.t === 'fort') {
         cx.font = 'bold 11px sans-serif'; cx.lineWidth = 3; cx.strokeStyle = '#000'; cx.fillStyle = o.owner === 0 ? '#bcd8ff' : o.owner ? '#ffb3a8' : '#f3e7bd';
@@ -384,7 +393,7 @@
     }
     for (const o of G.objs) {
       if (fogOn() && (!isExpl(o.x, o.y) || (o.t === 'monster' && !isVis(o.x, o.y)))) continue;
-      mx.fillStyle = (o.t === 'fort' || o.t === 'town') ? ownCol(o.owner) : o.t === 'monster' ? '#a33' : o.t === 'mine' ? (o.owner !== null ? ownCol(o.owner) : '#ddd') : o.t === 'merchant' ? '#fa0' : '#ee6';
+      mx.fillStyle = (o.t === 'fort' || o.t === 'town') ? ownCol(o.owner) : o.t === 'lair' ? '#ff6a00' : o.t === 'monster' ? '#a33' : o.t === 'mine' ? (o.owner !== null ? ownCol(o.owner) : '#ddd') : o.t === 'merchant' ? '#fa0' : '#ee6';
       mx.fillRect(o.x * k - (o.t === 'town' ? 1 : 0), o.y * k - (o.t === 'town' ? 1 : 0), k + (o.t === 'town' ? 2 : 0), k + (o.t === 'town' ? 2 : 0));
     }
     mx.fillStyle = '#8df'; for (const b of G.boats) mx.fillRect(b.x * k, b.y * k, k, k);
@@ -445,7 +454,7 @@
     h.army.forEach((a, i) => {
       const b = document.createElement('button');
       b.className = 'slot' + (a ? '' : ' empty') + (i === selSlot ? ' sel' : '');
-      if (a) { const c = C[a.t]; b.innerHTML = `${Art.pic(a.t, 44)}<small>${a.n}${c.lv > 1 ? ' ' + '★'.repeat(c.lv - 1) : ''}</small>`; b.title = `${c.n}\nAtt ${c.a} Def ${c.d} Dmg ${c.lo}-${c.hi} HP ${c.hp} Spd ${c.s}${c.shoot ? '\nShooter' : ''}${c.fly ? '\nFlying' : ''}`; }
+      if (a) { const c = C[a.t]; b.innerHTML = `${Art.pic(a.t, 44)}<small>${a.n}${c.lv > 1 ? ' ' + '★'.repeat(c.lv - 1) : ''}</small>`; b.title = `${c.n} — ${Art.rarity(a.t).n}\nAtt ${c.a} Def ${c.d} Dmg ${c.lo}-${c.hi} HP ${c.hp} Spd ${c.s}${c.shoot ? '\nShooter' : ''}${c.fly ? '\nFlying' : ''}`; }
       b.onclick = () => slotClick(i);
       el.appendChild(b);
     });
@@ -504,6 +513,7 @@
             : `<b>${o.name}</b> — neutral ${fn} town${g}<br>Capture it for a new castle (siege battle).`;
       }
       case 'merchant': return '<b>Wandering Merchant</b><br>Buy missing resources';
+      case 'lair': return `<b>🐲 Dragon Lair</b>${o.owner === 0 ? ' — yours<br>' + LAIR.map(id => `${C[id].n}: ${o.avail[id] || 0}`).join(' · ') : '<br>Home of the Faerie, Rust, Crystal and Azure dragons — sold in no castle.<br>Defeat the horde to claim it.'}${g}`;
       case 'dwelling': { const c = C[dwId(o)]; return `<b>${c.i} ${c.n} dwelling</b> (${FACTIONS[o.fac].name}) — ${o.owner === 0 ? `yours, ${o.avail} available` : 'unclaimed'}${g}`; }
       case 'resobj': return `<b>${{ windmill: 'Windmill', waterwheel: 'Water Wheel', garden: 'Mystical Garden' }[o.kind]}</b><br>Yields resources once per week.`;
       case 'stone': return '<b>Learning Stone</b><br>Grants experience once per hero.';
@@ -697,6 +707,31 @@
     };
     $('modal').classList.remove('hide');
   }
+  // Dragon Lair: beat the horde first (anyone must), then buy every kind of dragon each week
+  async function visitLair(o, h) {
+    if (o.owner !== 0) {
+      if (o.guard && o.guard.length && !(await fight(h, o.guard, { att: 0, def: 0 }, 'Dragon Lair guardians'))) return;
+      o.owner = 0; o.guard = []; sfx('build'); toast('The Dragon Lair is yours — dragons gather here every week!'); renderAll();
+    }
+    openLair(o, h);
+  }
+  function openLair(o, h) {
+    const need = (c, n) => Object.fromEntries(Object.entries(c.cost).map(([k, v]) => [k, v * n]));
+    const rows = LAIR.map(id => { const c = C[id], av = o.avail[id] || 0;
+      return `<div class="trow"><div class="ic">${Art.pic(id, 40)}</div><div><b>${c.n}</b> <span class="small">${Art.rarity(id).n} · Att ${c.a} Def ${c.d} Dmg ${c.lo}-${c.hi} HP ${c.hp} Spd ${c.s} · Flying${c.ab.includes('breath') ? ' · Breath' : ''} · +${LAIR_GROWTH[id]}/week</span><br><span class="small">Available: <b>${av}</b> · ${fmtCost(c.cost)} each</span></div>
+        <div class="acts"><input type="number" min="1" max="${av}" value="${av}" data-ln="${id}"><button data-lb="${id}"${av ? '' : ' disabled'}>Recruit</button></div></div>`; }).join('');
+    $('mbox').innerHTML = `<h2>🐲 Dragon Lair</h2><div class="small">These dragons cannot be recruited in any castle. While you hold the lair, new dragons arrive every week — buy them here and they join ${h.name}.</div>${rows}
+      <div class="mb"><button id="lrAll">Buy all I can afford</button><button class="primary" id="lrClose">Close</button></div>`;
+    const buy = (id, want) => { const c = C[id]; let n = Math.min(want, o.avail[id] || 0); while (n > 0 && !canAfford(G.res, need(c, n))) n--; if (n <= 0) return 0; if (!addToArmy(h, id, n)) return -1; pay(G.res, c.cost, n); o.avail[id] -= n; return n; };
+    $('lrClose').onclick = () => { $('modal').classList.add('hide'); renderAll(); };
+    $('mbox').querySelectorAll('[data-lb]').forEach(b => b.onclick = () => {
+      const id = b.dataset.lb, r = buy(id, parseInt($('mbox').querySelector('[data-ln="' + id + '"]').value) || 0);
+      if (r === -1) return toast('No free army slot.'); if (r === 0) return toast('Cannot recruit (resources or availability).');
+      toast('Recruited ' + r + ' ' + C[id].n + (r > 1 ? 's' : '') + '.'); sfx('build'); renderAll(); openLair(o, h);
+    });
+    $('lrAll').onclick = () => { let got = []; for (const id of [...LAIR].reverse()) { const r = buy(id, o.avail[id] || 0); if (r > 0) got.push(r + ' ' + C[id].n); } if (!got.length) return toast('Nothing affordable (or no free army slot).'); toast('Recruited ' + got.join(', ') + '.'); sfx('build'); renderAll(); openLair(o, h); };
+    $('modal').classList.remove('hide');
+  }
   function visitResObj(o, h) {
     const NAMES = { windmill: '🌬️ Windmill', waterwheel: '🎡 Water Wheel', garden: '🌻 Mystical Garden' };
     if (o.week === weekNow()) return showModal(`<h2>${NAMES[o.kind]}</h2><p>Nothing more to collect until next week.</p>`);
@@ -782,6 +817,7 @@
     }
     if (o.t === 'spring') return drinkSpring(o, h);
     if (o.t === 'dwelling') return visitDwelling(o, h);
+    if (o.t === 'lair') return visitLair(o, h);
     if (o.t === 'resobj') return visitResObj(o, h);
     if (o.t === 'stone') return visitStone(o, h);
     if (o.t === 'shrine') return visitShrine(o, h);
@@ -1476,6 +1512,7 @@
     if ((G.day - 1) % 7 === 0) {
       for (const tw of G.objs) if (tw.t === 'town') for (let i = 1; i <= 7; i++) if (tw.b[i]) tw.avail[i] = (tw.avail[i] || 0) + GROWTH[i - 1];
       for (const dw of G.objs) if (dw.t === 'dwelling' && dw.owner === 0) dw.avail += GROWTH[dw.tier - 1];
+      for (const lr of G.objs) if (lr.t === 'lair' && lr.owner === 0) for (const id of LAIR) lr.avail[id] = (lr.avail[id] || 0) + LAIR_GROWTH[id];
       for (const o of G.objs) if (o.t === 'fort' && o.owner === 0) {
         const mil = CASTLE_TIERS[0];
         const s = o.garrison.find(a => a && a.t === mil);

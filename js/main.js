@@ -1029,23 +1029,33 @@
 
   // ---------- generic army exchange ----------
   function openExchange(title, note, A, nameA, B, nameB, back, extra) {
-    let sel = null;
+    let sel = null, amt = 0;
     const arr = (r) => r === 'a' ? A : B;
     const render = () => {
       const row = (a, rk) => a.map((s, i) => `<button class="slot${s ? '' : ' empty'}${sel && sel.r === rk && sel.i === i ? ' sel' : ''}" data-r="${rk}" data-i="${i}">${s ? `${Art.pic(s.t, 40)}<small>${s.n}</small>` : ''}</button>`).join('');
       $('mbox').innerHTML = `<h2>${title}</h2><div class="small">${note}</div>${extra ? extra.html : ''}
         <h4>${nameA}</h4><div class="armyrow">${row(A, 'a')}</div><h4>${nameB}</h4><div class="armyrow">${row(B, 'b')}</div>
-        <div class="small">Click a slot, then another: move / merge / swap.</div>
+        ${sel ? (() => { const st = arr(sel.r)[sel.i]; return `<div class="small" style="margin-top:6px">Selected: <b>${C[st.t].n}</b> (${st.n}). Move <input type="number" id="xAmt" min="1" max="${st.n}" value="${Math.min(amt || st.n, st.n)}" style="width:72px"> <button id="xOne">1</button> <button id="xHalf">½</button> <button id="xAll">All</button> — then click an empty slot (or the same creature) to split, or any slot to swap/merge all.</div>`; })() : '<div class="small">Click a stack, choose how many to move, then click a slot: move / split / merge / swap.</div>'}
         <div class="mb"><button class="primary" id="xClose">${back ? 'Back' : 'Close'}</button></div>`;
       $('xClose').onclick = () => { if (back) back(); else { $('modal').classList.add('hide'); renderAll(); } };
       if (extra) extra.bind();
+      if (sel && $('xAmt')) {
+        const inp = $('xAmt'), mx = arr(sel.r)[sel.i].n, setA = (v) => { amt = Math.max(1, Math.min(mx, v)); inp.value = amt; };
+        inp.oninput = () => { amt = Math.max(1, Math.min(mx, parseInt(inp.value) || 1)); };
+        $('xOne').onclick = () => setA(1); $('xHalf').onclick = () => setA(Math.max(1, Math.floor(mx / 2))); $('xAll').onclick = () => setA(mx);
+      }
       $('mbox').querySelectorAll('.slot').forEach(b => b.onclick = () => {
         const r = b.dataset.r, i = +b.dataset.i;
-        if (!sel) { if (arr(r)[i]) sel = { r, i }; }
+        if (!sel) { if (arr(r)[i]) { sel = { r, i }; amt = arr(r)[i].n; } }
         else {
           if (!(sel.r === r && sel.i === i)) {
-            const X = arr(sel.r), Y = arr(r);
-            if (X[sel.i] && Y[i] && X[sel.i].t === Y[i].t) { Y[i].n += X[sel.i].n; X[sel.i] = null; }
+            const X = arr(sel.r), Y = arr(r), src = X[sel.i], n = Math.max(1, Math.min(src.n, amt || src.n));
+            if (n < src.n) {
+              if (!Y[i]) { Y[i] = { t: src.t, n }; src.n -= n; }
+              else if (Y[i].t === src.t) { Y[i].n += n; src.n -= n; }
+              else toast('To split a stack, pick an empty slot or a stack of the same creature.');
+            }
+            else if (src && Y[i] && src.t === Y[i].t) { Y[i].n += src.n; X[sel.i] = null; }
             else { const tmp = X[sel.i]; X[sel.i] = Y[i]; Y[i] = tmp; }
           }
           sel = null;
@@ -1247,7 +1257,7 @@
         <div class="acts"><button data-garr="1">Manage garrison</button></div></div>
 `;
     const tabBar = `<div class="ttabs"><button class="ttab${townTab === 'war' ? ' on' : ''}" data-ttab="war">⚔️ Warriors</button><button class="ttab${townTab === 'bld' ? ' on' : ''}" data-ttab="bld">🏗️ Buildings</button></div>`;
-    html += tabBar + (townTab === 'war' ? war + garrRow + outpostHtml(t) + caravanHtml(t, mt) : bld) + `<div class="small" style="margin-top:8px">${RES.map(k => RES_ICON[k] + ' ' + G.res[k]).join('  ')}</div>
+    html += tabBar + (townTab === 'war' ? war + garrRow + outpostHtml(t) + caravanHtml(t, mt) : garrRow + bld) + `<div class="small" style="margin-top:8px">${RES.map(k => RES_ICON[k] + ' ' + G.res[k]).join('  ')}</div>
       <div class="mb"><button class="primary" id="tClose">Leave town</button></div>`;
     $('mbox').innerHTML = html; $('modal').classList.remove('hide');
     if (!townLoop) { townLoop = true; requestAnimationFrame(drawTown); }

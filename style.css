@@ -223,3 +223,11 @@ body.inbattle { padding-bottom: 0; }
   #sheetBody #army { grid-template-columns: repeat(4, 1fr); }
   #sheetBody .slot { font-size: 30px; }
 }
+
+/* painted portraits */
+.pic { display: block; margin: 0 auto; border-radius: 7px; image-rendering: auto; }
+.pic.round { border-radius: 50%; }
+.slot .pic { margin-bottom: 1px; }
+.crow .pic, .card .small .pic { display: inline-block; vertical-align: middle; margin: 0 1px; }
+.hbtn { padding: 2px 3px; } .hbtn .pic { margin: 0; }
+#hero h3 .pic { display: inline-block; vertical-align: middle; }

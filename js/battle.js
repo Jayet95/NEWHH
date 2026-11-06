@@ -626,7 +626,7 @@ const Battle = (() => {
       ctx.beginPath(); ctx.arc(hp.x, hp.y, 27, 0, 7);
       ctx.fillStyle = isPlayer ? '#2a4f8a' : '#8a2a2a'; ctx.fill();
       ctx.lineWidth = flash ? 5 : 3; ctx.strokeStyle = flash ? '#fff' : '#ffd24a'; ctx.stroke();
-      ctx.fillStyle = '#fff'; emoji(hh.icon, hp.x, hp.y + 2, 34);
+      ctx.drawImage(Art.heroCanvas(hh.icon, isPlayer ? '#3a8aff' : '#e04a3a'), hp.x - 22, hp.y - 22, 44, 44);
       ctx.fillStyle = '#000b'; ctx.fillRect(hp.x - 36, hp.y + 31, 72, isPlayer ? 41 : 28);
       ctx.fillStyle = '#f3e7bd'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(hh.name, hp.x, hp.y + 40);
@@ -641,7 +641,7 @@ const Battle = (() => {
       ctx.beginPath(); ctx.arc(p.x, p.y + 4, HR * 0.72, 0, 7);
       ctx.fillStyle = flash ? '#ff8a7a' : (s.side === 0 ? '#2a4f8a' : '#8a2a2a'); ctx.fill();
       ctx.lineWidth = s === B.cur ? 4 : 2; ctx.strokeStyle = s === B.cur ? '#ffd24a' : '#111'; ctx.stroke();
-      ctx.fillStyle = '#fff'; emoji(C[s.t].i, p.x, p.y + 2, 30);
+      { const sz = HR * 1.28; ctx.drawImage(Art.portraitCanvas(s.t), p.x - sz / 2, p.y + 3 - sz / 2, sz, sz); }
       const lab = String(s.n), w = Math.max(24, lab.length * 9 + 8);
       ctx.fillStyle = '#000c'; ctx.fillRect(p.x + 4, p.y + 14, w, 16);
       ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(lab, p.x + 4 + w / 2, p.y + 23);
@@ -698,7 +698,7 @@ const Battle = (() => {
       const x = 90 + i * 50, y = 26;
       ctx.beginPath(); ctx.arc(x, y, 19, 0, 7); ctx.fillStyle = s.side === 0 ? '#2a4f8a' : '#8a2a2a'; ctx.fill();
       ctx.lineWidth = i === 0 ? 3 : 1.5; ctx.strokeStyle = i === 0 ? '#ffd24a' : '#000'; ctx.stroke();
-      ctx.fillStyle = '#fff'; emoji(C[s.t].i, x, y + 1, 20);
+      ctx.drawImage(Art.portraitCanvas(s.t), x - 15, y - 15, 30, 30);
     });
   }
   function drawInfo(h) {

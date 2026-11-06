@@ -260,6 +260,44 @@ const Art = (() => {
     }
   }
 
+  // ---------- portraits: framed plates for creatures and medallions for heroes ----------
+  const FONT = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+  const rr = (g, x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+  const METAL = { 1: ['#f0b886', '#a8683a', '#4e2c12'], 2: ['#f7fafd', '#9aa4b2', '#454c58'], 4: ['#fff3b0', '#d19a1e', '#6b4a08'] };
+  const star = (g, x, y, r) => { g.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? r * .45 : r; g.lineTo(x + Math.cos(a) * rad, y + Math.sin(a) * rad); } g.closePath(); g.fillStyle = '#ffe27a'; g.fill(); g.strokeStyle = '#5c430b'; g.lineWidth = .8; g.stroke(); };
+  const portCache = {}, heroCache = {}, urlCache = {};
+  function portraitCanvas(id, S = 72) {
+    const key = id + '|' + S; if (portCache[key]) return portCache[key];
+    const c = C[id] || { i: '❓', lv: 1 };
+    return portCache[key] = mk(S, S, (g) => {
+      const fac = String(id).replace(/\d.*$/, ''), hue = facHue(fac), lv = c.lv || 1, m = METAL[lv >= 4 ? 4 : lv >= 2 ? 2 : 1], hh = hue === null ? 28 : hue, sat = hue === null ? 14 : 48;
+      rr(g, 1, 1, S - 2, S - 2, S * .17); g.fillStyle = lin(g, 0, 0, S, S, m[0], m[2]); g.fill(); g.strokeStyle = '#140c04'; g.lineWidth = 1.5; g.stroke();
+      const i0 = S * .075; rr(g, i0, i0, S - 2 * i0, S - 2 * i0, S * .12);
+      const bg = g.createRadialGradient(S * .38, S * .3, 2, S * .5, S * .55, S * .68); bg.addColorStop(0, hsl(hh, sat, 46)); bg.addColorStop(1, hsl(hh, sat + 6, 13)); g.fillStyle = bg; g.fill();
+      g.save(); rr(g, i0, i0, S - 2 * i0, S - 2 * i0, S * .12); g.clip();
+      g.fillStyle = 'rgba(255,255,255,.07)'; g.beginPath(); g.moveTo(0, 0); g.lineTo(S, 0); g.lineTo(0, S * .75); g.fill();
+      ell(g, S * .5, S * .8, S * .3, S * .07, 'rgba(0,0,0,.45)');
+      if (c.fly) { g.strokeStyle = 'rgba(255,255,255,.28)'; g.lineWidth = S * .035; g.beginPath(); g.arc(S * .2, S * .45, S * .22, -1.2, 1.0); g.moveTo(S * .8 + S * .22 * Math.cos(2.1), S * .45); g.arc(S * .8, S * .45, S * .22, Math.PI - 1.0, Math.PI + 1.2); g.stroke(); }
+      g.restore();
+      g.font = Math.round(S * .56) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = 'rgba(0,0,0,.65)'; g.shadowBlur = S * .06; g.shadowOffsetY = S * .03; g.fillStyle = '#fff'; g.fillText(c.i, S * .5, S * .47); g.shadowColor = 'transparent';
+      for (const [x, y] of [[S * .13, S * .13], [S * .87, S * .13], [S * .13, S * .87], [S * .87, S * .87]]) { g.beginPath(); g.arc(x, y, S * .028, 0, 7); g.fillStyle = m[0]; g.fill(); }
+      const n = Math.min(4, lv - 1); for (let k = 0; k < n; k++) star(g, S * .5 + (k - (n - 1) / 2) * S * .15, S * .87, S * .068);
+      if (c.shoot) { g.strokeStyle = '#ffe27a'; g.lineWidth = S * .03; g.beginPath(); g.arc(S * .86, S * .5, S * .12, -1.2, 1.2); g.stroke(); }
+    });
+  }
+  function heroCanvas(icon, col = '#3a8aff', S = 72) {
+    const key = icon + col + S; if (heroCache[key]) return heroCache[key];
+    return heroCache[key] = mk(S, S, (g) => {
+      const c = S / 2; g.beginPath(); g.arc(c, c, c - 1, 0, 7); g.fillStyle = lin(g, 0, 0, S, S, '#fff3b0', '#8a6210'); g.fill(); g.strokeStyle = '#140c04'; g.lineWidth = 1.5; g.stroke();
+      g.beginPath(); g.arc(c, c, c * .82, 0, 7); const bg = g.createRadialGradient(c * .8, c * .7, 2, c, c, c * .85); bg.addColorStop(0, col); bg.addColorStop(1, '#0c1020'); g.fillStyle = bg; g.fill();
+      g.strokeStyle = 'rgba(255,255,255,.25)'; g.lineWidth = 1; g.stroke();
+      g.font = Math.round(S * .52) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = 'rgba(0,0,0,.6)'; g.shadowBlur = S * .06; g.fillStyle = '#fff'; g.fillText(icon, c, c + S * .02);
+    });
+  }
+  const dataUrl = (key, cv) => urlCache[key] || (urlCache[key] = cv.toDataURL());
+  const pic = (id, px = 40) => `<img class="pic" width="${px}" height="${px}" alt="" src="${dataUrl('c' + id, portraitCanvas(id))}">`;
+  const heroPic = (icon, col, px = 36) => `<img class="pic round" width="${px}" height="${px}" alt="" src="${dataUrl('h' + icon + col, heroCanvas(icon, col))}">`;
+
   // swap the emoji resource icons used throughout the HTML UI for painted ones
   const RES_EMOJI = Object.assign({}, RES_ICON);
   for (const k of Object.keys(RES_ICON)) RES_ICON[k] = resImg(k);
@@ -294,5 +332,5 @@ const Art = (() => {
     return curCache[name] = 'url(' + c.toDataURL() + ') ' + hot + ', ' + (name === 'no' ? 'not-allowed' : name === 'sword' ? 'crosshair' : 'pointer');
   }
 
-  return { tile, hexPath, hexPt, HR, cursor, obj, boat: boatC, resImg, resCanvas, RES_EMOJI, fmtCostTxt, facHue };
+  return { tile, hexPath, hexPt, HR, cursor, portraitCanvas, heroCanvas, pic, heroPic, obj, boat: boatC, resImg, resCanvas, RES_EMOJI, fmtCostTxt, facHue };
 })();

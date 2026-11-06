@@ -317,9 +317,10 @@
         cx.beginPath(); cx.arc(px, py, 15, 0, 7);
         cx.fillStyle = o.t === 'monster' ? 'rgba(90,10,10,.65)' : 'rgba(0,0,0,.45)'; cx.fill();
       }
+      if (o.t === 'monster') cx.drawImage(Art.portraitCanvas(o.guard[0].t), px - 15, py - 15, 30, 30);
       const spr = o.t === 'monster' ? null : Art.obj(o, o.fac);
       if (spr) { const sz = o.t === 'town' ? 50 : o.t === 'fort' ? 44 : o.t === 'pile' ? 30 : 38; cx.drawImage(spr, px - sz / 2, py - sz / 2 - (o.t === 'town' ? 5 : 2), sz, sz); }
-      else { cx.font = `26px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(objIcon(o), px, py + 1); }
+      else if (o.t !== 'monster') { cx.font = `26px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(objIcon(o), px, py + 1); }
       if (o.t === 'fort') {
         cx.beginPath(); cx.arc(px + 14, py - 16, 6, 0, 7); cx.fillStyle = ownCol(o.owner); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke();
         const gn = o.garrison.reduce((s, a) => s + (a ? a.n : 0), 0);
@@ -340,14 +341,14 @@
       if (!isVis(eh.x, eh.y)) continue;
       const px = hcx(eh.x, eh.y) - cam.x, py = hcy(eh.y) - cam.y;
       cx.beginPath(); cx.arc(px, py, 15, 0, 7); cx.fillStyle = ownCol(ai.id); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 2; cx.stroke();
-      cx.font = `22px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(eh.icon, px, py + 1);
+      cx.drawImage(Art.heroCanvas(eh.icon, ownCol(ai.id)), px - 13, py - 13, 26, 26);
     }
     G.heroes.forEach((h, i) => {
       const px = hcx(h.x, h.y) - cam.x + (G.heroes.filter((o, j) => j < i && o.x === h.x && o.y === h.y).length * 6), py = hcy(h.y) - cam.y;
       const rr = h.boat != null ? 11 : 15;
       cx.beginPath(); cx.arc(px, py - (h.boat != null ? 6 : 0), rr, 0, 7); cx.fillStyle = '#2a5fb0'; cx.fill();
       cx.strokeStyle = h === G.hero ? '#ffd24a' : '#fff'; cx.lineWidth = h === G.hero ? 3 : 1.5; cx.stroke();
-      cx.font = `${h.boat != null ? 16 : 22}px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(h.icon, px, py + 1 - (h.boat != null ? 6 : 0));
+      { const hs = h.boat != null ? 18 : 26; cx.drawImage(Art.heroCanvas(h.icon, ownCol(0)), px - hs / 2, py - (h.boat != null ? 6 : 0) - hs / 2, hs, hs); }
     });
     if (fogOn()) {
       for (let y = Math.max(0, y0); y < Math.min(G.H, y0 + vy); y++) for (let x = Math.max(0, x0); x < Math.min(G.W, x0 + vx); x++) {
@@ -416,8 +417,8 @@
     const h = G.hero;
     const ab = artBonus(h), plus = (v) => v ? ` <span class="bonus">(${v > 0 ? '+' : ''}${v})</span>` : '';
     const perkTxt = Object.keys(PERKS).filter(k => perk(h, k) > 0).map(k => `<span title="${PERKS[k].d}">${PERKS[k].i}${PERKS[k].n} ${RANK_NAMES[perk(h, k)]}${ab.sk[k] ? '*' : ''}</span>`).join(' · ');
-    $('hero').innerHTML = `<div class="hlist">${G.heroes.map((x, i) => `<button class="hbtn${x === h ? ' on' : ''}" data-h="${i}" title="${x.name} (${x.cls})">${x.icon}</button>`).join('')}</div>
-      <h3>${h.icon} ${h.name} <span class="small">${h.cls} — Level ${h.lvl}</span></h3>
+    $('hero').innerHTML = `<div class="hlist">${G.heroes.map((x, i) => `<button class="hbtn${x === h ? ' on' : ''}" data-h="${i}" title="${x.name} (${x.cls})">${Art.heroPic(x.icon, ownCol(0), 34)}</button>`).join('')}</div>
+      <h3>${Art.heroPic(h.icon, ownCol(0), 30)} ${h.name} <span class="small">${h.cls} — Level ${h.lvl}</span></h3>
       <div class="stats"><span>⚔️ Attack ${h.att}${plus(ab.att)}</span><span>🛡 Defense ${h.def}${plus(ab.def)}</span><span>✨ Spell Pow ${h.sp}${plus(ab.sp)}</span><span>📚 Knowledge ${h.kn}${plus(ab.kn)}</span></div>
       <div class="small" title="Morale: each point = 4% chance of an extra turn (negative: of skipping a turn). Mixing creatures from different castles lowers it; undead and golems are immune. Luck: each point = 4% chance of double damage.">😀 Morale ${sgn(heroMorale(h))} · 🍀 Luck ${sgn(heroLuck(h))}</div>
       <div class="small">Movement ${h.move}/${maxMove(h)}</div><div class="bar mv"><i style="width:${Math.min(100, h.move / maxMove(h) * 100)}%"></i></div>
@@ -444,7 +445,7 @@
     h.army.forEach((a, i) => {
       const b = document.createElement('button');
       b.className = 'slot' + (a ? '' : ' empty') + (i === selSlot ? ' sel' : '');
-      if (a) { const c = C[a.t]; b.innerHTML = `${c.i}<small>${a.n}${c.lv > 1 ? ' ' + '★'.repeat(c.lv - 1) : ''}</small>`; b.title = `${c.n}\nAtt ${c.a} Def ${c.d} Dmg ${c.lo}-${c.hi} HP ${c.hp} Spd ${c.s}${c.shoot ? '\nShooter' : ''}${c.fly ? '\nFlying' : ''}`; }
+      if (a) { const c = C[a.t]; b.innerHTML = `${Art.pic(a.t, 44)}<small>${a.n}${c.lv > 1 ? ' ' + '★'.repeat(c.lv - 1) : ''}</small>`; b.title = `${c.n}\nAtt ${c.a} Def ${c.d} Dmg ${c.lo}-${c.hi} HP ${c.hp} Spd ${c.s}${c.shoot ? '\nShooter' : ''}${c.fly ? '\nFlying' : ''}`; }
       b.onclick = () => slotClick(i);
       el.appendChild(b);
     });
@@ -683,7 +684,7 @@
   function openDwelling(o, h) {
     const id = dwId(o), c = C[id];
     $('mbox').innerHTML = `<h2>${c.i} ${c.n} dwelling</h2><div class="small">${FACTIONS[o.fac].name} · produces +${GROWTH[o.tier - 1]} per week while you hold it. Recruits join ${h.name}.</div>
-      <div class="trow"><div class="ic">${c.i}</div><div><b>${c.n}</b> <span class="small">Att ${c.a} Def ${c.d} Dmg ${c.lo}-${c.hi} HP ${c.hp} Spd ${c.s}</span><br><span class="small">Available: <b>${o.avail}</b> · ${fmtCost(c.cost)} each</span></div>
+      <div class="trow"><div class="ic">${Art.pic(id, 38)}</div><div><b>${c.n}</b> <span class="small">Att ${c.a} Def ${c.d} Dmg ${c.lo}-${c.hi} HP ${c.hp} Spd ${c.s}</span><br><span class="small">Available: <b>${o.avail}</b> · ${fmtCost(c.cost)} each</span></div>
         <div class="acts"><input type="number" id="dwN" min="1" max="${o.avail}" value="${o.avail}"><button id="dwBuy">Recruit</button></div></div>
       <div class="mb"><button class="primary" id="dwClose">Close</button></div>`;
     $('dwClose').onclick = () => { $('modal').classList.add('hide'); renderAll(); };
@@ -930,7 +931,7 @@
     let sel = null;
     const arr = (r) => r === 'a' ? A : B;
     const render = () => {
-      const row = (a, rk) => a.map((s, i) => `<button class="slot${s ? '' : ' empty'}${sel && sel.r === rk && sel.i === i ? ' sel' : ''}" data-r="${rk}" data-i="${i}">${s ? `${C[s.t].i}<small>${s.n}</small>` : ''}</button>`).join('');
+      const row = (a, rk) => a.map((s, i) => `<button class="slot${s ? '' : ' empty'}${sel && sel.r === rk && sel.i === i ? ' sel' : ''}" data-r="${rk}" data-i="${i}">${s ? `${Art.pic(s.t, 40)}<small>${s.n}</small>` : ''}</button>`).join('');
       $('mbox').innerHTML = `<h2>${title}</h2><div class="small">${note}</div>${extra ? extra.html : ''}
         <h4>${nameA}</h4><div class="armyrow">${row(A, 'a')}</div><h4>${nameB}</h4><div class="armyrow">${row(B, 'b')}</div>
         <div class="small">Click a slot, then another: move / merge / swap.</div>
@@ -966,7 +967,7 @@
   const starStr = (lv, max = MAX_LV) => '★'.repeat(lv) + '☆'.repeat(max - lv);
   function startTownAnim(kind, slot) { townAnim = { kind, slot, t0: performance.now() }; sfx(kind === 'upgrade' ? 'level' : 'build'); }
   function slotInfo(t, i) {
-    if (i < 7) return { built: !!t.b[i + 1], lv: t.up[i + 1] || 1, max: MAX_LV, icon: C[tierType(t, i + 1)].i };
+    if (i < 7) return { built: !!t.b[i + 1], lv: t.up[i + 1] || 1, max: MAX_LV, icon: C[tierType(t, i + 1)].i, id: tierType(t, i + 1) };
     if (i === 7) return { built: t.b.hall > 0, lv: t.b.hall, max: 5, icon: '🏛️' };
     if (i === 8) return { built: t.b.guild > 0, lv: t.b.guild, max: 3, icon: '🔮' };
     if (i === 9) return { built: !!t.b.market, lv: t.b.market ? 1 : 0, max: 1, icon: '⚖️' };
@@ -998,10 +999,10 @@
       g.fillStyle = LV_COL[Math.min(4, Math.max(0, s.lv - 1) * (s.max === 3 ? 2 : 1))]; g.fillRect(x - bw / 2, base - hgt, bw, hgt);
       g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x - bw / 2, base - hgt, 4, hgt);
       if (hgt >= bh * 0.99) { g.fillStyle = '#6a2c2c'; g.beginPath(); g.moveTo(x - 32, base - bh); g.lineTo(x, base - bh - 20); g.lineTo(x + 32, base - bh); g.closePath(); g.fill(); }
-      let size = 28;
-      if (an && an.kind === 'upgrade') size = 28 * (1 + 0.7 * Math.sin(p * Math.PI));
+      let size = 36;
+      if (an && an.kind === 'upgrade') size = 36 * (1 + 0.5 * Math.sin(p * Math.PI));
       const bob = Math.sin(now / 400 + i) * 2;
-      if (hgt >= bh * 0.6) { g.font = `${size}px ${FONT}`; g.fillStyle = '#fff'; g.fillText(s.icon, x, base - 28 + bob); }
+      if (hgt >= bh * 0.6) { g.drawImage(Art.portraitCanvas(s.id), x - size / 2, base - 28 + bob - size / 2, size, size); }
       if (an && an.kind === 'upgrade') {
         const rg = g.createRadialGradient(x, base - 30, 2, x, base - 30, 14 + p * 70);
         rg.addColorStop(0, `rgba(255,240,150,${0.9 * (1 - p)})`); rg.addColorStop(1, 'rgba(255,200,60,0)');
@@ -1095,7 +1096,7 @@
         for (const s of th.army) if (s && C[s.t].line === id && C[s.t].lv < lv) { cost += (c.cost.gold - C[s.t].cost.gold) * s.n; count += s.n; }
         if (count) upArmy = { cost, count };
       }
-      html += `<div class="trow"><div class="ic">${c.i}</div>
+      html += `<div class="trow"><div class="ic">${Art.pic(lineType(id, lv), 38)}</div>
         <div><b>${c.n}</b> <span class="stars">${built ? starStr(lv) : ''}</span> <span class="small">Att ${c.a} Def ${c.d} Dmg ${c.lo}-${c.hi} HP ${c.hp} Spd ${c.s}${c.shoot ? ' · Shooter' : ''}${c.fly ? ' · Flying' : ''}</span><br>
         <span class="small">${built ? `Available: <b>${av}</b> · ${fmtCost(c.cost)} each · +${c.gr}/week` : locked ? `🔒 Requires ${HALL_LEVELS[needHall].n} (Town Hall level ${needHall})` : `Dwelling not built — ${fmtCost(DWELL_COST[tier])}`}</span></div>
         <div class="acts">${built
@@ -1552,7 +1553,7 @@
   }
   function showFactionSelect(diff = 'normal', map = {}) {
     const cards = Object.entries(FACTIONS).map(([k, f]) => `<div class="card" data-f="${k}"><div class="big">${f.icon}</div><b>${f.name}</b><div class="small">${f.blurb}</div>
-      <div class="crow">${factionTiers(k).map(id => `<span title="${C[id].n} → ${C[lineType(id, 2)].n}">${C[id].i}</span>`).join('')}</div></div>`).join('');
+      <div class="crow">${factionTiers(k).map(id => `<span title="${C[id].n} → ${C[lineType(id, 2)].n}">${Art.pic(id, 28)}</span>`).join('')}</div></div>`).join('');
     $('mbox').innerHTML = `<h2>Choose your castle <span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid">${cards}</div><div class="mb"><button id="sBack">Back</button></div>`;
     $('sBack').onclick = () => showMapSelect(diff, map.preset ? map : undefined);
     $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => showHeroSelect(c.dataset.f, diff, map));
@@ -1563,7 +1564,7 @@
     const cards = FACTIONS[f].heroes.map(([n]) => { const d = HEROES[n];
       return `<div class="card" data-hid="${n}"><div class="big">${d.i}</div><b>${d.name}</b><div class="small">${d.cls}</div>
         <div class="small">⚔️${d.att} 🛡${d.def} ✨${d.sp} 📚${d.kn}</div><div class="small">Spells: ${[...START_SPELLS, ...d.spells].map(k => SPELLS[k].i).join(' ')}</div>
-        <div class="small">Army: ${ti.slice(0, 3).map(id => C[id].i).join(' ')}</div></div>`; }).join('');
+        <div class="small">Army: ${ti.slice(0, 3).map(id => Art.pic(id, 26)).join(' ')}</div></div>`; }).join('');
     $('mbox').innerHTML = `<h2>${FACTIONS[f].icon} ${FACTIONS[f].name} — choose your hero</h2><div class="grid two">${cards}</div>
       <div class="small">Your rival will command a different castle. Fight them across zones, forts and sieges.</div><div class="mb"><button id="sBack">Back</button></div>`;
     $('sBack').onclick = () => showFactionSelect(diff, map);

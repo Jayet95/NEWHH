@@ -2153,6 +2153,11 @@
     if (G) openMenu();
   });
 
+  // menu music while the title screen is up
+  const syncMood = () => { if (document.body.classList.contains('inbattle')) return; Sfx.mood($('title').classList.contains('hide') ? 'map' : 'menu'); };
+  new MutationObserver(syncMood).observe($('title'), { attributes: true, attributeFilter: ['class'] });
+  syncMood();
+
   refreshTitle();
   requestAnimationFrame(loop);
   window.__G = () => G;

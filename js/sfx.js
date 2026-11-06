@@ -44,7 +44,7 @@ const Sfx = (() => {
   // gentle generative tune: slow minor-pentatonic notes over a low drone; faster and edgier in battle
   const SCALE = { map: [220, 261.6, 293.7, 329.6, 392, 440, 523.3], battle: [196, 233.1, 261.6, 293.7, 349.2, 392, 466.2] };
   function musicTick() {
-    if (!on || mv() <= 0.001 || document.hidden || mood === 'battle') return;
+    if (!on || mv() <= 0.001 || document.hidden || mood !== 'map') return;
     const a = ctx(); if (!a) return;
     const sc = SCALE[mood], vol = 0.035 * mv() * 2.2;
     const f = sc[(step * 3 + ((Math.random() * 3) | 0)) % sc.length] * (Math.random() < 0.2 ? 2 : 1);
@@ -52,32 +52,34 @@ const Sfx = (() => {
     if (step % 4 === 0) tone(sc[0] / 2, 3.2, 'sine', vol * 0.9, 0, 0, 'music');
     step++;
   }
-  // battle music: an mp3 (audio/battle.mp3) that fades in when a fight starts and out when it ends
-  let track = null, fade = null, tracking = false;
+  // recorded music: audio/menu.mp3 on the title screen, audio/battle.mp3 in fights; the generated tune covers the map
+  const TRACKS = { menu: 'audio/menu.mp3', battle: 'audio/battle.mp3' };
+  const els = {}; let cur = null, fade = {};
   const trackVol = () => Math.min(1, mv() * 1.3);
-  const trackEl = () => { if (!track) { track = new Audio('audio/battle.mp3'); track.loop = true; track.preload = 'auto'; } return track; };
-  function fadeTo(el, target, ms, then) {
-    clearInterval(fade); const stepMs = 40, n = Math.max(1, Math.round(ms / stepMs)), v0 = el.volume, d = (target - v0) / n; let i = 0;
-    fade = setInterval(() => { i++; el.volume = Math.max(0, Math.min(1, v0 + d * i)); if (i >= n) { clearInterval(fade); if (then) then(); } }, stepMs);
+  const trackEl = (n) => { if (!els[n]) { els[n] = new Audio(TRACKS[n]); els[n].loop = true; els[n].preload = 'auto'; } return els[n]; };
+  function fadeTo(n, target, ms, then) {
+    const el = trackEl(n); clearInterval(fade[n]); const stepMs = 40, k = Math.max(1, Math.round(ms / stepMs)), v0 = el.volume, d = (target - v0) / k; let i = 0;
+    fade[n] = setInterval(() => { i++; el.volume = Math.max(0, Math.min(1, v0 + d * i)); if (i >= k) { clearInterval(fade[n]); if (then) then(); } }, stepMs);
   }
-  function battleMusic(start) {
+  function stopTrack(n) { if (!els[n] || els[n].paused) return; fadeTo(n, 0, 700, () => els[n].pause()); }
+  function playTrack(n, fromStart) {
     try {
-      if (start) {
-        if (!on || mv() <= 0.001) return;
-        const el = trackEl(); tracking = true; el.currentTime = 0; el.volume = 0; const p = el.play(); if (p && p.catch) p.catch(() => { tracking = false; });
-        fadeTo(el, trackVol(), 900);
-      } else if (track && tracking) { tracking = false; fadeTo(track, 0, 700, () => track.pause()); }
+      if (!TRACKS[n] || !on || mv() <= 0.001) return;
+      const el = trackEl(n); if (fromStart) el.currentTime = 0; if (el.paused) { el.volume = 0; const p = el.play(); if (p && p.catch) p.catch(() => { /* needs a tap first; retried on the first gesture */ }); }
+      fadeTo(n, trackVol(), 900);
     } catch (e) { /* ignore */ }
   }
+  function applyMood(fromStart) { for (const n in TRACKS) if (n !== mood) stopTrack(n); if (TRACKS[mood]) playTrack(mood, fromStart); }
   function startMusic() { if (musicTimer) return; musicTimer = setInterval(musicTick, 900); }
   return {
     play(n) { try { if (S[n]) S[n](); if (BUZZ[n] && typeof Settings !== 'undefined') Settings.buzz(BUZZ[n]); } catch (e) { /* ignore */ } },
-    toggle() { on = !on; if (!on && track) { track.pause(); tracking = false; } try { localStorage.setItem('h3js_snd', on ? '1' : '0'); } catch (e) { /* ignore */ } return on; },
+    toggle() { on = !on; if (!on) { for (const n in els) els[n].pause(); } else applyMood(false); try { localStorage.setItem('h3js_snd', on ? '1' : '0'); } catch (e) { /* ignore */ } return on; },
     get on() { return on; },
-    mood(m) { const was = mood; mood = m; if (m === 'battle' && was !== 'battle') battleMusic(true); else if (m !== 'battle' && was === 'battle') battleMusic(false); },
-    refresh() { if (track && tracking) { if (!on || mv() <= 0.001) { track.pause(); tracking = false; } else track.volume = trackVol(); } },
+    mood(m) { if (m === mood) return; mood = m; applyMood(true); },
+    refresh() { for (const n in els) { if (els[n].paused) continue; if (!on || mv() <= 0.001) els[n].pause(); else if (n === mood) els[n].volume = trackVol(); } if (TRACKS[mood] && on && mv() > 0.001 && els[mood] && els[mood].paused) playTrack(mood, false); },
+    resume() { applyMood(false); },
     startMusic,
   };
 })();
 // browsers only allow sound after a gesture: start the tune on the first tap or key press
-if (typeof document !== 'undefined') { const go = () => { Sfx.startMusic(); document.removeEventListener('pointerdown', go); document.removeEventListener('keydown', go); }; document.addEventListener('pointerdown', go); document.addEventListener('keydown', go); }
+if (typeof document !== 'undefined') { const go = () => { Sfx.startMusic(); Sfx.resume(); document.removeEventListener('pointerdown', go); document.removeEventListener('keydown', go); }; document.addEventListener('pointerdown', go); document.addEventListener('keydown', go); }

@@ -454,7 +454,7 @@
     h.army.forEach((a, i) => {
       const b = document.createElement('button');
       b.className = 'slot' + (a ? '' : ' empty') + (i === selSlot ? ' sel' : '');
-      if (a) { const c = C[a.t]; b.innerHTML = `${Art.pic(a.t, 44)}<small>${a.n}${c.lv > 1 ? ' ' + '★'.repeat(c.lv - 1) : ''}</small>`; b.title = `${c.n} — ${Art.rarity(a.t).n}\nAtt ${c.a} Def ${c.d} Dmg ${c.lo}-${c.hi} HP ${c.hp} Spd ${c.s}${c.shoot ? '\nShooter' : ''}${c.fly ? '\nFlying' : ''}`; }
+      if (a) { const c = C[a.t]; b.innerHTML = `${Art.pic(a.t, 44)}<small>${a.n}${c.lv > 1 ? ' ' + '★'.repeat(c.lv - 1) : ''}</small>`; b.title = `${c.n} — ${Art.rarity(a.t).n}\nAtt ${c.a} Def ${c.d} Dmg ${c.lo}-${c.hi} HP ${c.hp} Spd ${c.s}${c.shoot ? '\nArcher' : ''}${c.fly ? '\nFlying' : ''}`; }
       b.onclick = () => slotClick(i);
       el.appendChild(b);
     });
@@ -861,12 +861,15 @@
         const opts = ['⚔ Fight'], acts = ['fight'];
         if (canJoin) { opts.push('🤝 Recruit them'); acts.push('join'); }
         if (canFlee) { opts.push('🕊 Let them go'); acts.push('go'); }
+        const tribute = Math.max(50, Math.round(armyValue(o.guard) * 0.08 / 10) * 10);
+        if (canFlee) { opts.push(`💰 Demand ${tribute} gold`); acts.push('tribute'); }
         const names = armyList(o.guard, true);
         const pct = Math.round((0.5 + 0.25 * (cr - 1)) * 100);
         const i = await showModal(`<h2>😨 They tremble before you</h2><p>${names} cower before ${h.name}'s army (${ratio.toFixed(1)}× stronger).</p>
           <p class="small">${canJoin ? `Your Charisma lets ${pct}% of them join your army.` : 'You may spare them — no fight, no experience.'}${cr ? '' : ' (The Charisma perk would let them join you.)'}</p>`, opts);
         const act = acts[i];
         if (act === 'go') { G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return toast('The monsters scatter and flee.'); }
+        if (act === 'tribute') { G.res.gold += tribute; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); sfx('coin'); renderAll(); return toast(`The monsters hand over ${tribute} gold and scatter.`); }
         if (act === 'join') {
           let joined = 0;
           for (const g of o.guard) {
@@ -988,10 +991,35 @@
     }
   }
   // a player hero fights a rival hero (open field, or a siege when the rival attacks a town/fort the hero stands in)
+  // before two heroes fight: a hopelessly outmatched rival offers gold to be let go (and withdraws to its nearest castle),
+  // and when YOU are hopelessly outmatched you may pay the aggressor to leave you be (your army withdraws to your nearest castle)
+  async function negotiate(h, e) {
+    const ai = aiById(e.ai); if (!ai) return false;
+    const pv = armyValue(h.army), ev = armyValue(e.army); if (!pv || !ev) return false;
+    const ratio = Math.max(pv / ev, ev / pv);
+    const homes = G.objs.filter(o => o.t === 'town' && o.owner === ai.id).sort((a, b) => hexDist(a, e) - hexDist(b, e)), home = homes[0], mine = nearestTown(h.x, h.y);
+    if (pv >= ev * 2.5 && home && ai.gold >= 150) {
+      const gold = Math.min(Math.round((ev * 0.2 + 300) / 10) * 10, Math.floor(ai.gold));
+      const i = await showModal(`<h2>🏳️ ${e.name} offers to surrender</h2><p>The ${FACTIONS[ai.fac].name} hero cannot stand against ${h.name}'s army (<b>${ratio.toFixed(1)}×</b> stronger) and offers <b>${RES_ICON.gold}${gold}</b> to be let go. If you agree, ${e.name} and the army withdraw to <b>${home.name}</b>.</p><p class="small">Fighting on gives experience, the hero's artifacts and the spoils of war — but costs you troops.</p>`, ['⚔ Fight on', `💰 Accept ${gold} gold`]);
+      if (i !== 1) return false;
+      ai.gold -= gold; G.res.gold += gold; e.x = home.x; e.y = home.y; e.move = 0; sfx('coin'); if (typeof Celebrate !== 'undefined') Celebrate.loot(); renderAll();
+      toast(`${e.name} pays ${gold} gold and withdraws to ${home.name}.`); return true;
+    }
+    if (ev >= pv * 2.5 && mine && !heroAtTown(h)) {
+      const price = Math.round(Math.min(ev * 0.1 + 200, Math.max(300, G.res.gold * 0.5)) / 10) * 10;
+      if (G.res.gold < price) { toast(`You are outmatched (${ratio.toFixed(1)}×) — a ransom of ${price} gold would buy your retreat, but you cannot afford it.`); return false; }
+      const i = await showModal(`<h2>😰 Outmatched by ${e.name}</h2><p>The ${FACTIONS[ai.fac].name} army is <b>${ratio.toFixed(1)}×</b> stronger than yours. You may offer <b>${RES_ICON.gold}${price}</b> to be let alone: ${h.name} and the army then retreat to <b>${mine.name}</b> unharmed.</p><p class="small">Refusing means a battle you are very likely to lose.</p>`, ['💰 Pay ' + price + ' gold', '⚔ Fight anyway']);
+      if (i !== 0) return false;
+      G.res.gold -= price; ai.gold += price; h.x = mine.x; h.y = mine.y; h.boat = null; h.move = 0; G.path = null; if (h === G.hero) centerOn(h.x, h.y); renderAll();
+      toast(`${h.name} pays ${price} gold and retreats to ${mine.name}.`); return true;
+    }
+    return false;
+  }
   async function fightAiHero(h, e, playerAttacks) {
     const atTown = heroAtTown(h), fo = objAt(G, h.x, h.y), atFort = fo && fo.t === 'fort' && fo.owner === 0;
     if (!armyCount(h)) { retreat(h); return false; }
     const siege = !playerAttacks && (atTown || atFort) ? siegeOf(townAt(h.x, h.y) || fo, 0) : null;
+    if (!siege && await negotiate(h, e)) return false;
     const win = await fight(h, e.army, { att: eff(e, 'att'), def: eff(e, 'def') }, `${e.name}'s army`, siege, e);
     if (win) { removeAiHero(e); toast(`${e.name} is defeated!`); return true; }
     shrinkArmy(e.army, 0.5);
@@ -1034,14 +1062,14 @@
   const SLOTS = 11;
   const TIER_HALL = [null, 0, 0, 1, 2, 3, 4, 5];
   const UP_HALL = { 2: 1, 3: 2, 4: 3, 5: 4 };
-  let curTown = null;
+  let curTown = null, townTab = 'war';
   const defaultTown = () => townAt(G.hero.x, G.hero.y) || nearestTown(G.hero.x, G.hero.y);
   const tierType = (t, tier) => lineType(tiersOf(t)[tier - 1], (t.up && t.up[tier]) || 1);
   const starStr = (lv, max = MAX_LV) => '★'.repeat(lv) + '☆'.repeat(max - lv);
   function startTownAnim(kind, slot) { townAnim = { kind, slot, t0: performance.now() }; sfx(kind === 'upgrade' ? 'level' : 'build'); }
   function slotInfo(t, i) {
     if (i < 7) return { built: !!t.b[i + 1], lv: t.up[i + 1] || 1, max: MAX_LV, icon: C[tierType(t, i + 1)].i, id: tierType(t, i + 1) };
-    if (i === 7) return { built: t.b.hall > 0, lv: t.b.hall, max: 5, icon: '🏛️' };
+    if (i === 7) return { built: t.b.hall > 0, lv: t.b.hall, max: 5, icon: '🏛️', id: 'hall' };
     if (i === 8) return { built: t.b.guild > 0, lv: t.b.guild, max: 3, icon: '🔮' };
     if (i === 9) return { built: !!t.b.market, lv: t.b.market ? 1 : 0, max: 1, icon: '⚖️' };
     return { built: !!t.b.ship, lv: t.b.ship ? 1 : 0, max: 1, icon: '⚓' };
@@ -1049,48 +1077,10 @@
   function drawTown() {
     const cv = $('tcv');
     if (!cv || $('modal').classList.contains('hide')) { townLoop = false; return; }
-    const g = cv.getContext('2d'), now = performance.now(), t = curTown, W = cv.width, H = cv.height;
-    if (!t) return;
-    const sky = g.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, '#2a3f6a'); sky.addColorStop(0.7, '#c98f5a'); sky.addColorStop(1, '#4a6a3a');
-    g.fillStyle = sky; g.fillRect(0, 0, W, H);
-    g.fillStyle = 'rgba(30,25,40,.55)'; g.fillRect(W / 2 - 160, 40, 320, 62);
-    for (let k = 0; k < 6; k++) g.fillRect(W / 2 - 160 + k * 62, 28, 40, 14);
-    g.fillRect(W / 2 - 22, 8, 44, 44);
-    g.fillStyle = '#3d5a2e'; g.fillRect(0, 118, W, H - 118);
-    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const t = curTown; if (!t) return;
+    const now = performance.now();
     if (townAnim && now - townAnim.t0 > 1600) townAnim = null;
-    for (let i = 0; i < SLOTS; i++) {
-      const x = 40 + i * 70, base = 120, s = slotInfo(t, i);
-      const an = townAnim && townAnim.slot === i ? townAnim : null, p = an ? Math.min(1, (now - an.t0) / 1500) : 1;
-      if (!s.built) {
-        g.setLineDash([4, 4]); g.strokeStyle = 'rgba(255,255,255,.35)'; g.strokeRect(x - 28, base - 54, 56, 54); g.setLineDash([]);
-        g.font = '22px ' + FONT; g.fillStyle = '#fff'; g.globalAlpha = 0.6; g.fillText('🚧', x, base - 27); g.globalAlpha = 1;
-        continue;
-      }
-      const bw = 56, bh = 54, hgt = an && an.kind === 'build' ? bh * Math.min(1, p * 1.5) : bh;
-      g.fillStyle = LV_COL[Math.min(4, Math.max(0, s.lv - 1) * (s.max === 3 ? 2 : 1))]; g.fillRect(x - bw / 2, base - hgt, bw, hgt);
-      g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x - bw / 2, base - hgt, 4, hgt);
-      if (hgt >= bh * 0.99) { g.fillStyle = '#6a2c2c'; g.beginPath(); g.moveTo(x - 32, base - bh); g.lineTo(x, base - bh - 20); g.lineTo(x + 32, base - bh); g.closePath(); g.fill(); }
-      let size = 36;
-      if (an && an.kind === 'upgrade') size = 36 * (1 + 0.5 * Math.sin(p * Math.PI));
-      const bob = Math.sin(now / 400 + i) * 2;
-      if (hgt >= bh * 0.6) { g.drawImage(Art.portraitCanvas(s.id), x - size / 2, base - 28 + bob - size / 2, size, size); }
-      if (an && an.kind === 'upgrade') {
-        const rg = g.createRadialGradient(x, base - 30, 2, x, base - 30, 14 + p * 70);
-        rg.addColorStop(0, `rgba(255,240,150,${0.9 * (1 - p)})`); rg.addColorStop(1, 'rgba(255,200,60,0)');
-        g.fillStyle = rg; g.beginPath(); g.arc(x, base - 30, 14 + p * 70, 0, 7); g.fill();
-        g.font = '14px ' + FONT; g.fillStyle = '#ffe680';
-        for (let k = 0; k < 6; k++) { g.globalAlpha = 1 - p; g.fillText('✦', x + Math.cos(k * 1.1) * 34 * p, base - 30 - p * 55 + Math.sin(k * 2.3) * 12); }
-        g.globalAlpha = 1;
-      }
-      if (an && an.kind === 'build') {
-        g.font = '20px ' + FONT; g.fillStyle = '#fff'; g.fillText('🔨', x + 26, base - hgt - 6 + Math.sin(now / 90) * 5);
-        g.fillStyle = 'rgba(210,200,180,.5)';
-        for (let k = 0; k < 5; k++) { g.beginPath(); g.arc(x - 30 + k * 15, base - 3 - p * 8 * (k % 2 + 1), 3 + p * 5, 0, 7); g.fill(); }
-      }
-      if (s.max > 1) { g.font = '11px sans-serif'; g.fillStyle = '#ffd24a'; g.fillText(starStr(s.lv, s.max), x, base + 12); }
-    }
+    TownArt.scene(cv.getContext('2d'), t, now, townAnim, slotInfo, cv.width, cv.height);
     requestAnimationFrame(drawTown);
   }
 
@@ -1210,8 +1200,9 @@
     curTown = t;
     const th = townHero(t), here = !!th, mt = myTowns(), coastal = !!G.dock && t === mt[0];
     const tabs = mt.length > 1 ? `<div class="hlist">${mt.map((x, i) => `<button class="hbtn${x === t ? ' on' : ''}" data-tab="${i}" title="${x.name}">${FACTIONS[x.fac].icon}</button>`).join('')}</div>` : '';
-    let html = `${tabs}<h2>🏰 ${t.name} <span class="small">${FACTIONS[t.fac].name} · ${t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Settlement'}</span></h2><canvas id="tcv" width="780" height="150" style="width:100%;border-radius:6px;border:1px solid #6b4f24"></canvas>
+    let html = `${tabs}<h2>🏰 ${t.name} <span class="small">${FACTIONS[t.fac].name} · ${t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Settlement'}</span></h2><canvas id="tcv" width="780" height="190" style="width:100%;border-radius:6px;border:1px solid #6b4f24"></canvas>
       <div class="small">${here ? `${th.name} is in town — recruits join the hero's army.` : 'No hero in this town — recruits join the town garrison (a hero can pick them up later).'} Higher Town Hall levels unlock new dwellings and creature upgrades.</div>`;
+    let war = '';
     tiersOf(t).forEach((id, i) => {
       const tier = i + 1, lv = t.up[tier], c = C[lineType(id, lv)], built = t.b[tier], av = t.avail[tier] || 0;
       const needHall = TIER_HALL[tier], locked = t.b.hall < needHall;
@@ -1222,8 +1213,8 @@
         for (const s of th.army) if (s && C[s.t].line === id && C[s.t].lv < lv) { cost += (c.cost.gold - C[s.t].cost.gold) * s.n; count += s.n; }
         if (count) upArmy = { cost, count };
       }
-      html += `<div class="trow"><div class="ic">${Art.pic(lineType(id, lv), 38)}</div>
-        <div><b>${c.n}</b> <span class="stars">${built ? starStr(lv) : ''}</span> <span class="small">Att ${c.a} Def ${c.d} Dmg ${c.lo}-${c.hi} HP ${c.hp} Spd ${c.s}${c.shoot ? ' · Shooter' : ''}${c.fly ? ' · Flying' : ''}</span><br>
+      war += `<div class="trow"><div class="ic">${Art.pic(lineType(id, lv), 38)}</div>
+        <div><b>${c.n}</b> <span class="stars">${built ? starStr(lv) : ''}</span> <span class="small">Att ${c.a} Def ${c.d} Dmg ${c.lo}-${c.hi} HP ${c.hp} Spd ${c.s}${c.shoot ? ' · Archer' : ''}${c.fly ? ' · Flying' : ''}</span><br>
         <span class="small">${built ? `Available: <b>${av}</b> · ${fmtCost(c.cost)} each · +${c.gr}/week` : locked ? `🔒 Requires ${HALL_LEVELS[needHall].n} (Town Hall level ${needHall})` : `Dwelling not built — ${fmtCost(DWELL_COST[tier])}`}</span></div>
         <div class="acts">${built
           ? `<input type="number" min="1" max="${av}" value="${av}" id="n${tier}"><button data-buy="${tier}">Recruit</button>
@@ -1233,28 +1224,30 @@
     });
     const hl = t.b.hall, hNext = hl < 5 ? HALL_LEVELS[hl + 1] : null;
     const gl = t.b.guild, gNext = gl < 3 ? GUILD_COST[gl + 1] : null;
-    html += `<div class="trow"><div class="ic">🏛️</div><div><b>${hl ? HALL_LEVELS[hl].n : 'Town Hall'}</b> <span class="stars">${starStr(hl, 5)}</span><br>
+    const bld = `<div class="trow"><div class="ic">${TownArt.pic('hall', Math.max(1, hl), t.fac, 42)}</div><div><b>${hl ? HALL_LEVELS[hl].n : 'Town Hall'}</b> <span class="stars">${starStr(hl, 5)}</span><br>
         <span class="small">${hl ? `+${HALL_LEVELS[hl].inc} 🪙/day.` : 'No income yet.'}${hNext ? ` Next: ${hNext.n} (+${hNext.inc} 🪙/day) — unlocks ${hl + 1 >= 1 && TIER_HALL.indexOf(hl + 1) > 0 ? 'tier ' + TIER_HALL.indexOf(hl + 1) + ' dwelling' : ''}${UP_HALL[hl + 2] ? ' and Lv' + (hl + 2) + ' upgrades' : ''}.` : ''}</span></div>
         <div class="acts">${hNext ? `<button data-hall="1" title="${Art.fmtCostTxt(hNext.cost)}">${hl ? 'Upgrade' : 'Build'} ${fmtCost(hNext.cost)}</button>` : '<span class="small">MAX</span>'}</div></div>
-      <div class="trow"><div class="ic">🔮</div><div><b>Mage Guild</b> <span class="stars">${starStr(gl, 3)}</span><br>
+      <div class="trow"><div class="ic">${TownArt.pic('guild', Math.max(1, gl), t.fac, 42)}</div><div><b>Mage Guild</b> <span class="stars">${starStr(gl, 3)}</span><br>
         <span class="small">Spellbook: ${G.spells.map(k => SPELLS[k].i + ' ' + SPELLS[k].n).join(', ')}${gl < 3 ? `<br>Next level teaches: ${GUILD_SPELLS[gl + 1].map(k => SPELLS[k].i + ' ' + SPELLS[k].n).join(', ')}` : ''}</span></div>
         <div class="acts">${gNext ? `<button data-guild="1" title="${Art.fmtCostTxt(gNext)}">${gl ? 'Upgrade' : 'Build'} ${fmtCost(gNext)}</button>` : '<span class="small">MAX</span>'}</div></div>
-      <div class="trow"><div class="ic">⚖️</div><div><b>Marketplace</b><br><span class="small">${t.b.market ? `Buy missing resources at ${Math.round(MARKET_RATE * 100)}% rate.` : `Trade resources — ${fmtCost(MARKET_COST)}`}</span></div>
+      <div class="trow"><div class="ic">${TownArt.pic('market', 1, t.fac, 42)}</div><div><b>Marketplace</b><br><span class="small">${t.b.market ? `Buy missing resources at ${Math.round(MARKET_RATE * 100)}% rate.` : `Trade resources — ${fmtCost(MARKET_COST)}`}</span></div>
         <div class="acts">${t.b.market ? '<button data-trade="1">Trade</button>' : '<button data-build="market">Build</button>'}</div></div>
-      <div class="trow"><div class="ic">⚓</div><div><b>Shipyard</b><br><span class="small">${t.b.ship ? `Boats ${G.boats.length}/${MAX_BOATS}. A new boat appears at the port by the bay (${fmtCost(BOAT_COST)} each). Walk a hero onto a boat to sail; collect treasures at sea.` : coastal ? `Build boats to sail the sea and collect its treasures — ${fmtCost(SHIPYARD_COST)}` : 'There is no coast near this town.'}</span></div>
+      <div class="trow"><div class="ic">${TownArt.pic('ship', 1, t.fac, 42)}</div><div><b>Shipyard</b><br><span class="small">${t.b.ship ? `Boats ${G.boats.length}/${MAX_BOATS}. A new boat appears at the port by the bay (${fmtCost(BOAT_COST)} each). Walk a hero onto a boat to sail; collect treasures at sea.` : coastal ? `Build boats to sail the sea and collect its treasures — ${fmtCost(SHIPYARD_COST)}` : 'There is no coast near this town.'}</span></div>
         <div class="acts">${!coastal ? '' : t.b.ship ? `<button data-boat="1" ${G.boats.length >= MAX_BOATS ? 'disabled' : ''}>⛵ Build boat</button>` : '<button data-build="ship">Build</button>'}</div></div>
-      <div class="trow"><div class="ic">🛡️</div><div><b>Garrison</b><br><span class="small">${armyList(t.garrison, false) || 'No troops stationed.'} The garrison defends the town when no hero is inside${here ? '' : ' (bring a hero to move troops)'}.</span></div>
-        <div class="acts"><button data-garr="1">Manage garrison</button></div></div>
-      <div class="trow"><div class="ic">🧱</div><div><b>${FORT_LEVELS[t.fort || 0].n}</b> <span class="stars">${starStr(t.fort || 0, 3)}</span><br>
+      <div class="trow"><div class="ic">${TownArt.pic('fort', t.fort || 0, t.fac, 42)}</div><div><b>${FORT_LEVELS[t.fort || 0].n}</b> <span class="stars">${starStr(t.fort || 0, 3)}</span><br>
         <span class="small">Walls, gate and arrow towers are ×${FORT_LEVELS[t.fort || 0].hp} as strong in a siege${(t.fort || 0) < 3 ? ` — next: ${FORT_LEVELS[(t.fort || 0) + 1].n} (×${FORT_LEVELS[(t.fort || 0) + 1].hp} walls, ×${FORT_LEVELS[(t.fort || 0) + 1].tower} tower fire)` : ''}.</span></div>
         <div class="acts">${(t.fort || 0) < 3 ? `<button data-fortify="1" title="${Art.fmtCostTxt(FORT_LEVELS[(t.fort || 0) + 1].cost)}">⬆ ${fmtCost(FORT_LEVELS[(t.fort || 0) + 1].cost)}</button>` : '<span class="small">MAX</span>'}</div></div>
-      <div class="trow"><div class="ic">💣</div><div><b>${MINE_LEVELS[t.minel || 0].n}</b> <span class="stars">${starStr(t.minel || 0, 3)}</span><br>
+      <div class="trow"><div class="ic">${TownArt.pic('mines', t.minel || 0, t.fac, 42)}</div><div><b>${MINE_LEVELS[t.minel || 0].n}</b> <span class="stars">${starStr(t.minel || 0, 3)}</span><br>
         <span class="small">Hidden mines (${MINE_LEVELS[t.minel || 0].stock}) in front of the walls hurt and halt attackers. A defending hero can lay ${EMERGENCY_MINES} extra mines even without a minefield${(t.minel || 0) < 3 ? ` — next: ${MINE_LEVELS[(t.minel || 0) + 1].n} (${MINE_LEVELS[(t.minel || 0) + 1].stock} mines)` : ''}.</span></div>
         <div class="acts">${(t.minel || 0) < 3 ? `<button data-minefield="1" title="${Art.fmtCostTxt(MINE_LEVELS[(t.minel || 0) + 1].cost)}">⬆ ${fmtCost(MINE_LEVELS[(t.minel || 0) + 1].cost)}</button>` : '<span class="small">MAX</span>'}</div></div>
-      <div class="trow"><div class="ic">🍺</div><div><b>Tavern</b><br><span class="small">Heroes ${G.heroes.length}/${MAX_HEROES}. Hire more heroes and exchange troops between heroes in town.</span></div>
+      <div class="trow"><div class="ic">${TownArt.pic('tavern', 1, t.fac, 42)}</div><div><b>Tavern</b><br><span class="small">Heroes ${G.heroes.length}/${MAX_HEROES}. Hire more heroes and exchange troops between heroes in town.</span></div>
         <div class="acts"><button data-tavern="1">Hire heroes</button>${heroesAt(t.x, t.y).length > 1 ? '<button data-xhero="1">Exchange troops</button>' : ''}</div></div>
-      ${outpostHtml(t)}${caravanHtml(t, mt)}
-      <div class="small" style="margin-top:8px">${RES.map(k => RES_ICON[k] + ' ' + G.res[k]).join('  ')}</div>
+      `;
+    const garrRow = `      <div class="trow"><div class="ic">${TownArt.pic('garrison', 1, t.fac, 42)}</div><div><b>Garrison</b><br><span class="small">${armyList(t.garrison, false) || 'No troops stationed.'} The garrison defends the town when no hero is inside${here ? '' : ' (bring a hero to move troops)'}.</span></div>
+        <div class="acts"><button data-garr="1">Manage garrison</button></div></div>
+`;
+    const tabBar = `<div class="ttabs"><button class="ttab${townTab === 'war' ? ' on' : ''}" data-ttab="war">⚔️ Warriors</button><button class="ttab${townTab === 'bld' ? ' on' : ''}" data-ttab="bld">🏗️ Buildings</button></div>`;
+    html += tabBar + (townTab === 'war' ? war + garrRow + outpostHtml(t) + caravanHtml(t, mt) : bld) + `<div class="small" style="margin-top:8px">${RES.map(k => RES_ICON[k] + ' ' + G.res[k]).join('  ')}</div>
       <div class="mb"><button class="primary" id="tClose">Leave town</button></div>`;
     $('mbox').innerHTML = html; $('modal').classList.remove('hide');
     if (!townLoop) { townLoop = true; requestAnimationFrame(drawTown); }
@@ -1262,6 +1255,7 @@
     const again = () => { openTown(t); renderAll(); };
     const q = (sel, fn) => $('mbox').querySelectorAll(sel).forEach(fn);
     q('[data-tab]', b => b.onclick = () => openTown(mt[+b.dataset.tab]));
+    q('[data-ttab]', b => b.onclick = () => { townTab = b.dataset.ttab; openTown(t); });
     q('[data-outbuy]', b => b.onclick = () => {
       const [oi, id] = b.dataset.outbuy.split(':'), o = G.objs[+oi], c = C[id];
       if (!o || o.owner !== 0) return toast('You no longer hold that building.');
@@ -1356,8 +1350,8 @@
     const note = `+${FORT_INCOME} 🪙/day · zone mine income · +${MILITIA} militia/week · the garrison fights enemy heroes inside the walls with +3 Defense`;
     const fl = f.fort || 0, ml = f.minel || 0, fc = fl < FORT_MAX_FORT ? FORT_WALL_COST[fl + 1] : null, mc = ml < FORT_MAX_MINE ? FORT_MINE_COST[ml + 1] : null;
     const extra = {
-      html: `<div class="trow" style="grid-template-columns:30px 1fr auto"><div class="ic">🧱</div><div><b>${FORT_LEVELS[fl].n}</b> <span class="small">walls ×${FORT_LEVELS[fl].hp}</span></div><div class="acts">${fc ? `<button data-fw="1">⬆ ${fmtCost(fc)}</button>` : '<span class="small">MAX</span>'}</div></div>
-        <div class="trow" style="grid-template-columns:30px 1fr auto"><div class="ic">💣</div><div><b>${MINE_LEVELS[ml].n}</b> <span class="small">${MINE_LEVELS[ml].stock} hidden mines</span></div><div class="acts">${mc ? `<button data-fm="1">Build ${fmtCost(mc)}</button>` : '<span class="small">MAX</span>'}</div></div>`,
+      html: `<div class="trow" style="grid-template-columns:30px 1fr auto"><div class="ic">${TownArt.pic('fort', fl, G.faction, 42)}</div><div><b>${FORT_LEVELS[fl].n}</b> <span class="small">walls ×${FORT_LEVELS[fl].hp}</span></div><div class="acts">${fc ? `<button data-fw="1">⬆ ${fmtCost(fc)}</button>` : '<span class="small">MAX</span>'}</div></div>
+        <div class="trow" style="grid-template-columns:30px 1fr auto"><div class="ic">${TownArt.pic('mines', ml, G.faction, 42)}</div><div><b>${MINE_LEVELS[ml].n}</b> <span class="small">${MINE_LEVELS[ml].stock} hidden mines</span></div><div class="acts">${mc ? `<button data-fm="1">Build ${fmtCost(mc)}</button>` : '<span class="small">MAX</span>'}</div></div>`,
       bind: () => {
         $('mbox').querySelectorAll('[data-fw]').forEach(b => b.onclick = () => { if (!canAfford(G.res, fc)) return toast('Not enough resources.'); pay(G.res, fc); f.fort = fl + 1; sfx('build'); renderAll(); openFort(f, hero || h); });
         $('mbox').querySelectorAll('[data-fm]').forEach(b => b.onclick = () => { if (!canAfford(G.res, mc)) return toast('Not enough resources.'); pay(G.res, mc); f.minel = ml + 1; sfx('build'); renderAll(); openFort(f, hero || h); });
@@ -1665,7 +1659,7 @@
   // ---------- title / selection / help ----------
   const HELP = `<h2>How to Play</h2><p><b>Goal:</b> eliminate every rival by capturing all of their towns. Rival AI players build, recruit, hire several heroes and expand across the map — and they will attack your forts and towns. If you hold no town for 7 days you lose.</p>
     <p><b>Towns:</b> capture neutral and rival towns for more castles (each keeps its own faction, creatures and buildings). Use the tabs in the town screen to switch towns, and station a garrison so a town defends itself when no hero is inside.</p>
-    <p><b>Map:</b> click a tile to preview the path (green = reachable today, red = next turn), click again to walk. Click another hero to select it (Tab cycles). Monsters facing an army ${FLEE_RATIO}× stronger offer to flee; with the Charisma perk they can join you instead. Walk onto resources to grab them; mines give daily income; monsters, mines and artifacts are guarded. Merchants ⛺ sell missing resources.<br>
+    <p><b>Map:</b> click a tile to preview the path (green = reachable today, red = next turn), click again to walk. Click another hero to select it (Tab cycles). Monsters facing an army ${FLEE_RATIO}× stronger offer to flee (or pay tribute); with the Charisma perk they can join you instead. A rival hero who is hopelessly outmatched may offer gold to be let go, and if you are the outmatched one you can pay a ransom to retreat to your nearest castle with your army intact. Walk onto resources to grab them; mines give daily income; monsters, mines and artifacts are guarded. Merchants ⛺ sell missing resources.<br>
     Keys: arrows/WASD scroll · +/- zoom · H center hero · Space go · E end turn · T town · Tab next hero. Drag the map to pan, mouse wheel / pinch to zoom.<br>
     <b>On a phone:</b> drag to pan, pinch to zoom, tap a tile to preview the path and tap it again to go; in battle, tap a hex twice to confirm. Use the bottom bar for End Turn, Town and heroes.</p>
     <p><b>Sea:</b> build a Shipyard in town, then boats at the port by the bay. Walk a hero onto a boat to sail; collect floating treasures, salvage shipwrecks, fight sea monsters, and disembark on any shore tile. Pick the map type, size and seed when starting a game.</p>
@@ -1774,5 +1768,5 @@
   refreshTitle();
   requestAnimationFrame(loop);
   window.__G = () => G;
-  window.__dbg = { centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
+  window.__dbg = { negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
 })();

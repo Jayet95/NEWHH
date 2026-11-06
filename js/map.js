@@ -50,17 +50,20 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
       tiles[y][x] = t;
     }
   }
-  const P = { x: 5, y: H - 6 };
-  const AIPOS = [{ x: W - 6, y: 5 }, { x: 5, y: 5 }, { x: W - 6, y: H - 6 }, { x: Math.floor(W / 2), y: 4 }];
+  // the player's castle starts in a random corner (the map is laid out as before and mirrored); the bay lies along the nearest edge
+  const flipX = R() < 0.5, flipY = R() < 0.5, fx = (x) => flipX ? W - 1 - x : x, fy = (y) => flipY ? H - 1 - y : y;
+  const P = { x: fx(5), y: fy(H - 6) };
+  const AIPOS = [{ x: fx(W - 6), y: fy(5) }, { x: fx(5), y: fy(5) }, { x: fx(W - 6), y: fy(H - 6) }, { x: fx(Math.floor(W / 2)), y: fy(4) }];
   const aiStarts = aiFacs.map((f, i) => AIPOS[i]);
   const E = aiStarts[0];
   // the bay along the southern edge, reachable by boat from the player's port
   const bayRows = Math.max(3, Math.min(5, Math.round(4 * MP.bay)));
   const bayTiles = [];
+  const by = (y) => flipY ? H - 1 - y : y;
   for (let x = 10; x <= W - 12; x++) {
-    const top = H - bayRows + (n2[H - 1][x] > 0.5 ? 0 : 1);
-    for (let y = top; y < H; y++) { tiles[y][x] = T.WATER; bayTiles.push({ x, y }); }
-    if (top - 1 > 0 && tiles[top - 1][x] === T.GRASS) tiles[top - 1][x] = T.SAND;
+    const top = H - bayRows + (n2[by(H - 1)][x] > 0.5 ? 0 : 1);
+    for (let y = top; y < H; y++) { tiles[by(y)][x] = T.WATER; bayTiles.push({ x, y: by(y) }); }
+    if (top - 1 > 0 && tiles[by(top - 1)][x] === T.GRASS) tiles[by(top - 1)][x] = T.SAND;
   }
   const clear = (c, r) => { for (let y = c.y - r; y <= c.y + r; y++) for (let x = c.x - r; x <= c.x + r; x++) if (x >= 0 && y >= 0 && x < W && y < H) tiles[y][x] = T.GRASS; };
   clear(P, 3); aiStarts.forEach(a => clear(a, 3));
@@ -93,9 +96,9 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
   }
   if (!dock) {
     for (const c of bayTiles) {
-      if (tiles[c.y][c.x] !== T.WATER || c.y < 1) continue;
+      if (tiles[c.y][c.x] !== T.WATER || (flipY ? c.y > H - 2 : c.y < 1)) continue;
       const d = (c.x - P.x) ** 2 + (c.y - P.y) ** 2;
-      if (d < bd) { bd = d; dock = { x: c.x, y: c.y }; shore = { x: c.x, y: c.y - 1 }; }
+      if (d < bd) { bd = d; dock = { x: c.x, y: c.y }; shore = { x: c.x, y: flipY ? c.y + 1 : c.y - 1 }; }
     }
   }
   if (dock) {
@@ -112,8 +115,7 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
   const seen = new Set([P.y * W + P.x]), q = [P];
   while (q.length) {
     const c = q.shift();
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-      const nx = c.x + dx, ny = c.y + dy;
+    for (const [nx, ny] of hexNb(c.x, c.y)) {
       if (nx < 0 || ny < 0 || nx >= W || ny >= H || seen.has(ny * W + nx) || !passable(tiles[ny][nx])) continue;
       seen.add(ny * W + nx); q.push({ x: nx, y: ny });
     }

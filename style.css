@@ -231,3 +231,8 @@ body.inbattle { padding-bottom: 0; }
 .crow .pic, .card .small .pic { display: inline-block; vertical-align: middle; margin: 0 1px; }
 .hbtn { padding: 2px 3px; } .hbtn .pic { margin: 0; }
 #hero h3 .pic { display: inline-block; vertical-align: middle; }
+
+/* town window tabs */
+.ttabs { display: flex; gap: 6px; margin: 8px 0 6px; }
+.ttab { flex: 1; padding: 9px 6px; font-size: 15px; font-weight: bold; }
+.ttab.on { border-color: var(--gold); background: linear-gradient(#9a7620, #5e4510); }

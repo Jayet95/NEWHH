@@ -2,7 +2,7 @@
 // Offline-first service worker. __VERSION__ is replaced at build time (tools/build.js) so every deploy refreshes the cache.
 const VERSION = '__VERSION__';
 const CACHE = 'heroes3-js-' + VERSION;
-const ASSETS = ['./', './index.html', './style.css', './manifest.webmanifest', './js/sfx.js', './js/fx.js', './js/data.js', './js/art.js', './js/figures.js', './js/map.js', './js/battle.js', './js/main.js', './icons/icon-192.png', './icons/icon-512.png'];
+const ASSETS = ['./', './index.html', './style.css', './manifest.webmanifest', './js/sfx.js', './js/fx.js', './js/data.js', './js/art.js', './js/figures.js', './js/townart.js', './js/map.js', './js/battle.js', './js/main.js', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));

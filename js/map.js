@@ -205,27 +205,25 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
     }
   }
 
-  const kindsBase = ['gold', 'gold', 'gold', 'wood', 'wood', 'ore', 'ore', 'mercury', 'sulfur', 'crystal', 'gems'];
-  const nMines = Math.max(8, Math.round(11 * Math.pow(sc, 0.8)));
-  const mineKinds = Array.from({ length: nMines }, (_, i) => kindsBase[i % kindsBase.length]);
-  for (const k of mineKinds) { const c = pick(); if (!c) break; objs.push({ t: 'mine', kind: k, owner: null, x: c.x, y: c.y, guard: [guard(c, 0.8)] }); }
-  for (let i = 0, n = sc < 0.8 ? 2 : Math.round(3 * Math.sqrt(sc)); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'merchant', x: c.x, y: c.y }); }
-  for (let i = 0, n = Math.round(20 * sc); i < n; i++) { const c = pick(); if (!c) break; const k = RES[Math.floor(R() * RES.length)]; objs.push({ t: 'pile', kind: k, amt: k === 'gold' ? 500 + 250 * Math.floor(R() * 5) : 3 + Math.floor(R() * 6), x: c.x, y: c.y }); }
-  for (let i = 0, n = Math.round(5 * sc); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'chest', x: c.x, y: c.y, gold: 1000 + 500 * Math.floor(R() * 4) }); }
-  for (let i = 0, n = Math.round(5 * Math.sqrt(sc)); i < n; i++) { const c = pick(); if (c) objs.push({ t: 'art', art: randomArt(R, artTierFor(depthOf(c), R)), x: c.x, y: c.y, guard: [guard(c, 1.1)] }); }
-  for (let i = 0, n = Math.round(28 * sc * MP.density); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'monster', x: c.x, y: c.y, guard: [guard(c)] }); }
-
-  // ---- more adventure objects ----
-  const facKeys2 = Object.keys(FACTIONS), spellKeys = Object.keys(SPELLS);
-  for (let i = 0, n = Math.round(5 * sc); i < n; i++) { // creature dwellings: beat the guards, then recruit weekly
-    const c = pick(); if (!c) break; const d = depthOf(c), tier = 1 + Math.min(3, Math.floor(R() * (2 + d * 3)));
-    objs.push({ t: 'dwelling', fac: facKeys2[Math.floor(R() * facKeys2.length)], tier, owner: null, avail: GROWTH[tier - 1], x: c.x, y: c.y, guard: [guard(c, 0.9)] });
+  const facKeys3 = Object.keys(FACTIONS);
+  // dragon lairs and outside dwellings are placed first so they always find room on the map
+  for (let i = 0, n = Math.round(6 * sc); i < n; i++) { // creature dwellings: some are free to take, others must be won by beating the guards first
+    const c = pick(); if (!c) break; const d = depthOf(c), neutral = R() < 0.25;
+    if (neutral) {
+      const ids = Object.keys(NEUTRAL_DW), cid = ids[Math.min(ids.length - 1, Math.floor(d * ids.length * (0.7 + R() * 0.6)))];
+      objs.push({ t: 'dwelling', fac: null, cid, tier: 0, owner: null, avail: NEUTRAL_DW[cid], x: c.x, y: c.y, guard: R() < 0.3 ? [] : [guard(c, 0.9)] });
+    } else {
+      const tier = 1 + Math.min(5, Math.floor(R() * (2 + d * 5))), free = tier <= 2 ? R() < 0.4 : tier <= 4 ? R() < 0.12 : false;
+      objs.push({ t: 'dwelling', fac: facKeys3[Math.floor(R() * facKeys3.length)], tier, owner: null, avail: GROWTH[tier - 1], x: c.x, y: c.y, guard: free ? [] : [guard(c, 0.8 + 0.1 * tier)] });
+    }
   }
   for (let i = 0, n = Math.max(1, Math.round(1.1 * Math.sqrt(sc))); i < n; i++) { // dragon lairs: only reachable by beating a dragon horde
     let c = null; for (let t = 0; t < 8; t++) { const k = pick(); if (!k) break; c = k; if (depthOf(k) > 0.5) break; }
     if (!c) break; const d = depthOf(c);
     objs.push({ t: 'lair', owner: null, x: c.x, y: c.y, avail: Object.assign({}, LAIR_GROWTH), guard: [{ t: 'dragon', n: Math.max(3, Math.round((2 + d * 6) * DM.neutral)) }] });
   }
+  // ---- more adventure objects ----
+  const facKeys2 = Object.keys(FACTIONS), spellKeys = Object.keys(SPELLS);
   for (let i = 0, n = Math.round(5 * sc); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'resobj', kind: ['windmill', 'waterwheel', 'garden'][Math.floor(R() * 3)], week: -1, x: c.x, y: c.y }); }
   for (let i = 0, n = Math.round(2 * sc); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'stone', used: {}, x: c.x, y: c.y }); }
   for (let i = 0, n = Math.round(2 * sc); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'shrine', spell: spellKeys[Math.floor(R() * spellKeys.length)], used: {}, x: c.x, y: c.y }); }
@@ -243,6 +241,16 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
     const c = pick(); if (!c) break; const d = depthOf(c), k = ['wood', 'ore', 'mercury', 'sulfur', 'crystal', 'gems'][Math.floor(R() * 6)];
     objs.push({ t: 'seer', need: k, amt: k === 'wood' || k === 'ore' ? 12 + Math.floor(R() * 10) : 5 + Math.floor(R() * 4), art: randomArt(R, Math.max(2, artTierFor(d, R))), x: c.x, y: c.y });
   }
+
+  const kindsBase = ['gold', 'gold', 'gold', 'wood', 'wood', 'ore', 'ore', 'mercury', 'sulfur', 'crystal', 'gems'];
+  const nMines = Math.max(8, Math.round(11 * Math.pow(sc, 0.8)));
+  const mineKinds = Array.from({ length: nMines }, (_, i) => kindsBase[i % kindsBase.length]);
+  for (const k of mineKinds) { const c = pick(); if (!c) break; objs.push({ t: 'mine', kind: k, owner: null, x: c.x, y: c.y, guard: [guard(c, 0.8)] }); }
+  for (let i = 0, n = sc < 0.8 ? 2 : Math.round(3 * Math.sqrt(sc)); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'merchant', x: c.x, y: c.y }); }
+  for (let i = 0, n = Math.round(28 * sc * MP.density); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'monster', x: c.x, y: c.y, guard: [guard(c)] }); }
+  for (let i = 0, n = Math.round(5 * Math.sqrt(sc)); i < n; i++) { const c = pick(); if (c) objs.push({ t: 'art', art: randomArt(R, artTierFor(depthOf(c), R)), x: c.x, y: c.y, guard: [guard(c, 1.1)] }); }
+  for (let i = 0, n = Math.round(20 * sc); i < n; i++) { const c = pick(); if (!c) break; const k = RES[Math.floor(R() * RES.length)]; objs.push({ t: 'pile', kind: k, amt: k === 'gold' ? 500 + 250 * Math.floor(R() * 5) : 3 + Math.floor(R() * 6), x: c.x, y: c.y }); }
+  for (let i = 0, n = Math.round(5 * sc); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'chest', x: c.x, y: c.y, gold: 1000 + 500 * Math.floor(R() * 4) }); }
 
   // ---- the sea: nearest bay tile to the castle is the dock; collectibles float in the connected water ----
   if (dock) {
@@ -301,7 +309,7 @@ function findPath(G, sx, sy, tx, ty, ignoreObjs, sail, caps) {
   if (!tcost(tx, ty, target)) return null;
   const g = new Float32Array(N).fill(Infinity), f = new Float32Array(N).fill(Infinity), bc = new Float32Array(N);
   const prev = new Int32Array(N).fill(-1), closed = new Uint8Array(N);
-  const heur = (x, y) => hexDist({ x, y }, { x: tx, y: ty }) * 70;
+  const heur = (x, y) => hexDist({ x, y }, { x: tx, y: ty }) * 50;
   const s = k(sx, sy); g[s] = 0; f[s] = heur(sx, sy);
   const open = [s];
   while (open.length) {

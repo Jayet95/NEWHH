@@ -351,5 +351,76 @@ const Figures = (() => {
     else shoot = 'arrow';
     return styleCache[base] = { melee, shoot, col };
   }
-  return { sprite, FIG, style };
+  // ---------- hero portraits: a painted bust per hero (face traits from the name, gear from the class) ----------
+  const hh = (str) => { let h = 7; for (const ch of str) h = (h * 31 + ch.charCodeAt(0)) | 0; return Math.abs(h); };
+  const SKINS = [[28, 55, 78], [25, 50, 66], [22, 45, 52], [20, 40, 38], [30, 35, 86]];
+  const HAIRS = [[28, 55, 20], [45, 70, 60], [0, 0, 12], [14, 70, 36], [0, 0, 74], [32, 40, 34]];
+  const EYES = ['#3a6aa8', '#4a8a3a', '#6a4a22', '#6a6a72'];
+  const heroCache = {};
+  function hero(def) {
+    if (heroCache[def.id]) return heroCache[def.id];
+    const cv = document.createElement('canvas'); cv.width = cv.height = 128; const g = cv.getContext('2d'); g.scale(2, 2);
+    const h = hh(def.name), pk = (arr, i) => arr[Math.floor(((h >> (i * 3)) & 7) / 8 * arr.length)], cls = def.cls, fem = !!def.fem;
+    const fh = (Object.keys(FACTIONS).indexOf(def.fac) * 41 + 8) % 360;
+    let skin = pk(SKINS, 0), hair = pk(HAIRS, 1), eyeC = pk(EYES, 2);
+    if (cls === 'Demoniac') skin = [8, 45, 52]; if (cls === 'Necromancer') skin = [80, 12, 80];
+    // backdrop
+    g.fillStyle = lin(g, 0, 64, K([fh, 38, 34], 8), K([fh, 40, 10])); g.fillRect(0, 0, 64, 64);
+    g.fillStyle = 'rgba(255,255,255,.07)'; g.beginPath(); g.moveTo(32, 30); g.lineTo(0, 0); g.lineTo(24, 0); g.fill(); g.beginPath(); g.moveTo(32, 30); g.lineTo(64, 6); g.lineTo(64, 28); g.fill();
+    const ARM = { Knight: STEEL, Cleric: [45, 25, 92], Ranger: [105, 40, 30], Druid: [95, 38, 28], Wizard: [225, 50, 40], Demoniac: [0, 30, 18], Heretic: [350, 60, 32], Necromancer: [270, 18, 24], 'Death Knight': [250, 12, 22], Overlord: [275, 40, 28], Warlock: [285, 45, 32], Barbarian: [25, 40, 30], 'Battle Mage': [190, 50, 34], Beastmaster: [28, 38, 30], Witch: [170, 40, 30], Planeswalker: [245, 45, 32], Elementalist: [20, 70, 40] };
+    const arm = ARM[cls] || STEEL, dk = (c, d) => [c[0], c[1], Math.max(8, c[2] + d)];
+    // hair behind / hoods behind
+    const longHair = fem || cls === 'Witch' || (cls === 'Barbarian') || h % 5 === 0;
+    if (longHair && !['Death Knight'].includes(cls)) pl(g, [[20, 22], [22, 12], [32, 8], [42, 12], [44, 22], [46, 42], [38, 36], [26, 36], [18, 42]], hair);
+    if (['Ranger', 'Heretic', 'Necromancer', 'Planeswalker'].includes(cls)) pl(g, [[16, 40], [18, 18], [32, 6], [46, 18], [48, 40], [38, 30], [26, 30]], dk(arm, 2));
+    if (cls === 'Beastmaster') { pl(g, [[17, 36], [18, 16], [32, 7], [46, 16], [47, 36]], [28, 30, 38]); }
+    // shoulders + torso
+    pl(g, [[6, 64], [10, 50], [22, 43], [42, 43], [54, 50], [58, 64]], arm);
+    if (cls === 'Knight' || cls === 'Overlord' || cls === 'Demoniac' || cls === 'Death Knight') { ellp(g, 13, 49, 9.5, 6.5, cls === 'Knight' ? STEEL : dk(arm, 8), -.35); ellp(g, 51, 49, 9.5, 6.5, cls === 'Knight' ? STEEL : dk(arm, 8), .35); if (cls !== 'Knight') for (const x of [9, 55]) pl(g, [[x - 2, 46], [x, 38], [x + 2, 46]], cls === 'Demoniac' ? [8, 60, 40] : [275, 30, 40]); }
+    if (cls === 'Barbarian' || cls === 'Beastmaster') { for (let i = 0; i < 7; i++) ellp(g, 10 + i * 7.4, 49 + (i % 2) * 2, 6, 5, [28, 35, 44 - (i % 2) * 8]); }
+    if (cls === 'Cleric') { line(g, [[32, 43], [32, 64]], K(GOLD), 4); line(g, [[27, 52], [37, 52]], K(GOLD), 2); }
+    if (cls === 'Battle Mage' || cls === 'Wizard' || cls === 'Warlock' || cls === 'Elementalist' || cls === 'Witch') { line(g, [[24, 44], [32, 58], [40, 44]], K(dk(arm, 18)), 3); }
+    // neck
+    pl(g, [[28, 34], [36, 34], [37, 44], [27, 44]], dk(skin, -8));
+    // head
+    const hasHelm = cls === 'Death Knight';
+    if (!hasHelm) {
+      pl(g, [[21.5, 27], [22, 20], [26, 15.5], [32, 14.5], [38, 15.5], [42, 20], [42.5, 27], [40, 33], [36, 37.5], [32, 38.5], [28, 37.5], [24, 33]], skin);
+      for (const x of [21, 43]) ellp(g, x, 27, 1.6, 3, dk(skin, -6));
+      // eyes
+      for (const x of [27.5, 36.5]) { ellp(g, x, 26.5, 2.4, 1.5, [0, 0, 96]); dot(g, x + .2, 26.5, 1.1, cls === 'Necromancer' || cls === 'Planeswalker' || cls === 'Heretic' ? (cls === 'Necromancer' ? '#7dff8a' : cls === 'Heretic' ? '#ffb040' : '#bfe8ff') : eyeC); dot(g, x + .6, 26.1, .4, '#fff'); }
+      line(g, [[25, 23.2], [29.5, 23.6]], K(dk(hair, -4)), 1.1); line(g, [[34.5, 23.6], [39, 23.2]], K(dk(hair, -4)), 1.1);
+      line(g, [[32, 27], [31.2, 31], [33, 31.4]], 'rgba(90,40,20,.45)', .8);
+      if (fem) { line(g, [[29.5, 34.2], [32, 35], [34.5, 34.2]], '#b03a4a', 1.5); for (const x of [27.5, 36.5]) line(g, [[x - 2.2, 25.4], [x - 3, 24.4]], INK, .7); }
+      else line(g, [[29.5, 34.6], [32, 35.2], [34.5, 34.6]], 'rgba(70,25,15,.8)', 1.1);
+      if (!fem && cls !== 'Necromancer' && cls !== 'Demoniac' && h % 3 === 0) { pl(g, [[22.5, 29], [26, 34], [32, 40.5], [38, 34], [41.5, 29], [40, 37], [32, 44], [24, 37]], hair); line(g, [[29, 33.2], [35, 33.2]], K(dk(hair, -6)), 1.2); }
+      if (cls === 'Barbarian') { line(g, [[24, 28.5], [30, 30]], '#c23a2a', 1.6); line(g, [[34, 30], [40, 28.5]], '#c23a2a', 1.6); }
+    }
+    // hair front
+    const hairCap = () => pl(g, [[21.5, 25], [21, 18], [26, 12.5], [32, 11.5], [38, 12.5], [43, 18], [42.5, 25], [40, 19], [32, 17], [24, 19]], hair);
+    if (!hasHelm && !['Wizard', 'Witch', 'Warlock', 'Cleric', 'Ranger', 'Heretic', 'Necromancer', 'Planeswalker', 'Beastmaster'].includes(cls)) hairCap();
+    // class gear
+    switch (cls) {
+      case 'Knight': if (h % 2) { pl(g, [[21, 24], [21, 15], [26, 9.5], [38, 9.5], [43, 15], [43, 24], [40, 20], [24, 20]], STEEL); line(g, [[32, 9.5], [32, 24]], INK, 1.2); pl(g, [[30, 10], [34, 10], [36, 2], [28, 2]], RED); } break;
+      case 'Cleric': pl(g, [[22, 20], [26, 10], [32, 1], [38, 10], [42, 20], [38, 17], [26, 17]], [45, 25, 94]); line(g, [[32, 2.5], [32, 12]], K(GOLD), 1.6); line(g, [[28.5, 6]], K(GOLD), 1); line(g, [[29, 6.5], [35, 6.5]], K(GOLD), 1.6); ellp(g, 32, 44, 2, 2, GOLD); break;
+      case 'Ranger': pl(g, [[22, 22], [22, 15], [27, 9], [32, 6], [38, 9], [43, 15], [42, 22], [39, 17], [25, 17]], [105, 40, 26]); pl(g, [[40, 12], [50, 4], [46, 14]], [0, 70, 50]); break;
+      case 'Druid': for (let i = 0; i < 9; i++) { const a = -Math.PI + i * (Math.PI / 8); ellp(g, 32 + Math.cos(a) * 11.5, 21 + Math.sin(a) * 9, 3, 1.6, [115, 55, 34 + (i % 2) * 8], a + 1.57); } dot(g, 32, 12, 1.6, '#ff8aa8'); break;
+      case 'Wizard': ellp(g, 32, 17, 17, 3.6, [225, 50, 34]); pl(g, [[22, 17], [42, 17], [37, 9], [38, 1], [30, 7]], [225, 55, 36]); sparkle(g, 33, 9, 2.2, K(GOLD)); break;
+      case 'Demoniac': pl(g, [[23, 17], [18, 4], [27, 13]], '#e8dcc0'); pl(g, [[41, 17], [46, 4], [37, 13]], '#e8dcc0'); break;
+      case 'Heretic': pl(g, [[22, 22], [22, 15], [27, 9], [32, 6], [38, 9], [43, 15], [42, 22], [39, 17], [25, 17]], [350, 60, 30]); flame(g, 32, 13, 4, 9); break;
+      case 'Necromancer': pl(g, [[22, 22], [22, 15], [27, 9], [32, 6], [38, 9], [43, 15], [42, 22], [39, 17], [25, 17]], [270, 18, 20]); ellp(g, 32, 13, 2.6, 2.8, BONE); dot(g, 31, 12.6, .6, INK); dot(g, 33, 12.6, .6, INK); break;
+      case 'Death Knight': ellp(g, 32, 24.5, 11.5, 14, [250, 12, 24]); pl(g, [[21, 17], [18, 6], [26, 14]], [250, 10, 30]); pl(g, [[43, 17], [46, 6], [38, 14]], [250, 10, 30]); pl(g, [[24, 24], [40, 24], [38, 28], [26, 28]], '#0a0610'); line(g, [[26, 26], [38, 26]], '#6af0ff', 1.8); line(g, [[32, 14], [32, 38]], 'rgba(255,255,255,.12)', 1); break;
+      case 'Overlord': pl(g, [[23, 15], [23, 6], [27, 11], [30, 3], [32, 10], [34, 3], [37, 11], [41, 6], [41, 15]], [275, 45, 40]); dot(g, 32, 12.5, 1.4, '#ff5a8a'); break;
+      case 'Warlock': ellp(g, 32, 14, 12, 7, [285, 45, 34]); ellp(g, 32, 10, 8, 5, [285, 50, 42]); dot(g, 32, 12, 2, '#7af0ff'); break;
+      case 'Barbarian': if (h % 2) { pl(g, [[22, 18], [22, 11], [30, 9], [34, 9], [42, 11], [42, 18], [38, 15], [26, 15]], [215, 8, 52]); pl(g, [[22, 14], [14, 4], [24, 8]], '#efe6cf'); pl(g, [[42, 14], [50, 4], [40, 8]], '#efe6cf'); } break;
+      case 'Battle Mage': line(g, [[23, 19], [32, 15.5], [41, 19]], '#c8d0dc', 1.8); dot(g, 32, 15.5, 1.6, '#4af0ff'); break;
+      case 'Beastmaster': pl(g, [[22, 22], [22, 15], [27, 9], [32, 6], [38, 9], [43, 15], [42, 22], [39, 17], [25, 17]], [28, 30, 38]); pl(g, [[25, 10], [22, 2], [29, 8]], '#efe6cf'); pl(g, [[39, 10], [42, 2], [35, 8]], '#efe6cf'); break;
+      case 'Witch': ellp(g, 32, 15, 18, 3.4, [170, 40, 26]); pl(g, [[22, 15], [42, 15], [37, 8], [40, 0], [28, 6]], [170, 45, 28]); line(g, [[23, 14], [41, 14]], K(GOLD), 1.4); break;
+      case 'Planeswalker': pl(g, [[22, 22], [22, 15], [27, 9], [32, 6], [38, 9], [43, 15], [42, 22], [39, 17], [25, 17]], [245, 45, 28]); sparkle(g, 32, 13, 2.4, '#bfe8ff'); break;
+      case 'Elementalist': for (let i = 0; i < 5; i++) flame(g, 24 + i * 4, 17, 2.4, 6 + (i % 2) * 3); dot(g, 54, 36, 4, '#6ad0ff'); dot(g, 53, 35, 1.4, '#fff'); dot(g, 10, 36, 3.4, '#ff8a2a'); break;
+    }
+    if (cls === 'Knight') ellp(g, 32, 53, 3, 3, GOLD);
+    return heroCache[def.id] = cv;
+  }
+  return { sprite, FIG, style, hero };
 })();

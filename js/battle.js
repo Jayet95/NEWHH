@@ -640,7 +640,7 @@ const Battle = (() => {
       ctx.beginPath(); ctx.arc(hp.x, hp.y, 27, 0, 7);
       ctx.fillStyle = isPlayer ? '#2a4f8a' : '#8a2a2a'; ctx.fill();
       ctx.lineWidth = flash ? 5 : 3; ctx.strokeStyle = flash ? '#fff' : '#ffd24a'; ctx.stroke();
-      ctx.drawImage(Art.heroCanvas(hh.icon, isPlayer ? '#3a8aff' : '#e04a3a'), hp.x - 22, hp.y - 22, 44, 44);
+      ctx.drawImage(Art.heroCanvas(hh.icon, isPlayer ? '#3a8aff' : '#e04a3a', 72, hh.pid), hp.x - 22, hp.y - 22, 44, 44);
       ctx.fillStyle = '#000b'; ctx.fillRect(hp.x - 36, hp.y + 31, 72, isPlayer ? 41 : 28);
       ctx.fillStyle = '#f3e7bd'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(hh.name, hp.x, hp.y + 40);
@@ -824,7 +824,7 @@ const Battle = (() => {
       const html = fled ? '<h2>🏳️ Retreat</h2><p>Your army fled the field.</p>'
         : win ? `<h2>🏆 Victory!</h2><p>Your forces lost <b>${lost}</b> creatures.</p><p>Experience gained: <b>${res.xp}</b></p>`
           : '<h2>💀 Defeat</h2><p>Your army has been destroyed. The hero retreats to town.</p>';
-      await window.showModal(html, ['Continue']);
+      if (win) await window.showModal(html, ['Continue']);
       document.body.classList.remove('inbattle');
       B.resolve(res);
       B = null;
@@ -835,7 +835,7 @@ const Battle = (() => {
     cv = $('bat'); ctx = cv.getContext('2d'); bind();
     return new Promise(resolve => {
       const hero = { att: opts.hero.att, def: opts.hero.def, sp: opts.hero.sp, mana: opts.hero.mana, spells: opts.hero.spells || [],
-        perks: opts.hero.perks || {}, name: opts.hero.name || 'Hero', icon: opts.hero.icon || '🛡️', morale: opts.hero.morale || 0, luck: opts.hero.luck || 0 };
+        perks: opts.hero.perks || {}, name: opts.hero.name || 'Hero', icon: opts.hero.icon || '🛡️', pid: opts.hero.pid, morale: opts.hero.morale || 0, luck: opts.hero.luck || 0 };
       B = { eHero: opts.eHero || null, heroFlash: null, strikeUsed: false, siege: null, walls: new Map(), moat: new Set(), cw: 0, stacks: [], obs: new Map(), queue: [], waitQ: [], cur: null, round: 0, reach: new Map(), busy: false, input: false, auto: false, over: false,
         spell: null, castUsed: false, hover: null, fx: [], shot: null, xp: 0, hero, eStats: opts.eStats || { att: 0, def: 0 },
         armyIn: opts.army.map(a => a && { ...a }), canRetreat: opts.canRetreat !== false, resolve };

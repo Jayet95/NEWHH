@@ -310,18 +310,20 @@ const Art = (() => {
       if (c.shoot) { g.strokeStyle = '#ffe27a'; g.lineWidth = S * .03; g.beginPath(); g.arc(S * .86, S * .5, S * .12, -1.2, 1.2); g.stroke(); }
     });
   }
-  function heroCanvas(icon, col = '#3a8aff', S = 72) {
-    const key = icon + col + S; if (heroCache[key]) return heroCache[key];
+  function heroCanvas(icon, col = '#3a8aff', S = 72, pid) {
+    const key = icon + col + S + (pid || ''); if (heroCache[key]) return heroCache[key];
     return heroCache[key] = mk(S, S, (g) => {
       const c = S / 2; g.beginPath(); g.arc(c, c, c - 1, 0, 7); g.fillStyle = lin(g, 0, 0, S, S, '#fff3b0', '#8a6210'); g.fill(); g.strokeStyle = '#140c04'; g.lineWidth = 1.5; g.stroke();
-      g.beginPath(); g.arc(c, c, c * .82, 0, 7); const bg = g.createRadialGradient(c * .8, c * .7, 2, c, c, c * .85); bg.addColorStop(0, col); bg.addColorStop(1, '#0c1020'); g.fillStyle = bg; g.fill();
-      g.strokeStyle = 'rgba(255,255,255,.25)'; g.lineWidth = 1; g.stroke();
-      g.font = Math.round(S * .52) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = 'rgba(0,0,0,.6)'; g.shadowBlur = S * .06; g.fillStyle = '#fff'; g.fillText(icon, c, c + S * .02);
+      g.beginPath(); g.arc(c, c, c * .86, 0, 7); g.fillStyle = col; g.fill();
+      const def = pid && typeof HEROES !== 'undefined' ? HEROES[pid] : null, bust = def && typeof Figures !== 'undefined' && Figures.hero ? Figures.hero(def) : null;
+      if (bust) { g.save(); g.beginPath(); g.arc(c, c, c * .74, 0, 7); g.clip(); g.drawImage(bust, c - c * .74, c - c * .74, c * 1.48, c * 1.48); g.restore(); g.beginPath(); g.arc(c, c, c * .74, 0, 7); g.strokeStyle = 'rgba(0,0,0,.5)'; g.lineWidth = 1.2; g.stroke(); return; }
+      g.beginPath(); g.arc(c, c, c * .74, 0, 7); const bg = g.createRadialGradient(c * .8, c * .7, 2, c, c, c * .85); bg.addColorStop(0, col); bg.addColorStop(1, '#0c1020'); g.fillStyle = bg; g.fill();
+      g.font = Math.round(S * .46) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = 'rgba(0,0,0,.6)'; g.shadowBlur = S * .06; g.fillStyle = '#fff'; g.fillText(icon, c, c + S * .02);
     });
   }
   const dataUrl = (key, cv) => urlCache[key] || (urlCache[key] = cv.toDataURL());
   const pic = (id, px = 40) => `<img class="pic" width="${px}" height="${px}" alt="" src="${dataUrl('c' + id, portraitCanvas(id))}">`;
-  const heroPic = (icon, col, px = 36) => `<img class="pic round" width="${px}" height="${px}" alt="" src="${dataUrl('h' + icon + col, heroCanvas(icon, col))}">`;
+  const heroPic = (icon, col, px = 36, pid) => `<img class="pic round" width="${px}" height="${px}" alt="" src="${dataUrl('h' + icon + col + (pid || ''), heroCanvas(icon, col, 72, pid))}">`;
 
   // swap the emoji resource icons used throughout the HTML UI for painted ones
   const RES_EMOJI = Object.assign({}, RES_ICON);

@@ -147,15 +147,15 @@ const CLASSES = {
 };
 
 const FACTIONS = {
-  castle: { name: 'Castle', icon: '🏰', town: 'Castle Dawnwatch', enemyTown: 'Citadel Lionheart', blurb: 'Noble knights, strong archers and mighty Angels.', heroes: [['Orrin', 'Knight'], ['Rion', 'Cleric']] },
-  rampart: { name: 'Rampart', icon: '🌲', town: 'Rampart Greenhollow', enemyTown: 'Thornwall Keep', blurb: 'Elves, unicorns and dragons of the forest.', heroes: [['Mephala', 'Ranger'], ['Ufretin', 'Druid']] },
-  tower: { name: 'Tower', icon: '🗼', town: 'Tower Skyspire', enemyTown: 'Spire of Solmyr', blurb: 'Arcane masters: gremlins, golems, nagas and Titans.', heroes: [['Solmyr', 'Wizard'], ['Cyra', 'Wizard']] },
-  inferno: { name: 'Inferno', icon: '🔥', town: 'Inferno Emberfall', enemyTown: 'Hellgate Bastion', blurb: 'Demons and devils from the burning pits.', heroes: [['Xeron', 'Demoniac'], ['Calh', 'Heretic']] },
-  necropolis: { name: 'Necropolis', icon: '💀', town: 'Necropolis Blackspire', enemyTown: 'Necropolis Blackspire', blurb: 'Undead hordes: skeletons, vampires and bone dragons.', heroes: [['Sandro', 'Necromancer'], ['Straker', 'Death Knight']] },
-  dungeon: { name: 'Dungeon', icon: '🕳️', town: 'Dungeon Deepmaw', enemyTown: 'Underworld Citadel', blurb: 'Beholders, minotaurs and black dragons.', heroes: [['Mutare', 'Overlord'], ['Sephinroth', 'Warlock']] },
-  stronghold: { name: 'Stronghold', icon: '🛖', town: 'Stronghold Ironfang', enemyTown: 'Warlord Fortress', blurb: 'Brutal orcs, ogres, cyclopes and behemoths.', heroes: [['Crag Hack', 'Barbarian'], ['Gretchin', 'Battle Mage']] },
-  fortress: { name: 'Fortress', icon: '🐊', town: 'Fortress Mireholm', enemyTown: 'Swamp Fortress', blurb: 'Swamp beasts: basilisks, wyverns and hydras.', heroes: [['Tazar', 'Beastmaster'], ['Wystan', 'Witch']] },
-  conflux: { name: 'Conflux', icon: '🌀', town: 'Conflux Stormreach', enemyTown: 'Elemental Nexus', blurb: 'Living elements ending in the mighty Phoenix.', heroes: [['Pasis', 'Planeswalker'], ['Thane', 'Elementalist']] },
+  castle: { name: 'Castle', icon: '🏰', town: 'Castle Dawnwatch', enemyTown: 'Citadel Lionheart', blurb: 'Noble knights, strong archers and mighty Angels.', heroes: [['Orrin', 'Knight'], ['Rion', 'Cleric'], ['Valeska', 'Knight', { f: 1, sk: 'leadership', att: 1 }], ['Gelu', 'Ranger', { sk: 'scouting' }], ['Ingham', 'Cleric', { sk: 'wisdom', kn: 1 }], ['Roland', 'Knight', { sk: 'armorer', def: 1 }]] },
+  rampart: { name: 'Rampart', icon: '🌲', town: 'Rampart Greenhollow', enemyTown: 'Thornwall Keep', blurb: 'Elves, unicorns and dragons of the forest.', heroes: [['Mephala', 'Ranger', { f: 1 }], ['Ufretin', 'Druid'], ['Jenova', 'Ranger', { f: 1, sk: 'archery', att: 1 }], ['Kyrre', 'Druid', { sk: 'earthmagic' }], ['Gem', 'Druid', { f: 1, sk: 'logistics' }], ['Thorgrim', 'Ranger', { sk: 'forester', def: 1 }]] },
+  tower: { name: 'Tower', icon: '🗼', town: 'Tower Skyspire', enemyTown: 'Spire of Solmyr', blurb: 'Arcane masters: gremlins, golems, nagas and Titans.', heroes: [['Solmyr', 'Wizard'], ['Cyra', 'Wizard', { f: 1 }], ['Dessa', 'Wizard', { f: 1, sk: 'sorcery' }], ['Iona', 'Wizard', { f: 1, sk: 'wisdom', kn: 1 }], ['Neela', 'Wizard', { f: 1, sk: 'airmagic' }], ['Aine', 'Wizard', { sk: 'mysticism' }]] },
+  inferno: { name: 'Inferno', icon: '🔥', town: 'Inferno Emberfall', enemyTown: 'Hellgate Bastion', blurb: 'Demons and devils from the burning pits.', heroes: [['Xeron', 'Demoniac'], ['Calh', 'Heretic'], ['Fiona', 'Heretic', { f: 1, sk: 'firemagic' }], ['Rashka', 'Demoniac', { sk: 'offense', att: 1 }], ['Marius', 'Demoniac', { sk: 'leadership' }], ['Ignatius', 'Heretic', { sk: 'sorcery', sp: 1 }]] },
+  necropolis: { name: 'Necropolis', icon: '💀', town: 'Necropolis Blackspire', enemyTown: 'Necropolis Blackspire', blurb: 'Undead hordes: skeletons, vampires and bone dragons.', heroes: [['Sandro', 'Necromancer'], ['Straker', 'Death Knight'], ['Vokial', 'Necromancer', { sk: 'wisdom' }], ['Moandor', 'Death Knight', { sk: 'offense', att: 1 }], ['Charna', 'Necromancer', { f: 1, sk: 'mysticism' }], ['Tamika', 'Death Knight', { f: 1, sk: 'armorer', def: 1 }]] },
+  dungeon: { name: 'Dungeon', icon: '🕳️', town: 'Dungeon Deepmaw', enemyTown: 'Underworld Citadel', blurb: 'Beholders, minotaurs and black dragons.', heroes: [['Mutare', 'Overlord', { f: 1 }], ['Sephinroth', 'Warlock'], ['Jeddite', 'Overlord', { sk: 'scouting' }], ['Shiva', 'Warlock', { f: 1, sk: 'firemagic' }], ['Ajit', 'Overlord', { sk: 'leadership' }], ['Dace', 'Warlock', { sk: 'sorcery' }]] },
+  stronghold: { name: 'Stronghold', icon: '🛖', town: 'Stronghold Ironfang', enemyTown: 'Warlord Fortress', blurb: 'Brutal orcs, ogres, cyclopes and behemoths.', heroes: [['Crag Hack', 'Barbarian'], ['Gretchin', 'Battle Mage', { f: 1 }], ['Gird', 'Barbarian', { sk: 'offense' }], ['Yog', 'Barbarian', { sk: 'ballistics', att: 1 }], ['Zydar', 'Battle Mage', { sk: 'sorcery' }], ['Tyraxor', 'Barbarian', { sk: 'armorer', def: 1 }]] },
+  fortress: { name: 'Fortress', icon: '🐊', town: 'Fortress Mireholm', enemyTown: 'Swamp Fortress', blurb: 'Swamp beasts: basilisks, wyverns and hydras.', heroes: [['Tazar', 'Beastmaster'], ['Wystan', 'Witch', { f: 1 }], ['Alamar', 'Beastmaster', { sk: 'forester' }], ['Ranloo', 'Witch', { f: 1, sk: 'watermagic' }], ['Korbac', 'Beastmaster', { sk: 'offense' }], ['Verdish', 'Witch', { f: 1, sk: 'learning' }]] },
+  conflux: { name: 'Conflux', icon: '🌀', town: 'Conflux Stormreach', enemyTown: 'Elemental Nexus', blurb: 'Living elements ending in the mighty Phoenix.', heroes: [['Pasis', 'Planeswalker'], ['Thane', 'Elementalist'], ['Luna', 'Elementalist', { f: 1, sk: 'airmagic' }], ['Ciele', 'Planeswalker', { f: 1, sk: 'navigation' }], ['Grindan', 'Planeswalker', { sk: 'logistics' }], ['Fafner', 'Elementalist', { sk: 'wisdom', kn: 1 }]] },
 };
 
 const CASTLE_TIERS = []; // creature base ids of the player's faction (mutated by setFaction)
@@ -208,6 +208,9 @@ const ABIL = {
   C.troll.ab = ['regen']; C.dragon.ab = ['breath', 'res:0.5']; C.golem.ab = ['mindless', 'res:0.5']; C.naga.ab = ['noRet'];
 })();
 // ---------- Dragon Lair exclusives: not recruitable in any castle, only at a lair someone has first conquered ----------
+for (const id of Object.keys(C)) if (!C[id].cost && C[id].v) C[id].cost = { gold: Math.max(15, Math.round(C[id].v * 0.55)) };
+// neutral dwellings found on the map (not part of any castle): creature -> weekly growth
+const NEUTRAL_DW = { goblin: 12, wolf: 8, orc: 7, ogre: 4, golem: 5, troll: 3, naga: 2 };
 const LAIR = ['faerie', 'rustd', 'crystald', 'azured'];
 const LAIR_GROWTH = { faerie: 2, rustd: 2, crystald: 1, azured: 1 };
 Object.assign(C, {
@@ -238,7 +241,10 @@ Object.keys(TUNED_V).forEach(id => { const [v1, v5] = TUNED_V[id]; for (let L = 
 
 // hero roster: id -> definition
 const HEROES = {};
-for (const f in FACTIONS) FACTIONS[f].heroes.forEach(([n, cls]) => { HEROES[n] = { id: n, name: n, cls, fac: f, ...CLASSES[cls] }; });
+for (const f in FACTIONS) FACTIONS[f].heroes.forEach(([n, cls, ex = {}]) => {
+  const b = CLASSES[cls];
+  HEROES[n] = { id: n, name: n, cls, fac: f, ...b, att: b.att + (ex.att || 0), def: b.def + (ex.def || 0), sp: b.sp + (ex.sp || 0), kn: b.kn + (ex.kn || 0), sk: ex.sk || null, fem: !!ex.f };
+});
 
 // ---------- dwellings, upgrades, hall, guild ----------
 const DWELL_COST = [
@@ -415,7 +421,7 @@ function artTierFor(depth, rng) { return Math.max(1, Math.min(4, 1 + Math.floor(
 
 
 const T = { GRASS: 0, FOREST: 1, MOUNT: 2, WATER: 3, ROAD: 4, SAND: 5 };
-const TCOST = { 0: 100, 4: 70, 5: 150 };
+const TCOST = { 0: 100, 4: 50, 5: 150 }; // grass 100, road 50 (half the movement), sand 150
 
 function groupLabel(n) {
   if (n < 5) return 'Few'; if (n < 10) return 'Several'; if (n < 20) return 'A pack of';

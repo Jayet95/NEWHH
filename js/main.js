@@ -101,8 +101,8 @@
     h.army = out.concat(Array(7 - out.length).fill(null));
   }
   function makeHero(def, x, y) {
-    return { id: def.id, name: def.name, cls: def.cls, icon: def.i, x, y, att: def.att, def: def.def, sp: def.sp, kn: def.kn,
-      lvl: 1, xp: 0, mana: def.kn * 10, move: MOVE_PER_DAY, army: emptyArmy(), perks: Object.fromEntries((START_SKILLS[def.cls] || []).map(k => [k, 1])), arts: {}, pack: [], av: 0 };
+    return { id: def.id, pid: def.id, name: def.name, cls: def.cls, icon: def.i, x, y, att: def.att, def: def.def, sp: def.sp, kn: def.kn,
+      lvl: 1, xp: 0, mana: def.kn * 10, move: MOVE_PER_DAY, army: emptyArmy(), perks: Object.fromEntries([...(START_SKILLS[def.cls] || []), ...(def.sk ? [def.sk] : [])].map(k => [k, 1])), arts: {}, pack: [], av: 0 };
   }
   // ---------- artifacts & equipment ----------
   function slotFor(h, a) { return a.slot === 'ring' ? (!h.arts.ring1 ? 'ring1' : !h.arts.ring2 ? 'ring2' : null) : (!h.arts[a.slot] ? a.slot : null); }
@@ -266,7 +266,7 @@
       case 'wreck': return '🚢';
       case 'lair': return '🐲';
       case 'spring': return '⛲';
-      case 'dwelling': return C[factionTiers(o.fac)[o.tier - 1]].i;
+      case 'dwelling': return C[dwId(o)].i;
       case 'resobj': return { windmill: '🌬️', waterwheel: '🎡', garden: '🌻' }[o.kind];
       case 'stone': return '📚';
       case 'shrine': return '⛩️';
@@ -350,14 +350,14 @@
       if (!isVis(eh.x, eh.y)) continue;
       const px = hcx(eh.x, eh.y) - cam.x, py = hcy(eh.y) - cam.y;
       cx.beginPath(); cx.arc(px, py, 15, 0, 7); cx.fillStyle = ownCol(ai.id); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 2; cx.stroke();
-      cx.drawImage(Art.heroCanvas(eh.icon, ownCol(ai.id)), px - 13, py - 13, 26, 26);
+      cx.drawImage(Art.heroCanvas(eh.icon, ownCol(ai.id), 72, eh.pid), px - 13, py - 13, 26, 26);
     }
     G.heroes.forEach((h, i) => {
       const px = hcx(h.x, h.y) - cam.x + (G.heroes.filter((o, j) => j < i && o.x === h.x && o.y === h.y).length * 6), py = hcy(h.y) - cam.y;
       const rr = h.boat != null ? 11 : 15;
       cx.beginPath(); cx.arc(px, py - (h.boat != null ? 6 : 0), rr, 0, 7); cx.fillStyle = '#2a5fb0'; cx.fill();
       cx.strokeStyle = h === G.hero ? '#ffd24a' : '#fff'; cx.lineWidth = h === G.hero ? 3 : 1.5; cx.stroke();
-      { const hs = h.boat != null ? 18 : 26; cx.drawImage(Art.heroCanvas(h.icon, ownCol(0)), px - hs / 2, py - (h.boat != null ? 6 : 0) - hs / 2, hs, hs); }
+      { const hs = h.boat != null ? 18 : 26; cx.drawImage(Art.heroCanvas(h.icon, ownCol(0), 72, h.pid), px - hs / 2, py - (h.boat != null ? 6 : 0) - hs / 2, hs, hs); }
     });
     if (fogOn()) {
       for (let y = Math.max(0, y0); y < Math.min(G.H, y0 + vy); y++) for (let x = Math.max(0, x0); x < Math.min(G.W, x0 + vx); x++) {
@@ -426,8 +426,8 @@
     const h = G.hero;
     const ab = artBonus(h), plus = (v) => v ? ` <span class="bonus">(${v > 0 ? '+' : ''}${v})</span>` : '';
     const perkTxt = Object.keys(PERKS).filter(k => perk(h, k) > 0).map(k => `<span title="${PERKS[k].d}">${PERKS[k].i}${PERKS[k].n} ${RANK_NAMES[perk(h, k)]}${ab.sk[k] ? '*' : ''}</span>`).join(' · ');
-    $('hero').innerHTML = `<div class="hlist">${G.heroes.map((x, i) => `<button class="hbtn${x === h ? ' on' : ''}" data-h="${i}" title="${x.name} (${x.cls})">${Art.heroPic(x.icon, ownCol(0), 34)}</button>`).join('')}</div>
-      <h3>${Art.heroPic(h.icon, ownCol(0), 30)} ${h.name} <span class="small">${h.cls} — Level ${h.lvl}</span></h3>
+    $('hero').innerHTML = `<div class="hlist">${G.heroes.map((x, i) => `<button class="hbtn${x === h ? ' on' : ''}" data-h="${i}" title="${x.name} (${x.cls})">${Art.heroPic(x.icon, ownCol(0), 34, x.pid)}</button>`).join('')}</div>
+      <h3>${Art.heroPic(h.icon, ownCol(0), 34, h.pid)} ${h.name} <span class="small">${h.cls} — Level ${h.lvl}</span></h3>
       <div class="stats"><span>⚔️ Attack ${h.att}${plus(ab.att)}</span><span>🛡 Defense ${h.def}${plus(ab.def)}</span><span>✨ Spell Pow ${h.sp}${plus(ab.sp)}</span><span>📚 Knowledge ${h.kn}${plus(ab.kn)}</span></div>
       <div class="small" title="Morale: each point = 4% chance of an extra turn (negative: of skipping a turn). Mixing creatures from different castles lowers it; undead and golems are immune. Luck: each point = 4% chance of double damage.">😀 Morale ${sgn(heroMorale(h))} · 🍀 Luck ${sgn(heroLuck(h))}</div>
       <div class="small">Movement ${h.move}/${maxMove(h)}</div><div class="bar mv"><i style="width:${Math.min(100, h.move / maxMove(h) * 100)}%"></i></div>
@@ -503,7 +503,7 @@
     if (G.boats.some(b => b.x === x && b.y === y)) return '<b>⛵ Your boat</b><br>Walk onto it from the shore to set sail.';
     let o = objAt(G, x, y);
     if (o && o.t === 'monster' && !seen) o = null;
-    if (!o) return ['Grass', 'Forest (needs Forester)', 'Mountains (needs Mountaineer)', 'Water (needs a boat or Water Walk)', 'Road (fast)', 'Sand (slow)'][G.tiles[y][x]];
+    if (!o) return ['Grass', 'Forest (needs Forester)', 'Mountains (needs Mountaineer)', 'Water (needs a boat or Water Walk)', 'Road (half the movement cost)', 'Sand (slow)'][G.tiles[y][x]];
     const g = o.guard && o.guard.length ? `<br>Guarded by: ${armyList(o.guard, true)}` : '';
     switch (o.t) {
       case 'town': {
@@ -514,7 +514,7 @@
       }
       case 'merchant': return '<b>Wandering Merchant</b><br>Buy missing resources';
       case 'lair': return `<b>🐲 Dragon Lair</b>${o.owner === 0 ? ' — yours<br>' + LAIR.map(id => `${C[id].n}: ${o.avail[id] || 0}`).join(' · ') : '<br>Home of the Faerie, Rust, Crystal and Azure dragons — sold in no castle.<br>Defeat the horde to claim it.'}${g}`;
-      case 'dwelling': { const c = C[dwId(o)]; return `<b>${c.i} ${c.n} dwelling</b> (${FACTIONS[o.fac].name}) — ${o.owner === 0 ? `yours, ${o.avail} available` : 'unclaimed'}${g}`; }
+      case 'dwelling': { const c = C[dwId(o)]; return `<b>${c.i} ${c.n} dwelling</b> (${dwFac(o)}) — ${o.owner === 0 ? `yours, ${o.avail} available` : o.guard && o.guard.length ? 'unclaimed — fight the guards first' : 'unguarded — walk in to claim it'}${g}`; }
       case 'resobj': return `<b>${{ windmill: 'Windmill', waterwheel: 'Water Wheel', garden: 'Mystical Garden' }[o.kind]}</b><br>Yields resources once per week.`;
       case 'stone': return '<b>Learning Stone</b><br>Grants experience once per hero.';
       case 'shrine': return `<b>Shrine of ${SPELLS[o.spell].n}</b><br>Teaches a spell once per hero.`;
@@ -683,17 +683,19 @@
   }
   // ---------- adventure objects: dwellings, resource sites, stones, shrines, towers, banks, monoliths, seers ----------
   const weekNow = () => Math.floor((G.day - 1) / 7);
-  const dwId = (o) => factionTiers(o.fac)[o.tier - 1];
+  const dwId = (o) => o.cid || factionTiers(o.fac)[o.tier - 1];
+  const dwGrowth = (o) => o.cid ? NEUTRAL_DW[o.cid] : GROWTH[o.tier - 1];
+  const dwFac = (o) => o.fac ? FACTIONS[o.fac].name : 'Neutral';
   async function visitDwelling(o, h) {
     if (o.owner !== 0) {
       if (o.guard && o.guard.length && !(await fight(h, o.guard, { att: 0, def: 0 }, 'Dwelling guardians'))) return;
-      o.owner = 0; o.guard = []; toast(`You now own the ${C[dwId(o)].n} dwelling!`); renderAll();
+      o.owner = 0; o.guard = []; sfx('build'); toast(`You now own the ${C[dwId(o)].n} dwelling!`); renderAll();
     }
     openDwelling(o, h);
   }
   function openDwelling(o, h) {
     const id = dwId(o), c = C[id];
-    $('mbox').innerHTML = `<h2>${c.i} ${c.n} dwelling</h2><div class="small">${FACTIONS[o.fac].name} · produces +${GROWTH[o.tier - 1]} per week while you hold it. Recruits join ${h.name}.</div>
+    $('mbox').innerHTML = `<h2>${c.i} ${c.n} dwelling</h2><div class="small">${dwFac(o)} · produces +${dwGrowth(o)} per week while you hold it. Recruits join ${h.name}.</div>
       <div class="trow"><div class="ic">${Art.pic(id, 38)}</div><div><b>${c.n}</b> <span class="small">Att ${c.a} Def ${c.d} Dmg ${c.lo}-${c.hi} HP ${c.hp} Spd ${c.s}</span><br><span class="small">Available: <b>${o.avail}</b> · ${fmtCost(c.cost)} each</span></div>
         <div class="acts"><input type="number" id="dwN" min="1" max="${o.avail}" value="${o.avail}"><button id="dwBuy">Recruit</button></div></div>
       <div class="mb"><button class="primary" id="dwClose">Close</button></div>`;
@@ -908,7 +910,7 @@
   }
   async function fight(h, guard, eStats, title, siege, eHero) {
     if (!armyCount(h)) { toast(`${h.name} has no army! Recruit in town first.`); return false; }
-    const res = await Battle.run({ hero: { att: eff(h, 'att'), def: eff(h, 'def'), sp: eff(h, 'sp'), mana: h.mana, spells: G.spells, perks: perksOf(h), name: h.name, icon: h.icon, morale: heroMorale(h), luck: heroLuck(h) },
+    const res = await Battle.run({ hero: { att: eff(h, 'att'), def: eff(h, 'def'), sp: eff(h, 'sp'), mana: h.mana, spells: G.spells, perks: perksOf(h), name: h.name, icon: h.icon, pid: h.pid, morale: heroMorale(h), luck: heroLuck(h) },
       army: h.army, enemy: guard.filter(Boolean).map(a => ({ ...a })), eStats, eHero, title, siege, canRetreat: true });
     h.mana = res.mana; h.buff = null;
     if (res.win) {
@@ -919,7 +921,13 @@
         if (raised > 0 && addToArmy(h, 'necropolis1', raised)) toast(`💀 ${h.name} raises ${raised} skeletons from the fallen (Necromancy ${RANK_NAMES[nec]}).`);
       }
       await gainXp(h, res.xp);
-    } else retreat(h);
+    } else {
+      const tw = nearestTown(h.x, h.y), foe = armyList(guard.filter(Boolean), true);
+      retreat(h); renderAll();
+      await showModal(res.fled
+        ? `<h2>🏳️ Retreat</h2><p><b>${h.name}</b> ordered a retreat from <b>${title || 'the battle'}</b> and the scattered army is gone.</p><p>${tw ? h.name + ' rides back to <b>' + tw.name + '</b> alone.' : 'There is no town to return to!'}</p><p class="small">Enemy: ${foe}. Recruit fresh troops, gather artifacts and spells, and come back stronger — hovering a monster tells you how big its stack is.</p>`
+        : `<h2>💀 Defeat!</h2><p><b>${h.name}</b>'s army was wiped out in <b>${title || 'battle'}</b>.</p><p>${tw ? 'The hero limps back to <b>' + tw.name + '</b> with no troops.' : 'There is no town to return to!'}</p><p class="small">Enemy: ${foe}. Their numbers are unchanged — recruit more units, level up your hero, or use mines, walls and spells next time.</p>`, ['Continue']);
+    }
     renderAll();
     return res.win;
   }
@@ -1080,12 +1088,65 @@
     upd(); $('modal').classList.remove('hide');
   }
 
+  // ---------- outposts: every creature building you hold can be recruited from inside any of your towns ----------
+  function outpostHtml(t) {
+    const outs = G.objs.filter(o => (o.t === 'dwelling' || o.t === 'lair') && o.owner === 0);
+    if (!outs.length) return '';
+    let h = '<h4>🏕 Outposts — creatures from the buildings you hold</h4><div class="small">Dwellings and the Dragon Lair you have conquered deliver their weekly recruits to every castle: buy them here, no travelling needed.</div>';
+    for (const o of outs) {
+      const oi = G.objs.indexOf(o), ids = o.t === 'lair' ? LAIR : [dwId(o)];
+      for (const id of ids) {
+        const c = C[id], av = o.t === 'lair' ? (o.avail[id] || 0) : o.avail, gr = o.t === 'lair' ? LAIR_GROWTH[id] : dwGrowth(o);
+        h += `<div class="trow"><div class="ic">${Art.pic(id, 38)}</div><div><b>${c.n}</b> <span class="small">${Art.rarity(id).n} · ${o.t === 'lair' ? 'Dragon Lair' : dwFac(o) + ' dwelling'} · +${gr}/week</span><br><span class="small">Available: <b>${av}</b> · ${fmtCost(c.cost)} each</span></div>
+          <div class="acts"><input type="number" min="1" max="${av}" value="${av}"><button data-outbuy="${oi}:${id}"${av ? '' : ' disabled'}>Recruit</button></div></div>`;
+      }
+    }
+    return h;
+  }
+  // ---------- caravans: move troops between your castles; the trip takes days depending on the distance ----------
+  const caravanDays = (a, b) => Math.max(1, Math.ceil(hexDist(a, b) / 10));
+  function caravanHtml(t, mt) {
+    const cars = (G.caravans || []).filter(c => (c.fx === t.x && c.fy === t.y) || (c.tx === t.x && c.ty === t.y));
+    if (mt.length < 2 && !cars.length) return '';
+    const line = (c) => { const from = townAt(c.fx, c.fy), to = townAt(c.tx, c.ty); return `<div class="small">🚚 ${armyList(c.army, false)} — ${from ? from.name : 'a lost castle'} → ${to ? to.name : 'a lost castle'} · arrives in <b>${c.eta}</b> day${c.eta === 1 ? '' : 's'}</div>`; };
+    return `<div class="trow"><div class="ic">🚚</div><div><b>Reinforcements</b><br><span class="small">Send troops from this castle's garrison to another of your castles. They travel for a few days depending on the distance.</span>${cars.map(line).join('')}</div>
+      <div class="acts">${mt.length > 1 ? '<button data-caravan="1">Send troops…</button>' : ''}</div></div>`;
+  }
+  function openCaravan(t) {
+    const others = myTowns().filter(x => x !== t);
+    if (!others.length) return toast('You need a second castle.');
+    const stacks = t.garrison.map((a, i) => a ? { a, i } : null).filter(Boolean);
+    $('mbox').innerHTML = `<h2>🚚 Send troops from ${t.name}</h2><div class="small">Only the castle garrison can be sent (move units from a hero into the garrison first). The caravan cannot be stopped once it leaves.</div>
+      <h4>Destination</h4><select id="cvDest">${others.map((x, i) => `<option value="${i}">${x.name} — ${caravanDays(t, x)} day${caravanDays(t, x) === 1 ? '' : 's'}</option>`).join('')}</select>
+      <h4>Troops</h4>${stacks.length ? stacks.map(({ a, i }) => `<div class="trow"><div class="ic">${Art.pic(a.t, 38)}</div><div><b>${C[a.t].n}</b> <span class="small">in garrison: ${a.n}</span></div><div class="acts"><input type="number" min="0" max="${a.n}" value="${a.n}" data-cv="${i}"></div></div>`).join('') : '<p class="small">The garrison is empty.</p>'}
+      <div class="mb"><button id="cvBack">Back</button><button class="primary" id="cvGo"${stacks.length ? '' : ' disabled'}>Send caravan</button></div>`;
+    $('modal').classList.remove('hide');
+    $('cvBack').onclick = () => openTown(t);
+    $('cvGo').onclick = () => {
+      const dest = others[+$('cvDest').value], army = [];
+      $('mbox').querySelectorAll('[data-cv]').forEach(inp => { const i = +inp.dataset.cv, g = t.garrison[i], n = Math.min(g ? g.n : 0, Math.max(0, parseInt(inp.value) || 0)); if (n > 0) { army.push({ t: g.t, n }); g.n -= n; if (g.n <= 0) t.garrison[i] = null; } });
+      if (!army.length) return toast('Choose some troops to send.');
+      const days = caravanDays(t, dest); (G.caravans = G.caravans || []).push({ fx: t.x, fy: t.y, tx: dest.x, ty: dest.y, army, eta: days });
+      sfx('click'); toast(`Caravan sets out for ${dest.name}: ${days} day${days === 1 ? '' : 's'}.`); renderAll(); openTown(t);
+    };
+  }
+  function moveCaravans() {
+    if (!G.caravans || !G.caravans.length) return;
+    for (const c of G.caravans.slice()) {
+      if (--c.eta > 0) continue;
+      G.caravans.splice(G.caravans.indexOf(c), 1);
+      const dest = townAt(c.tx, c.ty);
+      if (!dest) { toast('🚚 A reinforcement caravan arrived at a castle you no longer hold — the troops scatter.'); continue; }
+      let lost = 0; for (const a of c.army) if (!addToArmy({ army: dest.garrison }, a.t, a.n)) lost += a.n;
+      toast(`🚚 Reinforcements reached ${dest.name}: ${armyList(c.army, false)}${lost ? ' (garrison full — ' + lost + ' turned away)' : ''}.`);
+    }
+  }
   function openTavern() {
     const premium = G.tavern.length === 0;
-    const ids = premium ? Object.keys(HEROES).filter(id => !G.heroes.some(h => h.id === id)) : G.tavern, price = premium ? HIRE_COST * 2 : HIRE_COST;
+    const ids = premium ? shuffle(Object.keys(HEROES).filter(id => !G.heroes.some(h => h.id === id))).slice(0, 8) : G.tavern, price = premium ? HIRE_COST * 2 : HIRE_COST;
     const cards = ids.map(id => { const d = HEROES[id];
-      return `<div class="trow" style="grid-template-columns:36px 1fr auto"><div class="ic">${d.i}</div>
-        <div><b>${d.name}</b> <span class="small">${d.cls} (${FACTIONS[d.fac].name})</span><br><span class="small">⚔️${d.att} 🛡${d.def} ✨${d.sp} 📚${d.kn}${d.spells.length ? ' · knows ' + d.spells.map(k => SPELLS[k].n).join(', ') : ''}</span></div>
+      return `<div class="trow" style="grid-template-columns:42px 1fr auto"><div class="ic">${Art.heroPic(d.i, ownCol(0), 36, d.id)}</div>
+        <div><b>${d.name}</b> <span class="small">${d.cls} (${FACTIONS[d.fac].name})${d.sk ? ' · ' + PERKS[d.sk].i + ' ' + PERKS[d.sk].n : ''}</span><br><span class="small">⚔️${d.att} 🛡${d.def} ✨${d.sp} 📚${d.kn}${d.spells.length ? ' · knows ' + d.spells.map(k => SPELLS[k].n).join(', ') : ''}</span></div>
         <div class="acts"><button data-hire="${id}">Hire ${RES_ICON.gold}${price}</button></div></div>`; }).join('');
     $('mbox').innerHTML = `<h2>🍺 Tavern</h2><p class="small">Heroes: ${G.heroes.length}/${MAX_HEROES}. New heroes arrive at the castle without an army — recruit troops and use the exchange to equip them. Heroes level up independently. The tavern offers new heroes every week.</p>${premium ? `<p>No heroes are waiting at the tavern right now — mercenary captains from across the realm will serve for <b>double</b> the price (${RES_ICON.gold}${price}).</p>` : ''}${cards}
       <div class="mb"><button class="primary" id="hBack">Back to town</button></div>`;
@@ -1163,6 +1224,7 @@
         <div class="acts">${(t.minel || 0) < 3 ? `<button data-minefield="1" title="${Art.fmtCostTxt(MINE_LEVELS[(t.minel || 0) + 1].cost)}">⬆ ${fmtCost(MINE_LEVELS[(t.minel || 0) + 1].cost)}</button>` : '<span class="small">MAX</span>'}</div></div>
       <div class="trow"><div class="ic">🍺</div><div><b>Tavern</b><br><span class="small">Heroes ${G.heroes.length}/${MAX_HEROES}. Hire more heroes and exchange troops between heroes in town.</span></div>
         <div class="acts"><button data-tavern="1">Hire heroes</button>${heroesAt(t.x, t.y).length > 1 ? '<button data-xhero="1">Exchange troops</button>' : ''}</div></div>
+      ${outpostHtml(t)}${caravanHtml(t, mt)}
       <div class="small" style="margin-top:8px">${RES.map(k => RES_ICON[k] + ' ' + G.res[k]).join('  ')}</div>
       <div class="mb"><button class="primary" id="tClose">Leave town</button></div>`;
     $('mbox').innerHTML = html; $('modal').classList.remove('hide');
@@ -1171,6 +1233,18 @@
     const again = () => { openTown(t); renderAll(); };
     const q = (sel, fn) => $('mbox').querySelectorAll(sel).forEach(fn);
     q('[data-tab]', b => b.onclick = () => openTown(mt[+b.dataset.tab]));
+    q('[data-outbuy]', b => b.onclick = () => {
+      const [oi, id] = b.dataset.outbuy.split(':'), o = G.objs[+oi], c = C[id];
+      if (!o || o.owner !== 0) return toast('You no longer hold that building.');
+      const stock = o.t === 'lair' ? (o.avail[id] || 0) : o.avail;
+      let n = Math.min(parseInt(b.parentElement.querySelector('input').value) || 0, stock);
+      while (n > 0 && !canAfford(G.res, Object.fromEntries(Object.entries(c.cost).map(([k, v]) => [k, v * n])))) n--;
+      if (n <= 0) return toast('Cannot recruit (resources or availability).');
+      if (!addToArmy(th || { army: t.garrison }, id, n)) return toast('No free army slot.');
+      pay(G.res, c.cost, n); if (o.t === 'lair') o.avail[id] -= n; else o.avail -= n;
+      toast(`Recruited ${n} ${c.n}${n > 1 ? 's' : ''} from your outpost.`); sfx('build'); again();
+    });
+    q('[data-caravan]', b => b.onclick = () => openCaravan(t));
     q('[data-fortify]', b => b.onclick = () => {
       const nx = FORT_LEVELS[(t.fort || 0) + 1]; if (!canAfford(G.res, nx.cost)) return toast('Not enough resources.');
       pay(G.res, nx.cost); t.fort = (t.fort || 0) + 1; sfx('build'); toast(`${nx.n} built — the walls are stronger.`); again();
@@ -1515,10 +1589,11 @@
     for (const h of G.heroes) { h.move = maxMove(h); h.mana = Math.min(maxMana(h), h.mana + 4 + 2 * perk(h, 'mysticism')); if (heroAtTown(h)) h.mana = maxMana(h); }
     const gain = computeGain();
     RES.forEach(k => { G.res[k] += gain[k]; });
+    moveCaravans();
     const parts = RES.filter(k => gain[k]).map(k => `+${gain[k]}${RES_ICON[k]}`);
     if ((G.day - 1) % 7 === 0) {
       for (const tw of G.objs) if (tw.t === 'town') for (let i = 1; i <= 7; i++) if (tw.b[i]) tw.avail[i] = (tw.avail[i] || 0) + GROWTH[i - 1];
-      for (const dw of G.objs) if (dw.t === 'dwelling' && dw.owner === 0) dw.avail += GROWTH[dw.tier - 1];
+      for (const dw of G.objs) if (dw.t === 'dwelling' && dw.owner === 0) dw.avail += dwGrowth(dw);
       for (const lr of G.objs) if (lr.t === 'lair' && lr.owner !== null && lr.owner !== undefined) for (const id of LAIR) lr.avail[id] = (lr.avail[id] || 0) + LAIR_GROWTH[id];
       for (const o of G.objs) if (o.t === 'fort' && o.owner === 0) {
         const mil = CASTLE_TIERS[0];
@@ -1606,10 +1681,10 @@
   function showHeroSelect(f, diff = 'normal', map = {}) {
     const ti = factionTiers(f);
     const cards = FACTIONS[f].heroes.map(([n]) => { const d = HEROES[n];
-      return `<div class="card" data-hid="${n}"><div class="big">${d.i}</div><b>${d.name}</b><div class="small">${d.cls}</div>
+      return `<div class="card" data-hid="${n}"><div class="big">${Art.heroPic(d.i, ownCol(0), 64, d.id)}</div><b>${d.name}</b><div class="small">${d.cls}${d.sk ? ' · ' + PERKS[d.sk].i + ' ' + PERKS[d.sk].n : ''}</div>
         <div class="small">⚔️${d.att} 🛡${d.def} ✨${d.sp} 📚${d.kn}</div><div class="small">Spells: ${[...START_SPELLS, ...d.spells].map(k => SPELLS[k].i).join(' ')}</div>
         <div class="small">Army: ${ti.slice(0, 3).map(id => Art.pic(id, 26)).join(' ')}</div></div>`; }).join('');
-    $('mbox').innerHTML = `<h2>${FACTIONS[f].icon} ${FACTIONS[f].name} — choose your hero</h2><div class="grid two">${cards}</div>
+    $('mbox').innerHTML = `<h2>${FACTIONS[f].icon} ${FACTIONS[f].name} — choose your hero</h2><div class="grid">${cards}</div>
       <div class="small">Your rival will command a different castle. Fight them across zones, forts and sieges.</div><div class="mb"><button id="sBack">Back</button></div>`;
     $('sBack').onclick = () => showFactionSelect(diff, map);
     $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => { $('modal').classList.add('hide'); $('title').classList.add('hide'); newGame(f, c.dataset.hid, diff, map); });

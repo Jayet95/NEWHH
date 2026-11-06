@@ -44,7 +44,7 @@ const Sfx = (() => {
   // gentle generative tune: slow minor-pentatonic notes over a low drone; faster and edgier in battle
   const SCALE = { map: [220, 261.6, 293.7, 329.6, 392, 440, 523.3], battle: [196, 233.1, 261.6, 293.7, 349.2, 392, 466.2] };
   function musicTick() {
-    if (!on || mv() <= 0.001 || document.hidden || mood !== 'map') return;
+    if (!on || mv() <= 0.001 || document.hidden || mood !== 'map' || (els.map && !els.map.paused) || !TRACKS.map) return;
     const a = ctx(); if (!a) return;
     const sc = SCALE[mood], vol = 0.035 * mv() * 2.2;
     const f = sc[(step * 3 + ((Math.random() * 3) | 0)) % sc.length] * (Math.random() < 0.2 ? 2 : 1);
@@ -52,8 +52,8 @@ const Sfx = (() => {
     if (step % 4 === 0) tone(sc[0] / 2, 3.2, 'sine', vol * 0.9, 0, 0, 'music');
     step++;
   }
-  // recorded music: audio/menu.mp3 on the title screen, audio/battle.mp3 in fights; the generated tune covers the map
-  const TRACKS = { menu: 'audio/menu.mp3', battle: 'audio/battle.mp3' };
+  // recorded music: audio/menu.mp3 on the title screen, audio/map.mp3 on the adventure map, audio/battle.mp3 in fights
+  const TRACKS = { menu: 'audio/menu.mp3', map: 'audio/map.mp3', battle: 'audio/battle.mp3' };
   const els = {}; let cur = null, fade = {};
   const trackVol = () => Math.min(1, mv() * 1.3);
   const trackEl = (n) => { if (!els[n]) { els[n] = new Audio(TRACKS[n]); els[n].loop = true; els[n].preload = 'auto'; } return els[n]; };
@@ -75,7 +75,7 @@ const Sfx = (() => {
     play(n) { try { if (S[n]) S[n](); if (BUZZ[n] && typeof Settings !== 'undefined') Settings.buzz(BUZZ[n]); } catch (e) { /* ignore */ } },
     toggle() { on = !on; if (!on) { for (const n in els) els[n].pause(); } else applyMood(false); try { localStorage.setItem('h3js_snd', on ? '1' : '0'); } catch (e) { /* ignore */ } return on; },
     get on() { return on; },
-    mood(m) { if (m === mood) return; mood = m; applyMood(true); },
+    mood(m) { if (m === mood) return; mood = m; applyMood(m !== 'map'); },
     refresh() { for (const n in els) { if (els[n].paused) continue; if (!on || mv() <= 0.001) els[n].pause(); else if (n === mood) els[n].volume = trackVol(); } if (TRACKS[mood] && on && mv() > 0.001 && els[mood] && els[mood].paused) playTrack(mood, false); },
     resume() { applyMood(false); },
     startMusic,

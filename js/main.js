@@ -1610,6 +1610,15 @@
     if (i === 1) save(); else if (i === 2) { Sfx.toggle(); $('bSnd').textContent = Sfx.on ? '🔊' : '🔇'; } else if (i === 3) fitZoom(); else if (i === 4) showModal(HELP); else if (i === 5) exitToMenu();
   };
 
+  // Android (Capacitor) hardware back button: close the open dialog, else ask to leave the game, else exit the app
+  const CapApp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+  if (CapApp && CapApp.addListener) CapApp.addListener('backButton', () => {
+    if (!$('modal').classList.contains('hide')) { const b = [...$('mbox').querySelectorAll('button')].find(x => /^(close|cancel|back|leave|ok|not now|leave town)/i.test(x.textContent.replace(/^[^A-Za-z]+/, '').trim())); if (b) b.click(); else $('modal').classList.add('hide'); return; }
+    if (document.body.classList.contains('inbattle')) return;
+    if (!$('title').classList.contains('hide')) return CapApp.exitApp();
+    if (G) exitToMenu();
+  });
+
   refreshTitle();
   requestAnimationFrame(loop);
   window.__G = () => G;

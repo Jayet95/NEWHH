@@ -1,0 +1,42 @@
+name: Android build
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      HAS_KS: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - run: npm ci
+      - run: node tools/build.js && npx cap sync android
+      - name: Restore upload keystore (optional)
+        if: env.HAS_KS != ''
+        run: echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/upload.jks"
+      - name: Build debug APK (installable on any phone)
+        working-directory: android
+        run: ./gradlew assembleDebug
+      - name: Build release bundle (for Google Play)
+        working-directory: android
+        env:
+          KS: ${{ runner.temp }}/upload.jks
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -f "$KS" ]; then
+            ./gradlew bundleRelease -Pandroid.injected.signing.store.file="$KS" -Pandroid.injected.signing.store.password="$KS_PASS" -Pandroid.injected.signing.key.alias="$KEY_ALIAS" -Pandroid.injected.signing.key.password="$KS_PASS"
+          else
+            ./gradlew bundleRelease
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-builds
+          path: |
+            android/app/build/outputs/apk/debug/*.apk
+            android/app/build/outputs/bundle/release/*.aab

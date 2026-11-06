@@ -1,0 +1,8 @@
+{
+  "appId": "com.jayet95.heroesjs",
+  "appName": "Heroes JS",
+  "webDir": "dist",
+  "backgroundColor": "#150f09",
+  "android": { "allowMixedContent": false },
+  "server": { "androidScheme": "https" }
+}

@@ -7,6 +7,14 @@
     "dev": "python -m http.server 8791",
     "build": "node tools/build.js",
     "deploy": "node tools/build.js && npx wrangler deploy",
-    "sim": "node tools/sim.js"
+    "sim": "node tools/sim.js",
+    "android": "node tools/build.js && npx cap sync android"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/assets": "^4.0.0",
+    "@capacitor/cli": "^8.6.0",
+    "@capacitor/core": "^8.6.0"
   }
 }

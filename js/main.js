@@ -58,7 +58,12 @@
   const allAiHeroes = () => G.ais.flatMap(a => a.heroes);
   const aiHeroAt = (x, y) => allAiHeroes().find(h => h.x === x && h.y === y);
   const AICOL = ['#e03a3a', '#e0a030', '#a050e0', '#30b0a0'];
-  const ownCol = (o) => (o === null || o === undefined) ? '#999' : o === 0 ? '#3a8aff' : AICOL[(o - 1) % 4];
+  const PALETTE = [['Blue', '#3a8aff'], ['Red', '#e03a3a'], ['Green', '#46b84a'], ['Orange', '#ff9a2a'], ['Purple', '#b06af0'], ['Teal', '#2ec8c0'], ['Pink', '#ff78b8'], ['Tan', '#d8b878']];
+  const ownCol = (o) => (o === null || o === undefined) ? '#999' : (G && G.col && G.col[o]) || (o === 0 ? '#3a8aff' : AICOL[(o - 1) % 4]);
+  // teams: you are team 1; allies share it, an "enemy bloc" is team 2, other rivals fight alone
+  const teamOf = (o) => o === 0 ? 1 : ((G.ais.find(a => a.id === o) || {}).team || (10 + o));
+  const isAlly = (a, b) => a !== null && a !== undefined && b !== null && b !== undefined && a !== b && teamOf(a) === teamOf(b);
+  const allyOfPlayer = (o) => o !== null && o !== undefined && o !== 0 && teamOf(o) === 1;
   const ownFill = (o, a) => { const c = ownCol(o); return `rgba(${parseInt(c.slice(1, 3), 16)},${parseInt(c.slice(3, 5), 16)},${parseInt(c.slice(5, 7), 16)},${a})`; };
   const armyCount = (h) => h.army.reduce((s, a) => s + (a ? a.n : 0), 0);
   const maxMana = (h) => eff(h, 'kn') * 10 + 15 * perk(h, 'wisdom') + (h.arts ? artBonus(h).mana : 0);
@@ -179,7 +184,9 @@
     G = { seed, preset, size, W: m.W, H: m.H, tiles: m.tiles, zone: m.zone, objs: m.objs, dock: m.dock, boats: [], nextBoat: 1, day: 1, over: false, path: null, faction, diff,
       res: { gold: D.gold, wood: r(20), ore: r(20), mercury: r(5), sulfur: r(5), crystal: r(5), gems: r(5) }, spells: [...START_SPELLS],
       wk: {}, heroes: [], sel: 0, hero: null, tavern: [], noTown: 0,
-      ais: aiFacs.map((f, i) => ({ id: i + 1, fac: f, name: FACTIONS[f].name, gold: Math.round(3000 * D.aiInc), heroes: [], alive: true, spawnWait: 0 })) };
+      col: (() => { const pc = Math.max(0, Math.min(7, map.color || 0)), free = PALETTE.map((p, i) => i).filter(i => i !== pc); return [PALETTE[pc][1], ...aiFacs.map((f, i) => PALETTE[free[i % free.length]][1])]; })(),
+      ais: aiFacs.map((f, i) => ({ id: i + 1, fac: f, name: FACTIONS[f].name, gold: Math.round(3000 * D.aiInc), heroes: [], alive: true, spawnWait: 0, team: ({ ally: 1, bloc: 2 }[(map.teams || [])[i]] || 3 + i) })) };
+    if (G.ais.every(a => a.team === 1)) G.ais[0].team = 3;
     for (const o of G.objs) if (o.t === 'town') {
       if (o.owner === 0) { o.fac = faction; o.name = FACTIONS[faction].town; initTown(o, 0); }
       else initTown(o, o.owner ? 1 : 0);
@@ -238,7 +245,8 @@
     if (!fogOn() || !vis) return;
     vis.fill(0);
     for (const h of G.heroes) markView(h.x, h.y, 6 + perk(h, 'scouting'));
-    for (const o of G.objs) if (o.owner === 0) markView(o.x, o.y, o.t === 'town' ? 9 : o.t === 'fort' ? 6 : 4);
+    for (const o of G.objs) if (o.owner === 0 || allyOfPlayer(o.owner)) markView(o.x, o.y, o.t === 'town' ? 9 : o.t === 'fort' ? 6 : 4);
+    for (const a of G.ais) if (allyOfPlayer(a.id)) for (const ah of a.heroes) markView(ah.x, ah.y, 6);
     for (const b of G.boats) markView(b.x, b.y, 3);
   }
   let MK = 6, miniTerr = null, miniCache = null, miniSig = '';
@@ -281,17 +289,27 @@
   }
   function defenderOf(o) {
     if (!o) return null;
-    if (o.t === 'town' || o.t === 'fort') { if (o.owner === 0) return null; return o.owner === null ? (o.guard || []) : (o.garrison || []); }
-    if (o.owner === 0) return null;
+    if (o.t === 'town' || o.t === 'fort') { if (o.owner === 0 || allyOfPlayer(o.owner)) return null; return o.owner === null ? (o.guard || []) : (o.garrison || []); }
+    if (o.owner === 0 || allyOfPlayer(o.owner)) return null;
     return o.guard && o.guard.length ? o.guard : null;
   }
   function threatAt(x, y) {
     if (!isExpl(x, y)) return null;
-    const ah = isVis(x, y) ? aiHeroAt(x, y) : null; if (ah) return threatOfDef(ah.army);
+    const ah = isVis(x, y) ? aiHeroAt(x, y) : null; if (ah) return allyOfPlayer(ah.ai) ? null : threatOfDef(ah.army);
     const o = objAt(G, x, y); if (!o || (o.t === 'monster' && !isVis(x, y))) return null;
     return threatOfDef(defenderOf(o));
   }
   const threatLine = (x, y) => { const t = threatAt(x, y); return t ? `<br>⚔ <b style="color:${t.col}">${t.label}</b> <span class="small">— your army is ${t.ratio >= 10 ? '10+' : t.ratio.toFixed(1)}× ${t.ratio >= 1 ? 'stronger' : 'as strong'}; expect to lose ≈${Math.round(t.loss * 100)}% of it</span>` : ''; };
+  // waving flag in the owner's colour (allies get a white fringe)
+  function drawFlag(px, py, col, rel, sc = 1) {
+    const t = performance.now() / 260, w = Math.sin(t + px * 0.07) * 1.6 * sc;
+    cx.save(); cx.translate(px, py); cx.scale(sc, sc);
+    cx.strokeStyle = '#2b2218'; cx.lineWidth = 1.7; cx.lineCap = 'round'; cx.beginPath(); cx.moveTo(0, 6); cx.lineTo(0, -13); cx.stroke();
+    cx.beginPath(); cx.moveTo(0.5, -13); cx.quadraticCurveTo(6, -14 + w, 12, -10.5 + w); cx.quadraticCurveTo(7, -8.5 - w * 0.5, 12, -5.5 + w * 0.6); cx.lineTo(0.5, -5); cx.closePath();
+    cx.fillStyle = col; cx.fill(); cx.lineWidth = 1.1; cx.strokeStyle = rel === 'ally' ? '#fff' : '#140a04'; cx.stroke();
+    cx.restore();
+  }
+  const relOf = (o) => o === 0 ? 'me' : o === null || o === undefined ? 'none' : allyOfPlayer(o) ? 'ally' : 'enemy';
   function objIcon(o) {
     switch (o.t) {
       case 'town': return '🏰';
@@ -365,15 +383,15 @@
       if (spr) { const sz = o.t === 'town' ? 50 : o.t === 'fort' || o.t === 'lair' ? 46 : o.t === 'pile' ? 30 : 38; cx.drawImage(spr, px - sz / 2, py - sz / 2 - (o.t === 'town' ? 5 : 2), sz, sz); }
       else if (o.t !== 'monster') { cx.font = `26px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(objIcon(o), px, py + 1); }
       if (o.t === 'fort') {
-        cx.beginPath(); cx.arc(px + 14, py - 16, 6, 0, 7); cx.fillStyle = ownCol(o.owner); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke();
+        drawFlag(px + 13, py - 8, ownCol(o.owner), relOf(o.owner), 1.1);
         const gn = o.garrison.reduce((s, a) => s + (a ? a.n : 0), 0);
         if (o.owner === 0 && gn) { cx.font = 'bold 11px sans-serif'; cx.fillStyle = '#000b'; cx.fillRect(px - 14, py + 10, 28, 13); cx.fillStyle = '#fff'; cx.fillText(gn, px, py + 17); }
       }
-      if (o.t === 'mine' || o.t === 'dwelling' || o.t === 'lair') { cx.beginPath(); cx.arc(px + 12, py - 12, 5, 0, 7); cx.fillStyle = ownCol(o.owner); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke(); }
-      if (o.t === 'town') { cx.beginPath(); cx.arc(px + 16, py - 18, 6, 0, 7); cx.fillStyle = ownCol(o.owner); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke(); }
+      if (o.t === 'mine' || o.t === 'dwelling' || o.t === 'lair') drawFlag(px + 11, py - 4, ownCol(o.owner), relOf(o.owner), 0.85);
+      if (o.t === 'town') drawFlag(px + 15, py - 10, ownCol(o.owner), relOf(o.owner), 1.25);
       { const df = defenderOf(o); if (df && (o.t !== 'monster' || vis[o.y * G.W + o.x] || !fogOn())) { const th = threatOfDef(df); if (th) { const bx = px - 14, by = py + 12; cx.beginPath(); cx.arc(bx, by, 5.5, 0, 7); cx.fillStyle = th.col; cx.fill(); cx.lineWidth = 1.6; cx.strokeStyle = '#140a04'; cx.stroke(); if (th.label === 'Deadly') { cx.strokeStyle = '#fff'; cx.lineWidth = 1.4; cx.beginPath(); cx.moveTo(bx - 2.4, by - 2.4); cx.lineTo(bx + 2.4, by + 2.4); cx.moveTo(bx + 2.4, by - 2.4); cx.lineTo(bx - 2.4, by + 2.4); cx.stroke(); } } } }
       if (o.t === 'town' || o.t === 'fort') {
-        cx.font = 'bold 11px sans-serif'; cx.lineWidth = 3; cx.strokeStyle = '#000'; cx.fillStyle = o.owner === 0 ? '#bcd8ff' : o.owner ? '#ffb3a8' : '#f3e7bd';
+        cx.font = 'bold 11px sans-serif'; cx.lineWidth = 3; cx.strokeStyle = '#000'; cx.fillStyle = o.owner === 0 ? '#bcd8ff' : allyOfPlayer(o.owner) ? '#c8f0c8' : o.owner ? '#ffb3a8' : '#f3e7bd';
         cx.strokeText(o.name, px, py - 27); cx.fillText(o.name, px, py - 27);
       }
     }
@@ -385,14 +403,14 @@
       if (!isVis(eh.x, eh.y)) continue;
       const px = hcx(eh.x, eh.y) - cam.x, py = hcy(eh.y) - cam.y;
       cx.beginPath(); cx.arc(px, py, 15, 0, 7); cx.fillStyle = ownCol(ai.id); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 2; cx.stroke();
-      cx.drawImage(Art.heroCanvas(eh.icon, ownCol(ai.id), 72, eh.pid), px - 13, py - 13, 26, 26);
+      cx.drawImage(Art.heroCanvas(eh.icon, ownCol(ai.id), 72, eh.pid), px - 13, py - 13, 26, 26); drawFlag(px + 11, py - 6, ownCol(ai.id), relOf(ai.id), 0.8);
     }
     G.heroes.forEach((h, i) => {
       const px = hcx(h.x, h.y) - cam.x + (G.heroes.filter((o, j) => j < i && o.x === h.x && o.y === h.y).length * 6), py = hcy(h.y) - cam.y;
       const rr = h.boat != null ? 11 : 15;
       cx.beginPath(); cx.arc(px, py - (h.boat != null ? 6 : 0), rr, 0, 7); cx.fillStyle = '#2a5fb0'; cx.fill();
       cx.strokeStyle = h === G.hero ? '#ffd24a' : '#fff'; cx.lineWidth = h === G.hero ? 3 : 1.5; cx.stroke();
-      { const hs = h.boat != null ? 18 : 26; cx.drawImage(Art.heroCanvas(h.icon, ownCol(0), 72, h.pid), px - hs / 2, py - (h.boat != null ? 6 : 0) - hs / 2, hs, hs); }
+      { const hs = h.boat != null ? 18 : 26; cx.drawImage(Art.heroCanvas(h.icon, ownCol(0), 72, h.pid), px - hs / 2, py - (h.boat != null ? 6 : 0) - hs / 2, hs, hs); drawFlag(px + 11, py - 6 - (h.boat != null ? 6 : 0), ownCol(0), 'me', 0.8); }
     });
     if (fogOn()) {
       for (let y = Math.max(0, y0); y < Math.min(G.H, y0 + vy); y++) for (let x = Math.max(0, x0); x < Math.min(G.W, x0 + vx); x++) {
@@ -487,7 +505,7 @@
         return `<div class="zrow"><span class="zdot" style="background:${ownCol(0)};color:${ownCol(0)}"></span>${z.t === 'town' ? '🏰' : '🏯'} ${z.name} <span class="small">garrison ${gn}</span></div>`; }).join('') +
       `<div class="small">Paying mines: ${mineIncome} · other zones: ${rest}</div>` +
       G.ais.map(ai => { const tw = G.objs.filter(o => o.t === 'town' && o.owner === ai.id).length, fr = G.objs.filter(o => o.t === 'fort' && o.owner === ai.id).length;
-        return `<div class="zrow" title="Rival: ${FACTIONS[ai.fac].name}"><span class="zdot" style="background:${ownCol(ai.id)};color:${ownCol(ai.id)}"></span>${FACTIONS[ai.fac].icon} ${ai.alive ? `${tw} towns, ${fr} forts, ${ai.heroes.length} heroes` : '<s>eliminated</s>'}</div>`; }).join('');
+        return `<div class="zrow" title="Rival: ${FACTIONS[ai.fac].name}"><span class="zdot" style="background:${ownCol(ai.id)};color:${ownCol(ai.id)}"></span>${allyOfPlayer(ai.id) ? '🤝 ' : ''}${FACTIONS[ai.fac].icon} ${ai.alive ? `${tw} towns, ${fr} forts, ${ai.heroes.length} heroes` : '<s>eliminated</s>'}</div>`; }).join('');
     const el = $('army'); el.innerHTML = '';
     h.army.forEach((a, i) => {
       const b = document.createElement('button');
@@ -540,7 +558,7 @@
   function describe(x, y) {
     if (!isExpl(x, y)) return 'Unexplored territory';
     const seen = isVis(x, y);
-    const ah = seen ? aiHeroAt(x, y) : null; if (ah) return `<b>${ah.name}</b> (rival ${FACTIONS[aiById(ah.ai).fac].name} hero, L${ah.lvl})<br>${armyList(ah.army, true)}`;
+    const ah = seen ? aiHeroAt(x, y) : null; if (ah) return `<b>${ah.name}</b> (${allyOfPlayer(ah.ai) ? 'allied' : 'rival'} ${FACTIONS[aiById(ah.ai).fac].name} hero, L${ah.lvl})<br>${armyList(ah.army, true)}`;
     const hs = heroesAt(x, y); if (hs.length) return hs.map(h => `<b>${h.name}</b> (${h.cls} L${h.lvl})${h.boat != null ? ' ⛵ sailing' : ''}`).join('<br>');
     if (G.boats.some(b => b.x === x && b.y === y)) return '<b>⛵ Your boat</b><br>Walk onto it from the shore to set sail.';
     let o = objAt(G, x, y);
@@ -551,6 +569,7 @@
       case 'town': {
         const fn = FACTIONS[o.fac || G.faction].name, gn = (o.garrison || []).reduce((s, a) => s + (a ? a.n : 0), 0);
         return o.owner === 0 ? `<b>${o.name}</b> — your ${fn} town (garrison ${gn})`
+          : allyOfPlayer(o.owner) ? `<b>${o.name}</b> — allied ${fn} town (it will never attack you)`
           : o.owner ? `<b>${o.name}</b> — rival ${fn} town${gn ? ' — garrison: ' + armyList(o.garrison, true) : ''}<br>Assaulting it is a siege battle.`
             : `<b>${o.name}</b> — neutral ${fn} town${g}<br>Capture it for a new castle (siege battle).`;
       }
@@ -590,7 +609,7 @@
       const cp = capsOf(G.hero);
       const blocked = (tt === T.FOREST && !cp.forest) || (tt === T.MOUNT && !cp.mount) || (tt === T.WATER && !cp.water && G.hero.boat == null && !G.boats.some(b => b.x === hover.x && b.y === hover.y));
       const ah = isVis(hover.x, hover.y) ? aiHeroAt(hover.x, hover.y) : null, mine = heroesAt(hover.x, hover.y).length > 0;
-      const hostile = ah || (o && isExpl(hover.x, hover.y) && ((o.t === 'monster' && isVis(hover.x, hover.y)) || (o.guard && o.guard.some(Boolean) && o.owner !== 0) || ((o.t === 'town' || o.t === 'fort') && o.owner !== 0)));
+      const hostile = (ah && !allyOfPlayer(ah.ai)) || (o && isExpl(hover.x, hover.y) && ((o.t === 'monster' && isVis(hover.x, hover.y)) || (o.guard && o.guard.some(Boolean) && o.owner !== 0 && !allyOfPlayer(o.owner)) || ((o.t === 'town' || o.t === 'fort') && o.owner !== 0 && !allyOfPlayer(o.owner))));
       const sailing = G.hero.boat != null || (tt === T.WATER && !blocked);
       cmap.style.cursor = !isExpl(hover.x, hover.y) ? Art.cursor('pointer') : mine ? Art.cursor('pointer') : hostile ? Art.cursor('sword') : blocked ? Art.cursor('no') : sailing ? Art.cursor('boat') : Art.cursor('horse');
     }
@@ -709,6 +728,7 @@
       await sleep(70);
       const last = i === path.length - 1, o = objAt(G, s.x, s.y);
       const eh = aiHeroAt(s.x, s.y);
+      if (eh && allyOfPlayer(eh.ai)) { openExchange(`🤝 ${eh.name}`, `Allied hero of the ${FACTIONS[aiById(eh.ai).fac].name} realm — swap troops freely.`, h.army, h.name, eh.army, eh.name, null); break; }
       if (eh) {
         if (o && (o.t === 'town' || o.t === 'fort') && o.owner === eh.ai) await interact(o, h, eh);
         else await fightAiHero(h, eh, true);
@@ -855,6 +875,7 @@
     return tmp.filter(Boolean);
   }
   async function interact(o, h, eh) {
+    if (o.owner !== null && o.owner !== undefined && o.owner !== 0 && allyOfPlayer(o.owner)) return toast(`${o.name || 'This place'} belongs to your ally — you are welcome to pass, but it is not yours to take.`);
     if (o.t === 'wreck') {
       if (o.guard && o.guard.length) { if (!(await fight(h, o.guard, { att: 0, def: 0 }, 'Shipwreck guardians'))) return; o.guard = []; }
       const n = 3 + Math.floor(Math.random() * 4);
@@ -952,7 +973,7 @@
   // victory: every rival has lost all of its towns
   function checkVictory() {
     for (const ai of G.ais) if (ai.alive && !G.objs.some(o => o.t === 'town' && o.owner === ai.id)) { ai.alive = false; ai.heroes = []; Ach.event('elim'); toast(`${FACTIONS[ai.fac].name} rival is eliminated!`); note(`💥 The ${FACTIONS[ai.fac].name} rival is eliminated!`); }
-    if (!G.over && G.ais.every(a => !a.alive)) { endGame(true); return true; }
+    if (!G.over && G.ais.every(a => !a.alive || allyOfPlayer(a.id))) { endGame(true); return true; }
     return false;
   }
   // ---------- spoils: gold and resources dropped by defeated armies, and the artifacts a defeated hero was carrying ----------
@@ -1576,7 +1597,7 @@
   function aiTargets(ai, h, power) {
     const R = 22 * sizeMv(), list = [];
     for (const o of G.objs) {
-      if (o.owner === ai.id) continue;
+      if (o.owner === ai.id || isAlly(ai.id, o.owner)) continue;
       const d = dist(o, h); if (d > R) continue;
       let sc = 0;
       switch (o.t) {
@@ -1590,7 +1611,7 @@
       }
       if (sc > 0) list.push({ x: o.x, y: o.y, score: sc });
     }
-    for (const ph of G.heroes) { const d = dist(ph, h); if (d > R) continue; if (power >= armyPower(ph.army) * 1.25) list.push({ x: ph.x, y: ph.y, score: 2400 / (d + 6) }); }
+    if (!isAlly(ai.id, 0)) for (const ph of G.heroes) { const d = dist(ph, h); if (d > R) continue; if (power >= armyPower(ph.army) * 1.25) list.push({ x: ph.x, y: ph.y, score: 2400 / (d + 6) }); }
     return list.sort((a, b) => b.score - a.score);
   }
   function aiKill(ai, h) { ai.heroes = ai.heroes.filter(x => x !== h); ai.spawnWait = 3; }
@@ -1614,7 +1635,7 @@
       const s = path[i];
       if (s.cost > h.move) return true;
       h.move -= s.cost; h.x = s.x; h.y = s.y;
-      const ph = heroesAt(s.x, s.y);
+      const ph = isAlly(ai.id, 0) ? [] : heroesAt(s.x, s.y);
       if (ph.length) {
         const d = ph.reduce((a, b) => armyCount(a) >= armyCount(b) ? a : b);
         centerOn(s.x, s.y); renderAll(); toast(`${h.name} of the ${FACTIONS[ai.fac].name} attacks ${d.name}!`); note(`⚔ ${h.name} of the ${FACTIONS[ai.fac].name} attacked ${d.name}`, s.x, s.y); await sleep(350);
@@ -1624,7 +1645,7 @@
         if (so && so.owner === 0 && (so.t === 'fort' || so.t === 'town')) await defendStructure(so, h);
         return true;
       }
-      const other = G.ais.flatMap(a => a.heroes).find(x => x !== h && x.x === s.x && x.y === s.y);
+      const other = G.ais.flatMap(a => a.heroes).find(x => x !== h && x.x === s.x && x.y === s.y && !isAlly(ai.id, x.ai));
       if (other) { if (quickBattle(h.army, other.army, 1)) aiKill(aiById(other.ai), other); else { aiKill(ai, h); return true; } }
       const o = objAt(G, s.x, s.y);
       if (o && await aiInteract(ai, h, o, i === path.length - 1)) return true;
@@ -1635,7 +1656,7 @@
   async function aiInteract(ai, h, o, last) {
     if (o.t === 'pile') { ai.gold += o.kind === 'gold' ? o.amt : o.amt * RES_VALUE[o.kind]; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return false; }
     if (o.t === 'chest') { ai.gold += o.gold; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return false; }
-    if (!last || o.owner === ai.id) return false;
+    if (!last || o.owner === ai.id || isAlly(ai.id, o.owner)) return false;
     const win = (def, bonus = 1) => { const d = def.map(a => a && ({ ...a })); return quickBattle(h.army, d, bonus); };
     const lose = () => { aiKill(ai, h); return true; };
     switch (o.t) {
@@ -1839,8 +1860,13 @@
       <p>Size: ${sizes}</p>
       <p>Fog of war: ${[[true, 'On'], [false, 'Off']].map(([v, n]) => `<button class="${(st.fog !== false) === v ? 'primary' : ''}" data-fog="${v}">${n}</button>`).join(' ')} <span class="small">Unexplored land is hidden; scouts, towers and your heroes reveal it.</span></p>
       <p>Rivals: ${[0, 1, 2, 3, 4].map(n => `<button class="${(st.ais || 0) === n ? 'primary' : ''}" data-a="${n}">${n ? n : 'Auto'}</button>`).join(' ')} <span class="small">AI players that expand and fight you.</span></p><p>Seed: <input id="mSeed" placeholder="empty = random map" value="${st.seed}" style="width:230px;background:#120d08;color:#f1e6c4;border:1px solid #6b4f24;padding:4px"> <span class="small">Share a seed to replay the same map.</span></p>
+      <h4>Colours &amp; teams</h4><p>Your flag: ${PALETTE.map((p, i) => `<button class="swatch${(st.color || 0) === i ? ' on' : ''}" data-col="${i}" style="background:${p[1]}" title="${p[0]}"></button>`).join('')}</p>
+      <div class="small">Allies never attack you, share vision and let you swap troops; an enemy bloc fights together. You win when every enemy realm is gone.</div>
+      ${(() => { const n = st.ais || ({ small: 1, medium: 1, large: 2, huge: 3, giant: 4 }[st.size] || 1), free = PALETTE.map((p, i) => i).filter(i => i !== (st.color || 0)); st.teams = st.teams || []; return Array.from({ length: n }, (_, i) => `<div class="setrow"><div><span class="zdot" style="background:${PALETTE[free[i % free.length]][1]};color:${PALETTE[free[i % free.length]][1]}"></span> <b>Rival ${i + 1}</b></div><div class="seg">${[['enemy', '⚔ Enemy'], ['ally', '🤝 Ally'], ['bloc', '⚔⚔ Bloc']].map(([v, l]) => `<button data-tm="${i}:${v}" class="${(st.teams[i] || 'enemy') === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>`).join(''); })()}
       <div class="mb"><button id="sBack">Back</button><button class="primary" id="sNext">Next: castle</button></div>`;
     const keep = () => { st.seed = $('mSeed').value; };
+    $('mbox').querySelectorAll('[data-col]').forEach(b => b.onclick = () => { keep(); st.color = +b.dataset.col; showMapSelect(diff, st); });
+    $('mbox').querySelectorAll('[data-tm]').forEach(b => b.onclick = () => { keep(); const [i, v] = b.dataset.tm.split(':'); (st.teams = st.teams || [])[+i] = v; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-m]').forEach(c => c.onclick = () => { keep(); st.preset = c.dataset.m; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-s]').forEach(b => b.onclick = () => { keep(); st.size = b.dataset.s; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-fog]').forEach(b => b.onclick = () => { keep(); st.fog = b.dataset.fog === 'true'; showMapSelect(diff, st); });
@@ -1987,7 +2013,7 @@
   function scoreParts() {
     const towns = myTowns().length, lv = G.heroes.reduce((p, x) => p + x.lvl, 0), st = G.st || {};
     const parts = [['Towns held', towns * 500], ['Hero levels', lv * 150], ['Creatures slain', (st.slain || 0) * 3], ['Battles won', (st.battles || 0) * 40], ['Gold earned', Math.round((st.gold || 0) * 0.1)], ['Speed bonus (win before day 90)', Math.max(0, 90 - G.day) * 100], ['Victory', 3000]];
-    const mult = ({ easy: 0.6, normal: 1, hard: 1.5, expert: 2.2 }[G.diff] || 1) * ({ small: 0.7, medium: 1, large: 1.3, huge: 1.6, giant: 2 }[G.size] || 1) * (1 + 0.25 * (G.ais.length - 1));
+    const mult = ({ easy: 0.6, normal: 1, hard: 1.5, expert: 2.2 }[G.diff] || 1) * ({ small: 0.7, medium: 1, large: 1.3, huge: 1.6, giant: 2 }[G.size] || 1) * (1 + 0.25 * (Math.max(1, G.ais.filter(a => !allyOfPlayer(a.id)).length) - 1));
     return { parts, mult, score: Math.min(1400000, Math.round(parts.reduce((p, x) => p + x[1], 0) * mult)) };
   }
   async function victoryScreen() {
@@ -2068,7 +2094,7 @@
     const cars = (G.caravans || []).map(c => `<div class="small">🚚 ${armyList(c.army, false)} → ${(townAt(c.tx, c.ty) || { name: '?' }).name} in ${c.eta} day${c.eta === 1 ? '' : 's'}</div>`).join('');
     modalOpen(`<h2>📋 Kingdom</h2><div class="small">Day ${G.day} · ${towns.length} town${towns.length === 1 ? '' : 's'} · ${G.heroes.length} hero${G.heroes.length === 1 ? '' : 'es'} · army strength ${fmtN(Math.round(power))}</div>
       <div class="trow" style="grid-template-columns:1fr auto"><div>📈 <b>Income per day</b> ${RES.filter(k => gain[k]).map(k => `+${fmtN(gain[k])}${RES_ICON[k]}`).join(' ') || '—'}</div><div class="acts"><button id="kdInc">Details</button></div></div>
-      <h4>Towns</h4>${tRows || '<div class="small">none</div>'}<h4>Heroes</h4>${hRows}<h4>Holdings</h4>${holds || '<div class="small">No mines, forts or dwellings yet.</div>'}${cars ? '<h4>On the road</h4>' + cars : ''}
+      <h4>Towns</h4>${tRows || '<div class="small">none</div>'}<h4>Heroes</h4>${hRows}<h4>Realms</h4>${G.ais.map(ai => `<div class="trow" style="grid-template-columns:1fr auto"><div><span class="zdot" style="background:${ownCol(ai.id)};color:${ownCol(ai.id)}"></span><b>${FACTIONS[ai.fac].name}</b> ${allyOfPlayer(ai.id) ? '🤝 ally' : teamOf(ai.id) === 2 ? '⚔⚔ enemy bloc' : '⚔ enemy'}</div><div class="small">${ai.alive ? G.objs.filter(o => o.t === 'town' && o.owner === ai.id).length + ' towns' : 'eliminated'}</div></div>`).join('')}<h4>Holdings</h4>${holds || '<div class="small">No mines, forts or dwellings yet.</div>'}${cars ? '<h4>On the road</h4>' + cars : ''}
       <div class="mb"><button class="primary" id="kdOk">Close</button></div>`);
     $('kdOk').onclick = closeModal; $('kdInc').onclick = () => openIncome(openKingdom);
     $('mbox').querySelectorAll('[data-loc]').forEach(b => b.onclick = () => { const [x, y] = b.dataset.loc.split(':').map(Number); closeModal(); centerOn(x, y); });

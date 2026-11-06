@@ -13,7 +13,7 @@ const Settings = (() => {
     set(k, v) { s[k] = v; try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* ignore */ } S.apply(); },
     seen(id) { if (!s.hintsSeen[id]) { s.hintsSeen[id] = 1; try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* ignore */ } } },
     resetHints() { s.hintsSeen = {}; s.hints = true; try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* ignore */ } },
-    buzz(ms) { if (s.haptics && navigator.vibrate) { try { navigator.vibrate(ms); } catch (e) { /* ignore */ } } },
+    buzz(ms) { if (s.haptics && navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) { try { navigator.vibrate(ms); } catch (e) { /* ignore */ } } },
     apply() {
       if (typeof document === 'undefined' || !document.body) return;
       document.body.classList.toggle('lefty', !!s.leftHand);

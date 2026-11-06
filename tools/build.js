@@ -17,6 +17,7 @@ fs.readdirSync(path.join(root, 'js')).filter((f) => f.endsWith('.js')).forEach((
 if (fs.existsSync(path.join(root, 'icons'))) fs.readdirSync(path.join(root, 'icons')).forEach((f) => copy('icons/' + f));
 // optional hand-made art: write its manifest and copy the folder
 require('./make_manifest')(root);
+if (fs.existsSync(path.join(root, 'audio'))) fs.cpSync(path.join(root, 'audio'), path.join(dist, 'audio'), { recursive: true });
 if (fs.existsSync(path.join(root, 'art'))) fs.cpSync(path.join(root, 'art'), path.join(dist, 'art'), { recursive: true });
 fs.writeFileSync(path.join(dist, 'sw.js'), fs.readFileSync(path.join(root, 'sw.js'), 'utf8').replace('__VERSION__', version));
 

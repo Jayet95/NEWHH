@@ -618,6 +618,7 @@
     else if (k === '+' || k === '=') zoomMid(1.25);
     else if (k === '-') zoomMid(0.8);
     else if (k === 'e') endTurn();
+    else if (k === 'escape') exitToMenu();
     else if (k === 't') openTown();
     else if (k === 'h') centerOn(G.hero.x, G.hero.y);
     else if (k === 'tab') { e.preventDefault(); if (!busy) { setActive((G.sel + 1) % G.heroes.length); G.path = null; centerOn(G.hero.x, G.hero.y); renderAll(); } }
@@ -1563,6 +1564,14 @@
   $('tNew').onclick = showDifficultySelect;
   $('tCont').onclick = () => { if (load()) $('title').classList.add('hide'); };
   $('tHelp').onclick = () => showModal(HELP);
+  async function exitToMenu() {
+    if (!G || busy) return;
+    const i = await showModal('<h2>Return to the main menu?</h2><p class="small">The game also autosaves at the start of every day.</p>', ['💾 Save & exit', 'Exit without saving', 'Cancel']);
+    if (i === 2) return;
+    if (i === 0) save();
+    $('title').classList.remove('hide'); refreshTitle();
+  }
+  $('bMenu').onclick = exitToMenu;
   $('bHelp').onclick = () => showModal(HELP);
   $('bSave').onclick = () => G && !busy && save();
   $('bEnd').onclick = endTurn;
@@ -1573,8 +1582,8 @@
   $('mHero').onclick = () => { if (G && !busy) { setActive((G.sel + 1) % G.heroes.length); G.path = null; centerOn(G.hero.x, G.hero.y); renderAll(); toast(`${G.hero.name} selected`); } };
   $('mMenu').onclick = async () => {
     if (!G || busy) return;
-    const i = await showModal('<h2>Menu</h2><p class="small">Drag to pan, pinch to zoom, tap a tile to preview the path and tap it again to go.</p>', ['Close', '💾 Save game', Sfx.on ? '🔇 Sound off' : '🔊 Sound on', '🗺 Zoom to fit', '❓ Help']);
-    if (i === 1) save(); else if (i === 2) { Sfx.toggle(); $('bSnd').textContent = Sfx.on ? '🔊' : '🔇'; } else if (i === 3) fitZoom(); else if (i === 4) showModal(HELP);
+    const i = await showModal('<h2>Menu</h2><p class="small">Drag to pan, pinch to zoom, tap a tile to preview the path and tap it again to go.</p>', ['Close', '💾 Save game', Sfx.on ? '🔇 Sound off' : '🔊 Sound on', '🗺 Zoom to fit', '❓ Help', '🚪 Main menu']);
+    if (i === 1) save(); else if (i === 2) { Sfx.toggle(); $('bSnd').textContent = Sfx.on ? '🔊' : '🔇'; } else if (i === 3) fitZoom(); else if (i === 4) showModal(HELP); else if (i === 5) exitToMenu();
   };
 
   refreshTitle();

@@ -1352,6 +1352,11 @@
     // a rival without any hero hires one first (cheaply), before spending on buildings and troops
     if (!ai.heroes.length && ai.spawnWait <= 0 && ai.gold >= HIRE_COST * 0.5) { ai.gold -= HIRE_COST * 0.5; spawnAiHero(ai, towns[0]); }
     for (const t of towns) { let k = 0; while (k < 2 && aiBuild(ai, t)) k++; aiRecruit(ai, t); }
+    // a held Dragon Lair: buy the strongest dragons the treasury allows and send them to the home castle
+    for (const lr of G.objs) if (lr.t === 'lair' && lr.owner === ai.id) {
+      const t = towns[0], hero = ai.heroes.find(h => h.x === t.x && h.y === t.y), army = hero ? hero.army : t.garrison;
+      for (const id of [...LAIR].reverse()) { const price = goldEq(C[id].cost), n = Math.min(lr.avail[id] || 0, Math.floor(ai.gold * 0.6 / price)); if (n > 0 && addToArmy({ army }, id, n)) { ai.gold -= n * price; lr.avail[id] -= n; } }
+    }
     const maxH = Math.min(4, 1 + Math.ceil(towns.length / 2) + (G.day > 25 ? 1 : 0));
     if (ai.heroes.length && ai.heroes.length < maxH && ai.spawnWait <= 0 && ai.gold >= HIRE_COST * 1.2) {
       ai.gold -= HIRE_COST; const t = towns[0]; spawnAiHero(ai, t); aiRecruit(ai, t);
@@ -1369,6 +1374,7 @@
         case 'pile': sc = 350 / (d + 4); break;
         case 'chest': sc = 500 / (d + 4); break;
         case 'mine': { const gp = armyPower(o.guard || []); if (power >= gp * 1.2) sc = 900 / (d + 6); break; }
+        case 'lair': { const gp = armyPower(o.guard || []); if (power >= gp * 1.25 + 1) sc = 3000 / (d + 8); break; }
         case 'fort': { const dp = defPower(o); if (power >= dp * 1.3 + 1) sc = 1600 / (d + 8); break; }
         case 'town': { const dp = defPower(o); if (power >= dp * 1.4 + 1) sc = 4000 / (d + 10); break; }
       }
@@ -1426,6 +1432,7 @@
       case 'monster': if (!win(o.guard)) return lose(); G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return true;
       case 'art': if (o.guard && o.guard.length && !win(o.guard)) return lose(); giveArt(h, o.art); G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return true;
       case 'mine': if (o.guard && o.guard.length && !win(o.guard)) return lose(); o.guard = []; o.owner = ai.id; return true;
+      case 'lair': if (o.guard && o.guard.length && !win(o.guard)) return lose(); o.guard = []; o.owner = ai.id; toast(`The ${FACTIONS[ai.fac].name} rivals seize the Dragon Lair!`); return true;
       case 'fort': case 'town': {
         if (o.owner === 0) { await defendStructure(o, h); return true; }
         const defenders = o.owner ? o.garrison : o.guard;
@@ -1512,7 +1519,7 @@
     if ((G.day - 1) % 7 === 0) {
       for (const tw of G.objs) if (tw.t === 'town') for (let i = 1; i <= 7; i++) if (tw.b[i]) tw.avail[i] = (tw.avail[i] || 0) + GROWTH[i - 1];
       for (const dw of G.objs) if (dw.t === 'dwelling' && dw.owner === 0) dw.avail += GROWTH[dw.tier - 1];
-      for (const lr of G.objs) if (lr.t === 'lair' && lr.owner === 0) for (const id of LAIR) lr.avail[id] = (lr.avail[id] || 0) + LAIR_GROWTH[id];
+      for (const lr of G.objs) if (lr.t === 'lair' && lr.owner !== null && lr.owner !== undefined) for (const id of LAIR) lr.avail[id] = (lr.avail[id] || 0) + LAIR_GROWTH[id];
       for (const o of G.objs) if (o.t === 'fort' && o.owner === 0) {
         const mil = CASTLE_TIERS[0];
         const s = o.garrison.find(a => a && a.t === mil);

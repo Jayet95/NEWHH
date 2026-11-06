@@ -1,3 +1,6 @@
+// hex grid helpers (pointy-top, odd-r offset). Order of neighbours: E, SE, SW, W, NW, NE
+function hexNb(x, y) { const o = y & 1; return [[x + 1, y], [x + o, y + 1], [x + o - 1, y + 1], [x - 1, y], [x + o - 1, y - 1], [x + o, y - 1]]; }
+function hexDist(a, b) { const ax = a.x - ((a.y - (a.y & 1)) >> 1), bx = b.x - ((b.y - (b.y & 1)) >> 1), ay = -ax - a.y, by = -bx - b.y; return Math.max(Math.abs(ax - bx), Math.abs(ay - by), Math.abs(a.y - b.y)); }
 'use strict';
 function rng(seed) {
   return function () {
@@ -293,7 +296,7 @@ function findPath(G, sx, sy, tx, ty, ignoreObjs, sail, caps) {
   if (!tcost(tx, ty, target)) return null;
   const g = new Float32Array(N).fill(Infinity), f = new Float32Array(N).fill(Infinity), bc = new Float32Array(N);
   const prev = new Int32Array(N).fill(-1), closed = new Uint8Array(N);
-  const heur = (x, y) => Math.max(Math.abs(x - tx), Math.abs(y - ty)) * 70;
+  const heur = (x, y) => hexDist({ x, y }, { x: tx, y: ty }) * 70;
   const s = k(sx, sy); g[s] = 0; f[s] = heur(sx, sy);
   const open = [s];
   while (open.length) {
@@ -304,9 +307,7 @@ function findPath(G, sx, sy, tx, ty, ignoreObjs, sail, caps) {
     if (closed[cur]) continue;
     closed[cur] = 1;
     const cx = cur % W, cy = (cur / W) | 0;
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-      if (!dx && !dy) continue;
-      const nx = cx + dx, ny = cy + dy;
+    for (const [nx, ny] of hexNb(cx, cy)) {
       if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
       const nk = k(nx, ny), cost = tcost(nx, ny, nk);
       if (!cost) continue;
@@ -314,7 +315,7 @@ function findPath(G, sx, sy, tx, ty, ignoreObjs, sail, caps) {
         const o = G.omap.get(nk);
         if (o && o.t !== 'pile' && o.t !== 'chest') continue;
       }
-      const ng = g[cur] + cost * (dx && dy ? 1.41 : 1);
+      const ng = g[cur] + cost;
       if (ng < g[nk]) { g[nk] = ng; f[nk] = ng + heur(nx, ny); prev[nk] = cur; bc[nk] = cost; open.push(nk); }
     }
   }
@@ -322,7 +323,7 @@ function findPath(G, sx, sy, tx, ty, ignoreObjs, sail, caps) {
   const path = [];
   for (let c = target; c !== s; c = prev[c]) {
     const p = prev[c], px = p % W, py = (p / W) | 0, cx = c % W, cy = (c / W) | 0;
-    path.push({ x: cx, y: cy, cost: Math.round(bc[c] * (px !== cx && py !== cy ? 1.41 : 1)) });
+    path.push({ x: cx, y: cy, cost: Math.round(bc[c]) });
   }
   return path.reverse();
 }

@@ -90,7 +90,7 @@ input, select { background: #120d08; color: var(--txt); border: 1px solid var(--
 @keyframes bannerAnim { 0% { opacity: 0; transform: scale(.8); } 15% { opacity: 1; transform: scale(1.05); } 25% { transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
 
 /* modal */
-#modal { position: fixed; inset: 0; background: rgba(4, 2, 0, .72); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 40; animation: fadeIn .15s ease-out; padding: 10px; }
+#modal { flex-direction: column; gap: 8px; position: fixed; inset: 0; background: rgba(4, 2, 0, .72); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 40; animation: fadeIn .15s ease-out; padding: 10px; }
 #modal.hide { display: none !important; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes popIn { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
@@ -194,3 +194,10 @@ body.inbattle { padding-bottom: 0; }
 }
 @media (pointer: coarse) { button, .card, .slot { -webkit-user-select: none; user-select: none; } #zoomctl button { width: 44px; height: 44px; } }
 .bonus { color: #8fe08f; }
+
+/* painted resource icons + resource strip shown above every dialog */
+.ri { width: 1.25em; height: 1.25em; vertical-align: -.28em; image-rendering: auto; }
+.chip small.inc { color: var(--good); font-size: .68em; margin-left: 2px; }
+#mres { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; max-width: 780px; width: 100%; padding: 5px 8px; background: linear-gradient(180deg, var(--panel2), var(--panel)); border: 2px solid var(--edge); border-radius: 10px; box-shadow: var(--shadow); flex: none; }
+#mres .chip { font-size: 14px; }
+@media (max-width: 760px) { #mres { gap: 3px; padding: 4px; } #mres .chip { font-size: 12px; padding: 1px 6px; } #mbox { max-height: calc(94vh - 52px); } }

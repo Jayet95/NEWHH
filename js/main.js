@@ -3,6 +3,8 @@
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   const TS = 32, FONT = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+  const HR = TS / Math.sqrt(3), RH = HR * 1.5, HH = HR * 2;
+  const hcx = (x, y) => (x + 0.5 + (y & 1) * 0.5) * TS, hcy = (y) => y * RH + HR;
   const COARSE = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   let VW = 960, VH = 640, Z = (COARSE || window.innerWidth < 700) ? 1.5 : 1;
   const SAVE = 'h3js_save_v7';
@@ -13,7 +15,7 @@
 
   // ---------- helpers ----------
   window.toast = (t) => {
-    const d = document.createElement('div'); d.textContent = t; $('toast').appendChild(d);
+    const d = document.createElement('div'); d.innerHTML = t; $('toast').appendChild(d);
     setTimeout(() => d.remove(), 2800);
   };
   window.showModal = (html, buttons = ['OK']) => new Promise(res => {
@@ -198,19 +200,9 @@
   // ---------- terrain rendering ----------
   function hash(x, y) { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
   function buildTerrain() {
-    terrain = document.createElement('canvas'); terrain.width = G.W * TS; terrain.height = G.H * TS;
+    terrain = document.createElement('canvas'); terrain.width = Math.ceil((G.W + 0.5) * TS); terrain.height = Math.ceil(G.H * RH + HR * 0.5);
     const c = terrain.getContext('2d');
-    for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) {
-      const t = G.tiles[y][x], h = hash(x, y), px = x * TS, py = y * TS;
-      const base = { [T.GRASS]: [74, 124, 58], [T.FOREST]: [52, 98, 46], [T.MOUNT]: [96, 90, 84], [T.WATER]: [40, 92, 146], [T.ROAD]: [168, 138, 90], [T.SAND]: [200, 178, 108] }[t];
-      const v = (h - 0.5) * 16;
-      c.fillStyle = `rgb(${base[0] + v},${base[1] + v},${base[2] + v})`; c.fillRect(px, py, TS, TS);
-      if (t === T.WATER) { c.strokeStyle = 'rgba(255,255,255,.18)'; c.beginPath(); c.moveTo(px + 4, py + 10 + h * 8); c.quadraticCurveTo(px + 12, py + 4 + h * 8, px + 20, py + 10 + h * 8); c.stroke(); }
-      if (t === T.GRASS && h > 0.8) { c.fillStyle = 'rgba(255,255,255,.25)'; c.fillRect(px + h * 20, py + h * 24, 2, 2); }
-      c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = `26px ${FONT}`;
-      if (t === T.FOREST) c.fillText('🌲', px + 16, py + 17);
-      if (t === T.MOUNT) c.fillText('⛰️', px + 16, py + 17);
-    }
+    for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) Art.tile(c, G.tiles[y][x], x, y, G);
   }
   // ---------- fog of war ----------
   let vis = null, fogDirty = true, miniFog = null;
@@ -219,11 +211,12 @@
   const isVis = (x, y) => !fogOn() || vis[y * G.W + x] === 1;
   function initFog() { const n = G.W * G.H; if (!G.expl) G.expl = new Array(n).fill(0); vis = new Uint8Array(n); fogDirty = true; }
   function markView(x, y, r, seeNow = true) {
-    const r2 = r * r + r;
-    for (let dy = -r; dy <= r; dy++) {
+    const r2 = r * r + r, ry = Math.ceil(r / 0.866);
+    for (let dy = -ry; dy <= ry; dy++) {
       const yy = y + dy; if (yy < 0 || yy >= G.H) continue;
-      for (let dx = -r; dx <= r; dx++) {
-        if (dx * dx + dy * dy > r2) continue;
+      for (let dx = -r - 1; dx <= r + 1; dx++) {
+        const ox = dx + ((yy & 1) - (y & 1)) * 0.5, oy = dy * 0.866;
+        if (ox * ox + oy * oy > r2) continue;
         const xx = x + dx; if (xx < 0 || xx >= G.W) continue;
         const i = yy * G.W + xx;
         if (seeNow) vis[i] = 1;
@@ -248,10 +241,11 @@
     miniFog = document.createElement('canvas'); miniFog.width = mini.width; miniFog.height = mini.height; fogDirty = true;
   }
   function clampCam() {
-    cam.x = G.W * TS <= VW ? -(VW - G.W * TS) / 2 : Math.max(0, Math.min(G.W * TS - VW, cam.x));
-    cam.y = G.H * TS <= VH ? -(VH - G.H * TS) / 2 : Math.max(0, Math.min(G.H * TS - VH, cam.y));
+    const WW = (G.W + 0.5) * TS, WH = G.H * RH + HR * 0.5;
+    cam.x = WW <= VW ? -(VW - WW) / 2 : Math.max(0, Math.min(WW - VW, cam.x));
+    cam.y = WH <= VH ? -(VH - WH) / 2 : Math.max(0, Math.min(WH - VH, cam.y));
   }
-  function centerOn(x, y) { resizeMap(); cam.x = x * TS + TS / 2 - VW / 2; cam.y = y * TS + TS / 2 - VH / 2; clampCam(); }
+  function centerOn(x, y) { resizeMap(); cam.x = hcx(x, Math.floor(y)) - VW / 2; cam.y = hcy(y) - VH / 2; clampCam(); }
   function resizeMap() {
     const w = cmap.clientWidth, h = cmap.clientHeight; if (w < 50 || h < 50) return;
     if (cmap.width === w && cmap.height === h && VW === w / Z) return;
@@ -291,26 +285,26 @@
     cx.setTransform(1, 0, 0, 1, 0, 0); cx.fillStyle = '#000'; cx.fillRect(0, 0, cmap.width, cmap.height); cx.setTransform(Z, 0, 0, Z, 0, 0);
     cx.imageSmoothingEnabled = Z < 1.4;
     cx.drawImage(terrain, cam.x, cam.y, VW, VH, 0, 0, VW, VH);
-    const x0 = Math.floor(cam.x / TS), y0 = Math.floor(cam.y / TS), vx = Math.ceil(VW / TS) + 2, vy = Math.ceil(VH / TS) + 2;
+    const x0 = Math.floor(cam.x / TS) - 1, y0 = Math.floor(cam.y / RH) - 1, vx = Math.ceil(VW / TS) + 3, vy = Math.ceil(VH / RH) + 3;
     cx.textAlign = 'center'; cx.textBaseline = 'middle';
     cx.lineWidth = 2; cx.strokeStyle = 'rgba(255,255,255,.45)';
     const zo = {}; for (const o of G.objs) if (o.t === 'fort' || o.t === 'town') zo[o.zone] = o.owner;
     for (let y = Math.max(0, y0); y < Math.min(G.H, y0 + vy); y++) for (let x = Math.max(0, x0); x < Math.min(G.W, x0 + vx); x++) {
-      const z = G.zone[y][x], ow = zo[z], px = x * TS - cam.x, py = y * TS - cam.y;
-      if (ow !== null && ow !== undefined && G.tiles[y][x] !== T.WATER) { cx.fillStyle = ownFill(ow, 0.2); cx.fillRect(px, py, TS, TS); }
-      if (x + 1 < G.W && G.zone[y][x + 1] !== z) { cx.beginPath(); cx.moveTo(px + TS, py); cx.lineTo(px + TS, py + TS); cx.stroke(); }
-      if (y + 1 < G.H && G.zone[y + 1][x] !== z) { cx.beginPath(); cx.moveTo(px, py + TS); cx.lineTo(px + TS, py + TS); cx.stroke(); }
+      const z = G.zone[y][x], ow = zo[z], px = hcx(x, y) - cam.x, py = hcy(y) - cam.y;
+      if (ow !== null && ow !== undefined && G.tiles[y][x] !== T.WATER) { Art.hexPath(cx, px, py, HR + 0.5); cx.fillStyle = ownFill(ow, 0.2); cx.fill(); }
+      const hn = hexNb(x, y);
+      for (let e = 0; e < 3; e++) { const nx = hn[e][0], ny = hn[e][1]; if (nx >= 0 && ny >= 0 && nx < G.W && ny < G.H && G.zone[ny][nx] !== z) { const p1 = Art.hexPt(px, py, HR, e), p2 = Art.hexPt(px, py, HR, e + 1); cx.beginPath(); cx.moveTo(p1[0], p1[1]); cx.lineTo(p2[0], p2[1]); cx.stroke(); } }
     }
     if (G.path) {
       let left = G.hero.move;
       G.path.forEach((s, i) => {
         left -= s.cost; const ok = left >= 0;
-        const px = s.x * TS - cam.x + TS / 2, py = s.y * TS - cam.y + TS / 2;
+        const px = hcx(s.x, s.y) - cam.x, py = hcy(s.y) - cam.y;
         cx.beginPath(); cx.arc(px, py, i === G.path.length - 1 ? 7 : 4, 0, 7);
         cx.fillStyle = ok ? 'rgba(140,255,140,.9)' : 'rgba(255,110,90,.9)'; cx.fill();
       });
       const total = G.path.reduce((s, p) => s + p.cost, 0), days = total <= G.hero.move ? 0 : Math.ceil((total - G.hero.move) / maxMove(G.hero));
-      const end = G.path[G.path.length - 1], lx = end.x * TS - cam.x + TS / 2, ly = end.y * TS - cam.y - 6, txt = days ? `${days + 1} days — click to go` : '✓ today — click to go';
+      const end = G.path[G.path.length - 1], lx = hcx(end.x, end.y) - cam.x, ly = hcy(end.y) - cam.y - 22, txt = days ? `${days + 1} days — click to go` : '✓ today — click to go';
       cx.font = 'bold 11px sans-serif'; const tw = cx.measureText(txt).width + 12;
       cx.fillStyle = days ? 'rgba(120,30,20,.9)' : 'rgba(20,80,30,.9)'; cx.fillRect(lx - tw / 2, ly - 9, tw, 18);
       cx.fillStyle = '#fff'; cx.fillText(txt, lx, ly);
@@ -318,13 +312,14 @@
     for (const o of G.objs) {
       if (o.x < x0 - 1 || o.x > x0 + vx || o.y < y0 - 1 || o.y > y0 + vy) continue;
       if (fogOn()) { const fi = o.y * G.W + o.x; if (!G.expl[fi] || (o.t === 'monster' && !vis[fi])) continue; }
-      const px = o.x * TS - cam.x + TS / 2, py = o.y * TS - cam.y + TS / 2;
-      if (o.t === 'monster' || o.t === 'art' || o.t === 'mine' || o.t === 'wreck') {
+      const px = hcx(o.x, o.y) - cam.x, py = hcy(o.y) - cam.y;
+      if (o.t === 'monster') {
         cx.beginPath(); cx.arc(px, py, 15, 0, 7);
         cx.fillStyle = o.t === 'monster' ? 'rgba(90,10,10,.65)' : 'rgba(0,0,0,.45)'; cx.fill();
       }
-      cx.font = `${o.t === 'town' ? 40 : o.t === 'fort' ? 34 : 26}px ${FONT}`; cx.fillStyle = '#fff';
-      cx.fillText(objIcon(o), px, py + 1);
+      const spr = o.t === 'monster' ? null : Art.obj(o, o.fac);
+      if (spr) { const sz = o.t === 'town' ? 50 : o.t === 'fort' ? 44 : o.t === 'pile' ? 30 : 38; cx.drawImage(spr, px - sz / 2, py - sz / 2 - (o.t === 'town' ? 5 : 2), sz, sz); }
+      else { cx.font = `26px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(objIcon(o), px, py + 1); }
       if (o.t === 'fort') {
         cx.beginPath(); cx.arc(px + 14, py - 16, 6, 0, 7); cx.fillStyle = ownCol(o.owner); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 1; cx.stroke();
         const gn = o.garrison.reduce((s, a) => s + (a ? a.n : 0), 0);
@@ -338,17 +333,17 @@
       }
     }
     for (const b of G.boats) {
-      const px = b.x * TS - cam.x + TS / 2, py = b.y * TS - cam.y + TS / 2;
-      cx.font = `30px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText('⛵', px, py + 2);
+      const px = hcx(b.x, b.y) - cam.x, py = hcy(b.y) - cam.y;
+      cx.drawImage(Art.boat(), px - 20, py - 22, 40, 40);
     }
     for (const ai of G.ais) for (const eh of ai.heroes) {
       if (!isVis(eh.x, eh.y)) continue;
-      const px = eh.x * TS - cam.x + TS / 2, py = eh.y * TS - cam.y + TS / 2;
+      const px = hcx(eh.x, eh.y) - cam.x, py = hcy(eh.y) - cam.y;
       cx.beginPath(); cx.arc(px, py, 15, 0, 7); cx.fillStyle = ownCol(ai.id); cx.fill(); cx.strokeStyle = '#000'; cx.lineWidth = 2; cx.stroke();
       cx.font = `22px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(eh.icon, px, py + 1);
     }
     G.heroes.forEach((h, i) => {
-      const px = h.x * TS - cam.x + TS / 2 + (G.heroes.filter((o, j) => j < i && o.x === h.x && o.y === h.y).length * 6), py = h.y * TS - cam.y + TS / 2;
+      const px = hcx(h.x, h.y) - cam.x + (G.heroes.filter((o, j) => j < i && o.x === h.x && o.y === h.y).length * 6), py = hcy(h.y) - cam.y;
       const rr = h.boat != null ? 11 : 15;
       cx.beginPath(); cx.arc(px, py - (h.boat != null ? 6 : 0), rr, 0, 7); cx.fillStyle = '#2a5fb0'; cx.fill();
       cx.strokeStyle = h === G.hero ? '#ffd24a' : '#fff'; cx.lineWidth = h === G.hero ? 3 : 1.5; cx.stroke();
@@ -357,11 +352,11 @@
     if (fogOn()) {
       for (let y = Math.max(0, y0); y < Math.min(G.H, y0 + vy); y++) for (let x = Math.max(0, x0); x < Math.min(G.W, x0 + vx); x++) {
         const fi = y * G.W + x;
-        if (!G.expl[fi]) { cx.fillStyle = '#05030a'; cx.fillRect(x * TS - cam.x, y * TS - cam.y, TS, TS); }
-        else if (!vis[fi]) { cx.fillStyle = 'rgba(5,3,10,.5)'; cx.fillRect(x * TS - cam.x, y * TS - cam.y, TS, TS); }
+        if (!G.expl[fi]) { Art.hexPath(cx, hcx(x, y) - cam.x, hcy(y) - cam.y, HR + 0.8); cx.fillStyle = '#05030a'; cx.fill(); }
+        else if (!vis[fi]) { Art.hexPath(cx, hcx(x, y) - cam.x, hcy(y) - cam.y, HR + 0.8); cx.fillStyle = 'rgba(5,3,10,.5)'; cx.fill(); }
       }
     }
-    if (hover) { cx.strokeStyle = 'rgba(255,255,255,.8)'; cx.lineWidth = 2; cx.strokeRect(hover.x * TS - cam.x + 1, hover.y * TS - cam.y + 1, TS - 2, TS - 2); }
+    if (hover) { Art.hexPath(cx, hcx(hover.x, hover.y) - cam.x, hcy(hover.y) - cam.y, HR - 1); cx.strokeStyle = 'rgba(255,255,255,.85)'; cx.lineWidth = 2; cx.stroke(); }
     drawMini();
   }
   const MC = { [T.GRASS]: '#4a7c3a', [T.FOREST]: '#2f5a2a', [T.MOUNT]: '#666', [T.WATER]: '#285c92', [T.ROAD]: '#a88a5a', [T.SAND]: '#c8b26c' };
@@ -394,7 +389,7 @@
     mx.fillStyle = '#8df'; for (const b of G.boats) mx.fillRect(b.x * k, b.y * k, k, k);
     for (const ai of G.ais) for (const eh of ai.heroes) { if (!isVis(eh.x, eh.y)) continue; mx.fillStyle = ownCol(ai.id); mx.fillRect(eh.x * k - 1, eh.y * k - 1, k + 2, k + 2); mx.strokeStyle = '#000'; mx.strokeRect(eh.x * k - 1, eh.y * k - 1, k + 2, k + 2); }
     mx.fillStyle = '#fff'; for (const h of G.heroes) mx.fillRect(h.x * k - 1, h.y * k - 1, k + 2, k + 2);
-    mx.strokeStyle = '#fff'; mx.lineWidth = 1; mx.strokeRect(cam.x / TS * k, cam.y / TS * k, VW / TS * k, VH / TS * k);
+    mx.strokeStyle = '#fff'; mx.lineWidth = 1; mx.strokeRect(cam.x / TS * k, cam.y / RH * k, VW / TS * k, VH / RH * k);
   }
   function loop() {
     if (G && !document.body.classList.contains('inbattle')) {
@@ -405,11 +400,16 @@
   }
 
   // ---------- UI panels ----------
+  function syncMres() { $('mres').style.display = (G && $('title').classList.contains('hide') && !$('modal').classList.contains('hide')) ? '' : 'none'; }
+  new MutationObserver(() => { if (G) renderResOnly(); syncMres(); }).observe($('modal'), { attributes: true, attributeFilter: ['class'] });
+  new MutationObserver(syncMres).observe($('title'), { attributes: true, attributeFilter: ['class'] });
+  function renderResOnly() { $('mres').innerHTML = $('res').innerHTML; }
   function renderAll() {
     if (!G) return;
     recomputeVision();
     const gn = computeGain();
-    $('res').innerHTML = RES.map(k => `<span class="chip" title="${k[0].toUpperCase() + k.slice(1)}: ${G.res[k]}${gn[k] ? ` (+${gn[k]}/day)` : ''}">${RES_ICON[k]} <b>${fmtN(G.res[k])}</b></span>`).join('');
+    const resHtml = RES.map(k => `<span class="chip" title="${k[0].toUpperCase() + k.slice(1)}: ${G.res[k]}${gn[k] ? ` (+${gn[k]}/day)` : ''}">${RES_ICON[k]} <b>${fmtN(G.res[k])}</b>${gn[k] ? `<small class="inc">+${fmtN(gn[k])}</small>` : ''}</span>`).join('');
+    $('res').innerHTML = resHtml; $('mres').innerHTML = resHtml; syncMres();
     $('income').innerHTML = `📈 ${RES.filter(k => gn[k]).map(k => `+${fmtN(gn[k])}${RES_ICON[k]}`).join(' ') || 'no income'}<small>/day</small>`;
     const d = G.day - 1;
     $('date').textContent = `Month ${Math.floor(d / 28) + 1} · Week ${Math.floor(d % 28 / 7) + 1} · Day ${d % 7 + 1} · ${DF().icon} ${DF().name}`;
@@ -477,7 +477,11 @@
   function tileFromEvent(ev) {
     const r = cmap.getBoundingClientRect();
     const px = (ev.clientX - r.left) * (cmap.width / r.width) / Z + cam.x, py = (ev.clientY - r.top) * (cmap.height / r.height) / Z + cam.y;
-    const x = Math.floor(px / TS), y = Math.floor(py / TS);
+    const qx = px - TS / 2, qy = py - HR, q = (Math.sqrt(3) / 3 * qx - qy / 3) / HR, rr = (2 / 3 * qy) / HR;
+    let rx = Math.round(q), rz = Math.round(rr), ry = Math.round(-q - rr);
+    const ddx = Math.abs(rx - q), ddz = Math.abs(rz - rr), ddy = Math.abs(ry + q + rr);
+    if (ddx > ddz && ddx > ddy) rx = -ry - rz; else if (ddy > ddz) ry = -rx - rz; else rz = -rx - ry;
+    const x = rx + ((rz - (rz & 1)) >> 1), y = rz;
     return x >= 0 && y >= 0 && x < G.W && y < G.H ? { x, y } : null;
   }
   function armyList(arr, vague) { return arr.filter(Boolean).map(a => vague ? `${groupLabel(a.n)} ${C[a.t].n}s` : `${a.n} ${C[a.t].n}`).join(', '); }
@@ -532,7 +536,10 @@
       const o = objAt(G, hover.x, hover.y), tt = G.tiles[hover.y][hover.x];
       const cp = capsOf(G.hero);
       const blocked = (tt === T.FOREST && !cp.forest) || (tt === T.MOUNT && !cp.mount) || (tt === T.WATER && !cp.water && G.hero.boat == null && !G.boats.some(b => b.x === hover.x && b.y === hover.y));
-      cmap.style.cursor = (o || heroesAt(hover.x, hover.y).length || aiHeroAt(hover.x, hover.y)) ? 'pointer' : blocked ? 'not-allowed' : 'crosshair';
+      const ah = isVis(hover.x, hover.y) ? aiHeroAt(hover.x, hover.y) : null, mine = heroesAt(hover.x, hover.y).length > 0;
+      const hostile = ah || (o && isExpl(hover.x, hover.y) && ((o.t === 'monster' && isVis(hover.x, hover.y)) || (o.guard && o.guard.some(Boolean) && o.owner !== 0) || ((o.t === 'town' || o.t === 'fort') && o.owner !== 0)));
+      const sailing = G.hero.boat != null || (tt === T.WATER && !blocked);
+      cmap.style.cursor = !isExpl(hover.x, hover.y) ? Art.cursor('pointer') : mine ? Art.cursor('pointer') : hostile ? Art.cursor('sword') : blocked ? Art.cursor('no') : sailing ? Art.cursor('boat') : Art.cursor('horse');
     }
     const tip = $('tip');
     if (hover) {
@@ -1014,7 +1021,7 @@
 
   function openMarket(rate, title, back) {
     const st = openMarket.st || (openMarket.st = { get: 'wood', give: 'gold', qty: 1 });
-    const opts = (sel) => RES.map(k => `<option value="${k}"${k === sel ? ' selected' : ''}>${RES_ICON[k]} ${k}</option>`).join('');
+    const opts = (sel) => RES.map(k => `<option value="${k}"${k === sel ? ' selected' : ''}>${Art.RES_EMOJI[k]} ${k}</option>`).join('');
     $('mbox').innerHTML = `<h2>⚖️ ${title}</h2>
       <p class="small">Rate: ${Math.round(rate * 100)}% of market value. Pay with any resource to buy the ones you are missing.</p>
       <div class="trow" style="grid-template-columns:1fr 1fr 100px"><div>Buy<br><select id="mGet">${opts(st.get)}</select></div>
@@ -1092,7 +1099,7 @@
         <span class="small">${built ? `Available: <b>${av}</b> · ${fmtCost(c.cost)} each · +${c.gr}/week` : locked ? `🔒 Requires ${HALL_LEVELS[needHall].n} (Town Hall level ${needHall})` : `Dwelling not built — ${fmtCost(DWELL_COST[tier])}`}</span></div>
         <div class="acts">${built
           ? `<input type="number" min="1" max="${av}" value="${av}" id="n${tier}"><button data-buy="${tier}">Recruit</button>
-             ${upC ? (upLocked ? `<button disabled title="Requires Town Hall level ${UP_HALL[nextLv]}">🔒 Lv${nextLv} (Hall ${UP_HALL[nextLv]})</button>` : `<button data-up="${tier}" title="${fmtCost(upC)}">⬆ Lv${nextLv} ${fmtCost(upC)}</button>`) : '<span class="small">MAX</span>'}
+             ${upC ? (upLocked ? `<button disabled title="Requires Town Hall level ${UP_HALL[nextLv]}">🔒 Lv${nextLv} (Hall ${UP_HALL[nextLv]})</button>` : `<button data-up="${tier}" title="${Art.fmtCostTxt(upC)}">⬆ Lv${nextLv} ${fmtCost(upC)}</button>`) : '<span class="small">MAX</span>'}
              ${upArmy ? `<button data-uparmy="${tier}">🪖 Upgrade ${upArmy.count} troops ${RES_ICON.gold}${upArmy.cost}</button>` : ''}`
           : (locked ? `<button disabled>🔒 Hall ${needHall}</button>` : `<button data-build="${tier}">Build</button>`)}</div></div>`;
     });
@@ -1100,10 +1107,10 @@
     const gl = t.b.guild, gNext = gl < 3 ? GUILD_COST[gl + 1] : null;
     html += `<div class="trow"><div class="ic">🏛️</div><div><b>${hl ? HALL_LEVELS[hl].n : 'Town Hall'}</b> <span class="stars">${starStr(hl, 5)}</span><br>
         <span class="small">${hl ? `+${HALL_LEVELS[hl].inc} 🪙/day.` : 'No income yet.'}${hNext ? ` Next: ${hNext.n} (+${hNext.inc} 🪙/day) — unlocks ${hl + 1 >= 1 && TIER_HALL.indexOf(hl + 1) > 0 ? 'tier ' + TIER_HALL.indexOf(hl + 1) + ' dwelling' : ''}${UP_HALL[hl + 2] ? ' and Lv' + (hl + 2) + ' upgrades' : ''}.` : ''}</span></div>
-        <div class="acts">${hNext ? `<button data-hall="1" title="${fmtCost(hNext.cost)}">${hl ? 'Upgrade' : 'Build'} ${fmtCost(hNext.cost)}</button>` : '<span class="small">MAX</span>'}</div></div>
+        <div class="acts">${hNext ? `<button data-hall="1" title="${Art.fmtCostTxt(hNext.cost)}">${hl ? 'Upgrade' : 'Build'} ${fmtCost(hNext.cost)}</button>` : '<span class="small">MAX</span>'}</div></div>
       <div class="trow"><div class="ic">🔮</div><div><b>Mage Guild</b> <span class="stars">${starStr(gl, 3)}</span><br>
         <span class="small">Spellbook: ${G.spells.map(k => SPELLS[k].i + ' ' + SPELLS[k].n).join(', ')}${gl < 3 ? `<br>Next level teaches: ${GUILD_SPELLS[gl + 1].map(k => SPELLS[k].i + ' ' + SPELLS[k].n).join(', ')}` : ''}</span></div>
-        <div class="acts">${gNext ? `<button data-guild="1" title="${fmtCost(gNext)}">${gl ? 'Upgrade' : 'Build'} ${fmtCost(gNext)}</button>` : '<span class="small">MAX</span>'}</div></div>
+        <div class="acts">${gNext ? `<button data-guild="1" title="${Art.fmtCostTxt(gNext)}">${gl ? 'Upgrade' : 'Build'} ${fmtCost(gNext)}</button>` : '<span class="small">MAX</span>'}</div></div>
       <div class="trow"><div class="ic">⚖️</div><div><b>Marketplace</b><br><span class="small">${t.b.market ? `Buy missing resources at ${Math.round(MARKET_RATE * 100)}% rate.` : `Trade resources — ${fmtCost(MARKET_COST)}`}</span></div>
         <div class="acts">${t.b.market ? '<button data-trade="1">Trade</button>' : '<button data-build="market">Build</button>'}</div></div>
       <div class="trow"><div class="ic">⚓</div><div><b>Shipyard</b><br><span class="small">${t.b.ship ? `Boats ${G.boats.length}/${MAX_BOATS}. A new boat appears at the port by the bay (${fmtCost(BOAT_COST)} each). Walk a hero onto a boat to sail; collect treasures at sea.` : coastal ? `Build boats to sail the sea and collect its treasures — ${fmtCost(SHIPYARD_COST)}` : 'There is no coast near this town.'}</span></div>
@@ -1112,10 +1119,10 @@
         <div class="acts"><button data-garr="1">Manage garrison</button></div></div>
       <div class="trow"><div class="ic">🧱</div><div><b>${FORT_LEVELS[t.fort || 0].n}</b> <span class="stars">${starStr(t.fort || 0, 3)}</span><br>
         <span class="small">Walls, gate and arrow towers are ×${FORT_LEVELS[t.fort || 0].hp} as strong in a siege${(t.fort || 0) < 3 ? ` — next: ${FORT_LEVELS[(t.fort || 0) + 1].n} (×${FORT_LEVELS[(t.fort || 0) + 1].hp} walls, ×${FORT_LEVELS[(t.fort || 0) + 1].tower} tower fire)` : ''}.</span></div>
-        <div class="acts">${(t.fort || 0) < 3 ? `<button data-fortify="1" title="${fmtCost(FORT_LEVELS[(t.fort || 0) + 1].cost)}">⬆ ${fmtCost(FORT_LEVELS[(t.fort || 0) + 1].cost)}</button>` : '<span class="small">MAX</span>'}</div></div>
+        <div class="acts">${(t.fort || 0) < 3 ? `<button data-fortify="1" title="${Art.fmtCostTxt(FORT_LEVELS[(t.fort || 0) + 1].cost)}">⬆ ${fmtCost(FORT_LEVELS[(t.fort || 0) + 1].cost)}</button>` : '<span class="small">MAX</span>'}</div></div>
       <div class="trow"><div class="ic">💣</div><div><b>${MINE_LEVELS[t.minel || 0].n}</b> <span class="stars">${starStr(t.minel || 0, 3)}</span><br>
         <span class="small">Hidden mines (${MINE_LEVELS[t.minel || 0].stock}) in front of the walls hurt and halt attackers. A defending hero can lay ${EMERGENCY_MINES} extra mines even without a minefield${(t.minel || 0) < 3 ? ` — next: ${MINE_LEVELS[(t.minel || 0) + 1].n} (${MINE_LEVELS[(t.minel || 0) + 1].stock} mines)` : ''}.</span></div>
-        <div class="acts">${(t.minel || 0) < 3 ? `<button data-minefield="1" title="${fmtCost(MINE_LEVELS[(t.minel || 0) + 1].cost)}">⬆ ${fmtCost(MINE_LEVELS[(t.minel || 0) + 1].cost)}</button>` : '<span class="small">MAX</span>'}</div></div>
+        <div class="acts">${(t.minel || 0) < 3 ? `<button data-minefield="1" title="${Art.fmtCostTxt(MINE_LEVELS[(t.minel || 0) + 1].cost)}">⬆ ${fmtCost(MINE_LEVELS[(t.minel || 0) + 1].cost)}</button>` : '<span class="small">MAX</span>'}</div></div>
       <div class="trow"><div class="ic">🍺</div><div><b>Tavern</b><br><span class="small">Heroes ${G.heroes.length}/${MAX_HEROES}. Hire more heroes and exchange troops between heroes in town.</span></div>
         <div class="acts"><button data-tavern="1">Hire heroes</button>${heroesAt(t.x, t.y).length > 1 ? '<button data-xhero="1">Exchange troops</button>' : ''}</div></div>
       <div class="small" style="margin-top:8px">${RES.map(k => RES_ICON[k] + ' ' + G.res[k]).join('  ')}</div>
@@ -1576,7 +1583,7 @@
   $('bSave').onclick = () => G && !busy && save();
   $('bEnd').onclick = endTurn;
   $('bTown').onclick = () => G && !busy && openTown();
-  function fitZoom() { if (!G) return; setZoom(Math.min(cmap.width / (G.W * TS), cmap.height / (G.H * TS)), 0, 0); clampCam(); }
+  function fitZoom() { if (!G) return; setZoom(Math.min(cmap.width / ((G.W + 0.5) * TS), cmap.height / (G.H * RH + HR * 0.5)), 0, 0); clampCam(); }
   $('mEnd').onclick = endTurn;
   $('mTown').onclick = () => G && !busy && openTown();
   $('mHero').onclick = () => { if (G && !busy) { setActive((G.sel + 1) % G.heroes.length); G.path = null; centerOn(G.hero.x, G.hero.y); renderAll(); toast(`${G.hero.name} selected`); } };

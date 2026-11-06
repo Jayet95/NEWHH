@@ -53,6 +53,7 @@
   const nearestTown = (x, y) => myTowns().sort((a, b) => Math.max(Math.abs(a.x - x), Math.abs(a.y - y)) - Math.max(Math.abs(b.x - x), Math.abs(b.y - y)))[0] || null;
   const tiersOf = (t) => factionTiers(t.fac || G.faction);
   const aiById = (id) => G.ais.find(a => a.id === id);
+  const gst = (k, n) => { if (!G) return; (G.st = G.st || {})[k] = (G.st[k] || 0) + n; };
   const note = (t, x, y) => { (G.report = G.report || []).push({ t, x, y }); };
   const allAiHeroes = () => G.ais.flatMap(a => a.heroes);
   const aiHeroAt = (x, y) => allAiHeroes().find(h => h.x === x && h.y === y);
@@ -998,6 +999,7 @@
     h.mana = res.mana; h.buff = null;
     if (res.win) {
       res.survivors.forEach((n, i) => { if (h.army[i]) { if (n > 0) h.army[i].n = n; else h.army[i] = null; } });
+      if (!h.ai) { gst('slain', slain0); gst('battles', 1); }
       if (!h.ai) Ach.event('fightWon', { slain: slain0, ratio: th0 ? th0.ratio : undefined, lossPct: before0 ? (before0 - armyCount(h)) / before0 : 0, hero: !!(eHero && (eHero.real || eHero.arts)) });
       const nec = perk(h, 'necromancy');
       if (nec && res.xp > 0) {
@@ -1763,6 +1765,7 @@
     for (const h of G.heroes) { h.move = maxMove(h); h.mana = Math.min(maxMana(h), h.mana + 4 + 2 * perk(h, 'mysticism')); if (heroAtTown(h)) h.mana = maxMana(h); }
     const gain = computeGain();
     RES.forEach(k => { G.res[k] += gain[k]; });
+    gst('gold', gain.gold || 0);
     Ach.event('day', { day: G.day, gold: gain.gold || 0, towns: myTowns().length, mines: G.objs.filter(x => x.t === 'mine' && x.owner === 0).length, azure: G.heroes.some(x => x.army.some(a => a && a.t === 'azured')) });
     moveCaravans();
     const parts = RES.filter(k => gain[k]).map(k => `+${gain[k]}${RES_ICON[k]}`);
@@ -1800,6 +1803,7 @@
   async function endGame(win, why) {
     G.over = true; if (win) Ach.event('win', { diff: G.diff, size: G.size, day: G.day }); sfx(win ? 'fanfare' : 'lose'); if (win && typeof Celebrate !== 'undefined') Celebrate.game();
     try { localStorage.removeItem(SAVE); } catch (e) { /* ignore */ }
+    if (win) { await victoryScreen(); $('title').classList.remove('hide'); refreshTitle(); return; }
     await showModal(win ? `<h2>🏆 Victory!</h2><p>Every rival has lost its towns: you rule the realm on day ${G.day} (${DF().name}). Well fought!</p>` : `<h2>💀 Defeat</h2><p>${why || 'Your hero has fallen.'}</p>`, ['Main menu']);
     $('title').classList.remove('hide'); refreshTitle();
   }
@@ -1869,6 +1873,7 @@
   $('tLoad').onclick = () => openSlots();
   $('tSet').onclick = () => openSettings();
   $('tAch').onclick = () => openAchievements();
+  $('tBoard').onclick = () => openLeaderboard();
   $('tHelp').onclick = () => openHelp();
   async function exitToMenu() {
     if (!G || busy) return;
@@ -1915,13 +1920,14 @@
     modalOpen(`<h2>☰ Menu</h2><div class="menugrid">
       <button data-mn="save">💾 Save / Load</button><button data-mn="set">⚙ Settings</button>
       <button data-mn="kd">📋 Kingdom</button><button data-mn="ach">🏆 Achievements</button>
+      <button data-mn="lb">📊 Leaderboard</button><button data-mn="hint">💡 Hints on/off</button>
       <button data-mn="rep">📜 Turn report</button><button data-mn="help">📖 Help & glossary</button>
       <button data-mn="snd">${Sfx.on ? '🔇 Sound off' : '🔊 Sound on'}</button><button data-mn="fit">🗺 Zoom to fit</button>
       <button data-mn="exit">🚪 Main menu</button></div><div class="mb"><button class="primary" id="mnClose">Resume</button></div>`);
     $('mnClose').onclick = closeModal;
     $('mbox').querySelectorAll('[data-mn]').forEach(b => b.onclick = () => {
       const k = b.dataset.mn;
-      if (k === 'save') openSlots(); else if (k === 'set') openSettings(); else if (k === 'kd') openKingdom(); else if (k === 'ach') openAchievements();
+      if (k === 'save') openSlots(); else if (k === 'set') openSettings(); else if (k === 'kd') openKingdom(); else if (k === 'ach') openAchievements(); else if (k === 'lb') openLeaderboard(); else if (k === 'hint') { Settings.set('hints', !Settings.hints); if (Settings.hints) Settings.resetHints(); toast(Settings.hints ? 'Hints on.' : 'Hints off.'); }
       else if (k === 'rep') openReport(); else if (k === 'help') openHelp();
       else if (k === 'snd') { Sfx.toggle(); $('bSnd').textContent = Sfx.on ? '🔊' : '🔇'; openMenu(); }
       else if (k === 'fit') { closeModal(); fitZoom(); } else if (k === 'exit') { $('modal').classList.add('hide'); exitToMenu(); }
@@ -1975,6 +1981,51 @@
       modalOpen(`<h2>📖 Glossary</h2>${GLOSSARY.map(([t, d]) => `<details><summary><b>${t}</b></summary><p class="small" style="margin:4px 0 8px">${d}</p></details>`).join('')}<div class="mb"><button class="primary" id="glBack">Back</button></div>`);
       $('glBack').onclick = () => openHelp();
     };
+  }
+
+  // ---- score + leaderboard ----
+  function scoreParts() {
+    const towns = myTowns().length, lv = G.heroes.reduce((p, x) => p + x.lvl, 0), st = G.st || {};
+    const parts = [['Towns held', towns * 500], ['Hero levels', lv * 150], ['Creatures slain', (st.slain || 0) * 3], ['Battles won', (st.battles || 0) * 40], ['Gold earned', Math.round((st.gold || 0) * 0.1)], ['Speed bonus (win before day 90)', Math.max(0, 90 - G.day) * 100], ['Victory', 3000]];
+    const mult = ({ easy: 0.6, normal: 1, hard: 1.5, expert: 2.2 }[G.diff] || 1) * ({ small: 0.7, medium: 1, large: 1.3, huge: 1.6, giant: 2 }[G.size] || 1) * (1 + 0.25 * (G.ais.length - 1));
+    return { parts, mult, score: Math.min(1400000, Math.round(parts.reduce((p, x) => p + x[1], 0) * mult)) };
+  }
+  async function victoryScreen() {
+    const sc = scoreParts();
+    await new Promise((res) => {
+      modalOpen(`<h2>🏆 Victory!</h2><p>Every rival has lost its towns: you rule the realm on day ${G.day} (${DF().name}).</p><h4>Score</h4>${sc.parts.map(([l, v]) => `<div class="trow" style="grid-template-columns:1fr auto"><div>${l}</div><div>+${fmtN(v)}</div></div>`).join('')}
+        <div class="trow" style="grid-template-columns:1fr auto"><div>Difficulty × map size × rivals</div><div>×${sc.mult.toFixed(2)}</div></div>
+        <div class="trow" style="grid-template-columns:1fr auto"><div><b>Final score</b></div><div><b style="color:var(--gold);font-size:22px">${fmtN(sc.score)}</b></div></div>
+        <div class="setrow"><div><b>Your name</b><div class="small">Shown on the leaderboard</div></div><input id="lbName" maxlength="16" value="${Board.name.replace(/"/g, '')}" placeholder="Commander" style="width:170px"></div>
+        <div class="mb"><button id="lbSkip">Skip</button><button class="primary" id="lbSend">Submit score</button></div>`);
+      $('lbSkip').onclick = () => { $('modal').classList.add('hide'); res(); };
+      $('lbSend').onclick = async () => {
+        const name = ($('lbName').value || '').trim() || 'Commander'; Board.name = name; $('lbSend').disabled = true; $('lbSend').textContent = 'Sending…';
+        const r = await Board.submit({ name, score: sc.score, diff: G.diff, size: G.size, day: G.day, fac: G.faction, hero: G.hero.name });
+        toast(r.ok ? 'Score submitted to the global board!' : 'Saved on this device (the global board is unavailable).');
+        openLeaderboard(r.ok ? 'global' : 'local', { diff: G.diff, size: G.size }); res();
+      };
+    });
+  }
+  let lbTab = 'global', lbF = {};
+  async function openLeaderboard(tab, f) {
+    if (tab) lbTab = tab; if (f) lbF = f;
+    const seg = (key, opts) => '<div class="seg">' + opts.map(([v, l]) => `<button data-lf="${key}:${v}" class="${(lbF[key] || '') === v ? 'on' : ''}">${l}</button>`).join('') + '</div>';
+    modalOpen(`<h2>📊 Leaderboard</h2><div class="seg" style="margin-bottom:8px"><button data-lt="global" class="${lbTab === 'global' ? 'on' : ''}">🌍 Global</button><button data-lt="local" class="${lbTab === 'local' ? 'on' : ''}">📱 This device</button></div>
+      <div class="small">Difficulty</div>${seg('diff', [['', 'All'], ['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Hard'], ['expert', 'Expert']])}
+      <div class="small" style="margin-top:6px">Map size</div>${seg('size', [['', 'All'], ['small', 'S'], ['medium', 'M'], ['large', 'L'], ['huge', 'XL'], ['giant', 'XXL']])}
+      <div id="lbList" style="margin-top:10px"><div class="small">Loading…</div></div><div class="mb"><button class="primary" id="lbBack">Close</button></div>`);
+    $('lbBack').onclick = () => { if (G && $('title').classList.contains('hide')) openMenu(); else $('modal').classList.add('hide'); };
+    $('mbox').querySelectorAll('[data-lt]').forEach(b => b.onclick = () => openLeaderboard(b.dataset.lt));
+    $('mbox').querySelectorAll('[data-lf]').forEach(b => b.onclick = () => { const [k, v] = b.dataset.lf.split(':'); lbF = Object.assign({}, lbF, { [k]: v }); openLeaderboard(); });
+    let list, note = '';
+    if (lbTab === 'global') {
+      const r = await Board.global(lbF);
+      if (r.ok) list = r.list; else { list = Board.local(lbF); note = r.status === 503 ? 'The online leaderboard is not set up on this server yet — showing the scores on this device.' : 'Could not reach the online leaderboard — showing the scores on this device.'; }
+    } else list = Board.local(lbF);
+    if (!$('lbList')) return;
+    const me = Board.name.toLowerCase();
+    $('lbList').innerHTML = (note ? `<div class="small" style="color:#ffb3a8;margin-bottom:6px">${note}</div>` : '') + (list.length ? list.slice(0, 50).map((e, i) => `<div class="lbrow${me && String(e.n).toLowerCase() === me ? ' me' : ''}"><div class="lbrank r${i < 3 ? i + 1 : 0}">${i + 1}</div><div><b>${String(e.n).replace(/[<>&]/g, '')}</b><div class="small">${(DIFFICULTY[e.d] || { name: e.d }).name} · ${(SIZES[e.z] || { name: e.z }).name} · day ${e.y} · ${FACTIONS[e.f] ? FACTIONS[e.f].name : ''}${e.h ? ' · ' + String(e.h).replace(/[<>&]/g, '') : ''}</div></div><div class="lbscore">${fmtN(e.s)}</div></div>`).join('') : '<div class="small">No scores yet — win a game to enter the board!</div>');
   }
 
   // ---- achievements screen ----

@@ -1,9 +1,18 @@
 name = "newhh"
+main = "worker/index.js"
 compatibility_date = "2025-01-01"
 
 # publish on https://newhh.jayet95.workers.dev
 workers_dev = true
 
-# Static game bundle produced by `node tools/build.js`
+# Static game bundle produced by `node tools/build.js`. Files are served from here first;
+# anything else (the /api/* leaderboard routes) goes to the Worker in worker/index.js.
 [assets]
 directory = "./dist"
+binding = "ASSETS"
+
+# Global leaderboard storage: create it once with   npx wrangler kv namespace create SCORES
+# then paste the printed id below and uncomment these three lines (see LEADERBOARD.md).
+# [[kv_namespaces]]
+# binding = "SCORES"
+# id = "PASTE_NAMESPACE_ID_HERE"

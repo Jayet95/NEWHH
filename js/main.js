@@ -1045,6 +1045,7 @@
         $('xOne').onclick = () => setA(1); $('xHalf').onclick = () => setA(Math.max(1, Math.floor(mx / 2))); $('xAll').onclick = () => setA(mx);
       }
       $('mbox').querySelectorAll('.slot').forEach(b => b.onclick = () => {
+        if (dragged) return;
         const r = b.dataset.r, i = +b.dataset.i;
         if (!sel) { if (arr(r)[i]) { sel = { r, i }; amt = arr(r)[i].n; } }
         else {
@@ -1062,7 +1063,44 @@
         }
         render();
       });
+      // drag & drop (finger or mouse): pick a stack up and drop it on any slot — empty = move, same creature = merge, other = swap
+      let drag = null, ghost = null;
+      const slotAt = (x, y) => { const el = document.elementFromPoint(x, y), s = el && el.closest ? el.closest('.slot') : null; return s && s.dataset.r ? s : null; };
+      const clearDrop = () => $('mbox').querySelectorAll('.slot.drop').forEach(e => e.classList.remove('drop'));
+      $('mbox').querySelectorAll('.slot').forEach(b => {
+        b.onpointerdown = (e) => {
+          const r = b.dataset.r, i = +b.dataset.i; if (!arr(r)[i]) return;
+          drag = { r, i, x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
+          try { b.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+        };
+        b.onpointermove = (e) => {
+          if (!drag || drag.id !== e.pointerId) return;
+          if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 9) {
+            drag.moved = true; ghost = document.createElement('div'); ghost.className = 'dragghost'; ghost.innerHTML = b.innerHTML; document.body.appendChild(ghost); b.classList.add('lifted');
+          }
+          if (drag.moved) { ghost.style.left = e.clientX + 'px'; ghost.style.top = e.clientY + 'px'; clearDrop(); const t = slotAt(e.clientX, e.clientY); if (t) t.classList.add('drop'); }
+        };
+        const finish = (e, cancel) => {
+          if (!drag || drag.id !== e.pointerId) return;
+          const d = drag; drag = null; if (ghost) { ghost.remove(); ghost = null; } clearDrop(); b.classList.remove('lifted');
+          if (!d.moved) return;
+          dragged = true; setTimeout(() => { dragged = false; }, 60);
+          const t = cancel ? null : slotAt(e.clientX, e.clientY); if (!t) return;
+          const tr = t.dataset.r, ti = +t.dataset.i; if (tr === d.r && ti === d.i) return;
+          const X = arr(d.r), Y = arr(tr), src = X[d.i]; if (!src) return;
+          const n = sel && sel.r === d.r && sel.i === d.i ? Math.max(1, Math.min(src.n, amt || src.n)) : src.n;
+          if (n < src.n) {
+            if (!Y[ti]) { Y[ti] = { t: src.t, n }; src.n -= n; }
+            else if (Y[ti].t === src.t) { Y[ti].n += n; src.n -= n; }
+            else { toast('To split a stack, drop it on an empty slot or the same creature.'); return; }
+          } else if (Y[ti] && Y[ti].t === src.t) { Y[ti].n += src.n; X[d.i] = null; }
+          else { const tmp = X[d.i]; X[d.i] = Y[ti]; Y[ti] = tmp; }
+          sel = null; sfx('click'); render();
+        };
+        b.onpointerup = (e) => finish(e, false); b.onpointercancel = (e) => finish(e, true);
+      });
     };
+    let dragged = false;
     render(); $('modal').classList.remove('hide');
   }
 

@@ -232,7 +232,7 @@ const Art = (() => {
   function tile(c, t, x, y, G) {
     const cxp = (x + .5 + (y & 1) * .5) * 32, cyp = y * HR * 1.5 + HR, px = cxp - 16, py = cyp - 16, r = (i) => h2(x * 31 + i * 17, y * 57 + i * 11);
     if (typeof Assets !== 'undefined') {
-      const tn = { [T.GRASS]: 'grass', [T.FOREST]: 'forest', [T.MOUNT]: 'mountain', [T.WATER]: 'water', [T.ROAD]: 'road', [T.SAND]: 'sand' }[t], ta = Assets.get('terrain/' + tn + '_' + (1 + Math.floor(r(0) * 4)), 'terrain/' + tn);
+      const tn0 = { [T.GRASS]: 'grass', [T.FOREST]: 'forest', [T.MOUNT]: 'mountain', [T.WATER]: 'water', [T.ROAD]: 'road', [T.SAND]: 'sand' }[t], tn = (t === T.ROAD && Assets.get('roads/dirt_straight')) ? 'grass' : tn0, ta = Assets.get('terrain/' + tn + '_' + (1 + Math.floor(r(0) * 4)), 'terrain/' + tn);
       if (ta) {
         const sw = Math.min(ta.width, 100), sh = Math.min(ta.height, Math.round(sw * (HR * 2 + 2) / 34)), sx = r(5) * (ta.width - sw), sy = r(6) * (ta.height - sh);
         c.save(); hexPath(c, cxp, cyp, HR + .7); c.clip(); c.drawImage(ta, sx, sy, sw, sh, cxp - 17, cyp - HR - 1, 34, HR * 2 + 2);
@@ -391,10 +391,26 @@ const Art = (() => {
   }
 
   // trees / mountains from the art pack are drawn on top of the base tiles (second pass, so they overlap the row above)
-  function tileOverlay(c, t, x, y) {
-    if (typeof Assets === 'undefined' || (t !== T.FOREST && t !== T.MOUNT)) return;
+  function tileOverlay(c, t, x, y, G) {
+    if (typeof Assets === 'undefined') return;
+    const cxp = (x + .5 + (y & 1) * .5) * 32, cyp = y * HR * 1.5 + HR;
+    if (t === T.ROAD) {                                   // road pieces: a half-road from the centre to every connected neighbour plus a hub
+      const st = Assets.get('roads/dirt_straight'); if (!st || !G) return;
+      const nb = hexNb(x, y), rw = 15, L = 19, ih = st.height, iw = st.width;
+      for (let i = 0; i < 6; i++) { const p = nb[i]; if (p[0] < 0 || p[1] < 0 || p[0] >= G.W || p[1] >= G.H || G.tiles[p[1]][p[0]] !== T.ROAD) continue; c.save(); c.translate(cxp, cyp); c.rotate(i * Math.PI / 3 + Math.PI / 2); c.drawImage(st, 0, 0, iw, ih / 2, -rw / 2, -L, rw, L); c.restore(); }
+      c.save(); c.beginPath(); c.arc(cxp, cyp, rw / 2 + .5, 0, 7); c.clip(); c.drawImage(st, 0, ih * .25, iw, ih * .5, cxp - rw / 2, cyp - rw / 2 - 1, rw, rw + 2); c.restore();
+      return;
+    }
+    if (t === T.WATER) {                                  // the odd reef or whirlpool far from the shore
+      if (!G) return; const nb = hexNb(x, y);
+      if (nb.some(p => p[0] < 0 || p[1] < 0 || p[0] >= G.W || p[1] >= G.H || G.tiles[p[1]][p[0]] !== T.WATER)) return;
+      const r = h2(x * 13 + 3, y * 7 + 5), k = r < 0.03 ? 'reef' : r < 0.036 ? 'whirlpool' : null; if (!k) return;
+      const im = Assets.get('decor/' + k); if (!im) return; const w = 40, h = im.height * w / im.width;
+      c.drawImage(im, cxp - w / 2, cyp - h / 2, w, h); return;
+    }
+    if (t !== T.FOREST && t !== T.MOUNT) return;
     const im = Assets.get(t === T.FOREST ? 'terrain/forest_overlay' : 'terrain/mountain_overlay'); if (!im) return;
-    const cxp = (x + .5 + (y & 1) * .5) * 32, cyp = y * HR * 1.5 + HR, box = t === T.FOREST ? 40 : 44, k = Math.min(box / im.width, box / im.height), w = im.width * k, h = im.height * k;
+    const box = t === T.FOREST ? 40 : 44, k = Math.min(box / im.width, box / im.height), w = im.width * k, h = im.height * k;
     c.save(); c.translate(cxp, cyp + 16); if (h2(x * 7, y * 3) > .5) c.scale(-1, 1); c.drawImage(im, -w / 2, -h, w, h); c.restore();
   }
   // after custom art finishes loading: forget everything painted so far and rebuild the icon strings

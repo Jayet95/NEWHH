@@ -221,7 +221,7 @@
     terrain = document.createElement('canvas'); terrain.width = Math.ceil((G.W + 0.5) * TS); terrain.height = Math.ceil(G.H * RH + HR * 0.5);
     const c = terrain.getContext('2d');
     for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) Art.tile(c, G.tiles[y][x], x, y, G);
-    for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) Art.tileOverlay(c, G.tiles[y][x], x, y);
+    for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) Art.tileOverlay(c, G.tiles[y][x], x, y, G);
   }
   // ---------- fog of war ----------
   let vis = null, fogDirty = true, miniFog = null;
@@ -367,9 +367,11 @@
       // pirate-map trail: a dotted route (cream while the hero can still reach it today, red beyond) ending in a big red X
       let prev = { x: G.hero.x, y: G.hero.y };
       cx.lineCap = 'round';
+      const fp = Assets.get('markers/footprints');
       G.path.forEach((s) => {
         left -= s.cost; const ok = left >= 0;
         const ax = hcx(prev.x, prev.y) - cam.x, ay = hcy(prev.y) - cam.y, bx = hcx(s.x, s.y) - cam.x, by = hcy(s.y) - cam.y;
+        if (fp) { const ang = Math.atan2(by - ay, bx - ax), fw = 21, fh = fp.height * fw / fp.width; cx.save(); cx.translate(bx, by); cx.rotate(ang + Math.PI / 2); cx.globalAlpha = ok ? 1 : 0.55; cx.shadowColor = 'rgba(0,0,0,.9)'; cx.shadowBlur = 5; cx.drawImage(fp, -fw / 2, -fh / 2, fw, fh); cx.shadowBlur = 0; cx.shadowColor = 'transparent'; cx.drawImage(fp, -fw / 2, -fh / 2, fw, fh); cx.restore(); prev = s; return; }
         cx.setLineDash([0.1, 7]);
         cx.beginPath(); cx.moveTo(ax, ay); cx.lineTo(bx, by);
         cx.lineWidth = 6.5; cx.strokeStyle = 'rgba(25,12,0,.8)'; cx.stroke();
@@ -377,7 +379,11 @@
         cx.setLineDash([]); prev = s;
       });
       { const e = G.path[G.path.length - 1], ex = hcx(e.x, e.y) - cam.x, ey = hcy(e.y) - cam.y, r = 9;
-        for (const [w, col] of [[8.5, 'rgba(25,12,0,.9)'], [5, '#e0281c']]) { cx.lineWidth = w; cx.strokeStyle = col; cx.beginPath(); cx.moveTo(ex - r, ey - r); cx.lineTo(ex + r, ey + r); cx.moveTo(ex + r, ey - r); cx.lineTo(ex - r, ey + r); cx.stroke(); } }
+        const eo = objAt(G, e.x, e.y), ahh = aiHeroAt(e.x, e.y), hostile = (ahh && !allyOfPlayer(ahh.ai)) || (eo && eo.owner !== 0 && !allyOfPlayer(eo.owner) && (eo.t === 'monster' || defenderOf(eo))), boat = G.boats.some(b => b.x === e.x && b.y === e.y);
+        const mk = hostile ? Assets.get('markers/attack') : boat ? Assets.get('markers/anchor') : null;
+        if (mk) { const mw = 30, mh = mk.height * mw / mk.width; cx.drawImage(mk, ex - mw / 2, ey - mh / 2, mw, mh); }
+        else for (const [w, col] of [[8.5, 'rgba(25,12,0,.9)'], [5, '#e0281c']]) { cx.lineWidth = w; cx.strokeStyle = col; cx.beginPath(); cx.moveTo(ex - r, ey - r); cx.lineTo(ex + r, ey + r); cx.moveTo(ex + r, ey - r); cx.lineTo(ex - r, ey + r); cx.stroke(); }
+        const hg = Assets.get('markers/hourglass'); if (hg && G.path.reduce((q, p) => q + p.cost, 0) > G.hero.move) { const hw = 16, hh = hg.height * hw / hg.width; cx.drawImage(hg, ex + 12, ey - 24, hw, hh); } }
       const total = G.path.reduce((s, p) => s + p.cost, 0), days = total <= G.hero.move ? 0 : Math.ceil((total - G.hero.move) / maxMove(G.hero));
       const end = G.path[G.path.length - 1], lx = hcx(end.x, end.y) - cam.x, ly = hcy(end.y) - cam.y - 22, txt = days ? `${days + 1} days — click to go` : '✓ today — click to go';
       cx.font = 'bold 11px sans-serif'; const tw = cx.measureText(txt).width + 12;

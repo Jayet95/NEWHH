@@ -68,16 +68,17 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
   const clear = (c, r) => { for (let y = c.y - r; y <= c.y + r; y++) for (let x = c.x - r; x <= c.x + r; x++) if (x >= 0 && y >= 0 && x < W && y < H) tiles[y][x] = T.GRASS; };
   clear(P, 3); aiStarts.forEach(a => clear(a, 3));
   // winding roads from the player's castle to every rival capital
+  // roads are one hex wide: straight hex lines through a couple of random waypoints, so every step is a true neighbour
+  const toCube = (x, y) => { const q = x - ((y - (y & 1)) >> 1); return { x: q, y: -q - y, z: y }; };
+  const fromCube = (c) => ({ x: c.x + ((c.z - (c.z & 1)) >> 1), y: c.z });
+  const cubeRound = (c) => { let rx = Math.round(c.x), ry = Math.round(c.y), rz = Math.round(c.z); const dx = Math.abs(rx - c.x), dy = Math.abs(ry - c.y), dz = Math.abs(rz - c.z); if (dx > dy && dx > dz) rx = -ry - rz; else if (dy > dz) ry = -rx - rz; else rz = -rx - ry; return { x: rx, y: ry, z: rz }; };
+  const hexLinePts = (A, B) => { const a = toCube(A.x, A.y), b = toCube(B.x, B.y), n = Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y), Math.abs(a.z - b.z)), out = []; for (let i = 0; i <= n; i++) { const t = n ? i / n : 0; out.push(fromCube(cubeRound({ x: a.x + (b.x - a.x) * t + 1e-6, y: a.y + (b.y - a.y) * t + 2e-6, z: a.z + (b.z - a.z) * t - 3e-6 }))); } return out; };
+  const clampPt = (p) => ({ x: Math.max(2, Math.min(W - 3, p.x)), y: Math.max(2, Math.min(H - 3, p.y)) });
   const carveRoad = (A, B) => {
-    let x = A.x, y = A.y;
-    while (x !== B.x || y !== B.y) {
-      tiles[y][x] = T.ROAD; if (x + 1 < W) tiles[y][x + 1] = T.ROAD;
-      const dx = Math.sign(B.x - x), dy = Math.sign(B.y - y);
-      const r = R();
-      if (dx && (!dy || r < 0.55)) x += dx; else if (dy) y += dy; else x += dx;
-      if (R() < 0.12) { const j = R() < 0.5 ? -1 : 1; if (y + j > 1 && y + j < H - 1 && !dy) y += j; }
-    }
-    tiles[B.y][B.x] = T.ROAD;
+    const span = Math.max(Math.abs(A.x - B.x), Math.abs(A.y - B.y)), wps = [A];
+    for (let k = 1; k <= (span > 24 ? 3 : 2); k++) { const t = k / ((span > 24 ? 3 : 2) + 1); wps.push(clampPt({ x: Math.round(A.x + (B.x - A.x) * t + (R() - 0.5) * 9), y: Math.round(A.y + (B.y - A.y) * t + (R() - 0.5) * 7) })); }
+    wps.push(B);
+    for (let i = 0; i + 1 < wps.length; i++) for (const p of hexLinePts(wps[i], wps[i + 1])) if (p.x >= 0 && p.y >= 0 && p.x < W && p.y < H) tiles[p.y][p.x] = T.ROAD;
   };
   aiStarts.forEach(a => carveRoad(P, a));
   tiles[P.y][P.x] = T.ROAD;

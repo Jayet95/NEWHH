@@ -1,5 +1,8 @@
-name = "heroes3-js"
+name = "newhh"
 compatibility_date = "2025-01-01"
+
+# publish on https://newhh.jayet95.workers.dev
+workers_dev = true
 
 # Static game bundle produced by `node tools/build.js`
 [assets]

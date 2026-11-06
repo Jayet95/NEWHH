@@ -538,8 +538,14 @@
     if (hover) {
       tip.innerHTML = describe(hover.x, hover.y);
       const r = $('stage').getBoundingClientRect();
-      tip.style.left = Math.min(ev.clientX - r.left + 14, r.width - 270) + 'px'; tip.style.top = (ev.clientY - r.top + 14) + 'px';
       tip.classList.remove('hide');
+      // keep the tooltip fully inside the visible part of the map: flip to the other side of the cursor near the right / bottom edges
+      const visW = Math.min(r.width, window.innerWidth - r.left), visH = Math.min(r.height, window.innerHeight - r.top);
+      const tw = tip.offsetWidth, th = tip.offsetHeight, cxp = ev.clientX - r.left, cyp = ev.clientY - r.top;
+      let x = cxp + 14, y = cyp + 14;
+      if (x + tw > visW - 4) x = cxp - tw - 14;
+      if (y + th > visH - 4) y = cyp - th - 14;
+      tip.style.left = Math.max(4, Math.min(x, visW - tw - 4)) + 'px'; tip.style.top = Math.max(4, Math.min(y, visH - th - 4)) + 'px';
     } else tip.classList.add('hide');
   }
   cmap.addEventListener('mousemove', updateHover);

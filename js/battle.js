@@ -721,9 +721,15 @@ const Battle = (() => {
       ctx.lineWidth = s === B.cur ? 4 : 2; ctx.strokeStyle = s === B.cur ? '#ffd24a' : '#111'; ctx.stroke();
       { const sz = HR * 1.28; ctx.save(); ctx.translate(p.x, p.y + 3); ctx.rotate(off.rot); if (s.side === 1) ctx.scale(-1, 1); ctx.drawImage(Art.portraitCanvas(s.t), -sz / 2, -sz / 2, sz, sz); ctx.restore(); }
       }
-      const lab = String(s.n), w = Math.max(24, lab.length * 9 + 8);
-      ctx.fillStyle = '#000c'; ctx.fillRect(p.x + 4, p.y + 14, w, 16);
-      ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(lab, p.x + 4 + w / 2, p.y + 23);
+      { // stack-size plate: rounded, team-coloured, bold outlined numerals
+        const n = s.n, lab = n >= 100000 ? Math.round(n / 1000) + 'k' : n >= 10000 ? (n / 1000).toFixed(1).replace(/.0$/, '') + 'k' : String(n);
+        ctx.font = 'bold 15px Georgia, serif'; const w = Math.max(28, ctx.measureText(lab).width + 14), h = 20, bx = p.x + 2, by = p.y + 12;
+        const g = ctx.createLinearGradient(0, by, 0, by + h); g.addColorStop(0, s.side === 0 ? '#3b6fc4' : '#c4473f'); g.addColorStop(1, s.side === 0 ? '#16305e' : '#5e1a16');
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(bx, by, w, h, 6) : ctx.rect(bx, by, w, h);
+        ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#f3d27a'; ctx.stroke(); ctx.lineWidth = 1; ctx.strokeStyle = '#140a04'; ctx.stroke();
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = '#140a04'; ctx.strokeText(lab, bx + w / 2, by + h / 2 + 1);
+        ctx.fillStyle = '#fff'; ctx.fillText(lab, bx + w / 2, by + h / 2 + 1); ctx.textBaseline = 'alphabetic';
+      }
       let tags = ''; if (s.haste) tags += '💨'; if (s.bless) tags += '✨'; if (s.stone) tags += '🪨'; if (s.defb) tags += '🛡'; if (s.slow) tags += '🐌'; if (s.curse) tags += '☠️'; if (s.bloodlust) tags += '😡'; if (s.shield) tags += '🌀'; if (s.stunned > 0) tags += '🙈';
       if (tags) { ctx.font = '12px ' + FONT; ctx.fillText(tags, p.x, p.y - HR * 0.78); }
     }

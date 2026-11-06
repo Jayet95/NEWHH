@@ -347,6 +347,7 @@
       case 'monster': return C[o.guard[0].t].i;
     }
   }
+  const monNeed = new Set();
   function draw() {
     if (!G) return;
     cx.setTransform(1, 0, 0, 1, 0, 0); cx.fillStyle = '#000'; cx.fillRect(0, 0, cmap.width, cmap.height); cx.setTransform(Z, 0, 0, Z, 0, 0);
@@ -398,7 +399,15 @@
         cx.beginPath(); cx.arc(px, py, 15, 0, 7);
         cx.fillStyle = o.t === 'monster' ? 'rgba(90,10,10,.65)' : 'rgba(0,0,0,.45)'; cx.fill();
       }
-      if (o.t === 'monster') cx.drawImage(Art.portraitCanvas(o.guard[0].t), px - 15, py - 15, 30, 30);
+      if (o.t === 'monster') {
+        const mt = o.guard[0].t, mb = mt.replace(/_\d$/, ''), mu = /_\d$/.test(mt) ? '_up' : '', ms = 'poses/left/idle/' + mb + mu;
+        const pimg = typeof Assets !== 'undefined' ? Assets.get(ms, 'poses/left/idle/' + mb) : null;
+        if (pimg) { const k = Math.min(36 / pimg.height, 34 / pimg.width), w = pimg.width * k, h = pimg.height * k; cx.drawImage(pimg, px - w / 2, py + 14 - h, w, h); }
+        else {
+          cx.drawImage(Art.portraitCanvas(mt), px - 15, py - 15, 30, 30);
+          if (typeof Assets !== 'undefined' && Assets.has(ms) && !monNeed.has(ms)) { monNeed.add(ms); Assets.need([ms, 'poses/left/idle/' + mb]).then(() => draw()); }
+        }
+      }
       const spr = o.t === 'monster' ? null : Art.obj(o, o.fac);
       if (spr) { const sz = o.t === 'town' ? 50 : o.t === 'fort' || o.t === 'lair' ? 46 : o.t === 'dwelling' ? 44 : o.t === 'pile' ? 30 : 38; cx.drawImage(spr, px - sz / 2, py - sz / 2 - (o.t === 'town' ? 5 : 2), sz, sz); }
       else if (o.t !== 'monster') { cx.font = `26px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(objIcon(o), px, py + 1); }

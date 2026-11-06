@@ -11,6 +11,8 @@ fs.mkdirSync(path.join(dist, 'icons'), { recursive: true });
 
 const copy = (rel) => fs.copyFileSync(path.join(root, rel), path.join(dist, rel));
 ['index.html', 'style.css', 'manifest.webmanifest', '_headers'].forEach(copy);
+// stamp every script/style URL with the build version so browsers never mix files from two deploys
+fs.writeFileSync(path.join(dist, 'index.html'), fs.readFileSync(path.join(dist, 'index.html'), 'utf8').replace(/(src="js\/[\w.]+\.js|href="style\.css)"/g, '$1?v=' + version + '"'));
 fs.readdirSync(path.join(root, 'js')).filter((f) => f.endsWith('.js')).forEach((f) => copy('js/' + f));
 if (fs.existsSync(path.join(root, 'icons'))) fs.readdirSync(path.join(root, 'icons')).forEach((f) => copy('icons/' + f));
 fs.writeFileSync(path.join(dist, 'sw.js'), fs.readFileSync(path.join(root, 'sw.js'), 'utf8').replace('__VERSION__', version));

@@ -467,7 +467,21 @@ const Battle = (() => {
     const rc = cv.getBoundingClientRect();
     return hexAt((ev.clientX - rc.left) * 960 / rc.width, (ev.clientY - rc.top) * 640 / rc.height);
   }
-  function onMove(ev) { if (B) B.hover = mouseHex(ev); }
+  // mouse pointer in battle: bow when you can shoot, sword when you can strike, wand for spells, boots to move, a red sign otherwise
+  function battleCursor(h) {
+    if (!B || B.over || !B.input || B.busy || !B.cur || B.cur.side !== 0 || !h || typeof Art === 'undefined' || !Art.cursor) return '';
+    const s = B.cur, t = stackAt(h.c, h.r);
+    if (B.spell === '__mine') return Art.cursor('boot');
+    if (B.spell === '__strike') return t && t.side === 1 ? Art.cursor('sword') : Art.cursor('no');
+    if (B.spell) return t && (SPELLS[B.spell].tgt === 'enemy') === (t.side === 1) ? Art.cursor('wand') : Art.cursor('no');
+    const st = structAt(h.c, h.r);
+    if (st && isAttacker(s)) return C[s.t].shoot && s.ammo > 0 ? Art.cursor('arrow') : spotNear(s, h.c, h.r, B.reach) ? Art.cursor('sword') : Art.cursor('no');
+    if (t && t.side !== s.side) return canShoot(s) ? Art.cursor('arrow') : meleeSpot(s, t, B.reach) ? Art.cursor('sword') : Art.cursor('no');
+    if (t) return Art.cursor('no');
+    const r = B.reach.get(key(h.c, h.r));
+    return r && r.d > 0 ? Art.cursor('boot') : Art.cursor('no');
+  }
+  function onMove(ev) { if (!B) return; B.hover = mouseHex(ev); if (!COARSE) { try { cv.style.cursor = battleCursor(B.hover) || ''; } catch (e) { /* ignore */ } } }
   // spell school rank (0 = untrained) and Wisdom gate: spell level <= 2 + Wisdom rank
   const spellRank = (sp) => perk(SCHOOL_SKILL[sp.school]);
   const spellOk = (sp) => sp.lv <= 2 + perk('wisdom');

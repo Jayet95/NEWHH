@@ -371,13 +371,22 @@ const Art = (() => {
         g.save(); g.translate(16, 16); g.rotate(-Math.PI / 4);
         outline(() => { g.beginPath(); g.moveTo(-2.5, 10); g.lineTo(-2.5, -9); g.lineTo(0, -15); g.lineTo(2.5, -9); g.lineTo(2.5, 10); g.closePath(); }, lin(g, -3, 0, 3, 0, '#f4f7fb', '#8a95a3'));
         outline(() => { g.beginPath(); g.rect(-8, 10, 16, 3.5); }, '#e3b840'); outline(() => { g.beginPath(); g.rect(-1.8, 13.5, 3.6, 6); }, '#7a4a1c'); g.restore();
+      } else if (name === 'arrow') {
+        g.beginPath(); g.arc(11, 16, 11, -1.15, 1.15); g.strokeStyle = '#120a02'; g.lineWidth = 4.6; g.stroke(); g.strokeStyle = '#e0a860'; g.lineWidth = 2.6; g.stroke();
+        g.strokeStyle = '#120a02'; g.lineWidth = 4; g.beginPath(); g.moveTo(5, 16); g.lineTo(26, 16); g.stroke(); g.strokeStyle = '#f4ecd8'; g.lineWidth = 2; g.stroke();
+        outline(() => { g.beginPath(); g.moveTo(30, 16); g.lineTo(23, 11.5); g.lineTo(23, 20.5); g.closePath(); }, '#cfd6de'); outline(() => { g.beginPath(); g.moveTo(5, 16); g.lineTo(1, 12); g.lineTo(8, 16); g.lineTo(1, 20); g.closePath(); }, '#e0443a');
+      } else if (name === 'wand') {
+        g.strokeStyle = '#120a02'; g.lineWidth = 5; g.lineCap = 'round'; g.beginPath(); g.moveTo(4, 28); g.lineTo(20, 12); g.stroke(); g.strokeStyle = '#9a6a3a'; g.lineWidth = 2.6; g.stroke();
+        outline(() => { g.beginPath(); for (let i = 0; i < 10; i++) { const an = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 3.6 : 8.5; g.lineTo(23 + Math.cos(an) * r, 9 + Math.sin(an) * r); } g.closePath(); }, '#ffe27a');
+      } else if (name === 'boot') {
+        for (const [x, y] of [[10, 22], [21, 11]]) { outline(() => { g.beginPath(); g.ellipse(x, y - 3, 4.6, 6.2, -0.2, 0, 7); }, '#d9a05a'); outline(() => { g.beginPath(); g.ellipse(x + 0.8, y + 5.6, 3, 2.8, -0.2, 0, 7); }, '#c08040'); for (let i = 0; i < 3; i++) { g.fillStyle = '#6a3a14'; g.beginPath(); g.arc(x - 2 + i * 2.2, y - 8.6 + Math.abs(i - 1) * 0.8, 1, 0, 7); g.fill(); } }
       } else if (name === 'no') {
         g.strokeStyle = '#120a02'; g.lineWidth = 6; g.beginPath(); g.arc(16, 16, 10, 0, 7); g.moveTo(9, 23); g.lineTo(23, 9); g.stroke(); g.strokeStyle = '#ff5a48'; g.lineWidth = 3; g.stroke();
       } else {
         outline(() => { g.beginPath(); g.moveTo(8, 4); g.lineTo(8, 24); g.lineTo(13, 19); g.lineTo(17, 28); g.lineTo(20, 26); g.lineTo(16, 18); g.lineTo(23, 18); g.closePath(); }, '#fff');
       }
     });
-    const hot = { horse: '16 16', boat: '16 16', sword: '6 6', no: '16 16' }[name] || '8 4';
+    const hot = { horse: '16 16', boat: '16 16', sword: '6 6', no: '16 16', arrow: '16 16', wand: '5 5', boot: '16 16' }[name] || '8 4';
     return curCache[name] = 'url(' + c.toDataURL() + ') ' + hot + ', ' + (name === 'no' ? 'not-allowed' : name === 'sword' ? 'crosshair' : 'pointer');
   }
 

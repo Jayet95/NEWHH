@@ -821,6 +821,7 @@ const Battle = (() => {
     const res = { win, fled, survivors: surv, xp: win ? Math.floor(B.xp) : 0, mana: B.hero.mana };
     setTimeout(async () => {
       B.canRetreat = false;
+      if (win && typeof Celebrate !== 'undefined') Celebrate.fight();
       const html = fled ? '<h2>🏳️ Retreat</h2><p>Your army fled the field.</p>'
         : win ? `<h2>🏆 Victory!</h2><p>Your forces lost <b>${lost}</b> creatures.</p><p>Experience gained: <b>${res.xp}</b></p>`
           : '<h2>💀 Defeat</h2><p>Your army has been destroyed. The hero retreats to town.</p>';

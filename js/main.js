@@ -889,7 +889,7 @@
   }
   async function conquerTown(h, o, hero) {
     const defenders = defendersOf(o, hero);
-    const cmd = hero ? { name: hero.name, icon: hero.icon, att: eff(hero, 'att'), def: eff(hero, 'def') } : { name: 'Garrison commander', icon: '🏰', att: 4, def: 4 };
+    const cmd = hero ? { name: hero.name, icon: hero.icon, pid: hero.pid, real: hero, att: eff(hero, 'att'), def: eff(hero, 'def') } : { name: 'Garrison commander', icon: '🏰', att: 4, def: 4 };
     if (defenders.length && !(await fight(h, defenders, { att: cmd.att, def: cmd.def }, `Siege of ${o.name}`, siegeOf(o, 1), cmd))) { if (hero) shrinkArmy(hero.army, 0.5); return; }
     if (hero) removeAiHero(hero);
     takeTown(o, 0);
@@ -908,6 +908,33 @@
     if (!G.over && G.ais.every(a => !a.alive)) { endGame(true); return true; }
     return false;
   }
+  // ---------- spoils: gold and resources dropped by defeated armies, and the artifacts a defeated hero was carrying ----------
+  const RES_DROP = ['wood', 'ore', 'mercury', 'sulfur', 'crystal', 'gems'];
+  function collectSpoils(h, guard, foeHero, withLoot = true) {
+    const sp = { gold: 0, res: {}, arts: [], lost: [] };
+    if (withLoot) {
+      const val = guard.filter(Boolean).reduce((s, a) => s + (C[a.t].v || 0) * a.n, 0);
+      sp.gold = Math.round(val * (0.1 + Math.random() * 0.15) * (foeHero ? 0.8 : 1) / 10) * 10;
+      if (Math.random() < (foeHero ? 0.5 : 0.35)) { const k = RES_DROP[Math.floor(Math.random() * RES_DROP.length)]; sp.res[k] = Math.max(1, Math.min(14, Math.round(2 + val / 1500 * (1 + Math.random())))); }
+    }
+    if (foeHero) {
+      const items = [...Object.values(foeHero.arts || {}).filter(Boolean), ...(foeHero.pack || [])];
+      foeHero.arts = {}; foeHero.pack = []; foeHero.av = (foeHero.av || 0) + 1;
+      for (const id of items) (giveArt(h, id) === 'full' ? sp.lost : sp.arts).push(id);
+    }
+    if (sp.gold) G.res.gold += sp.gold;
+    for (const k in sp.res) G.res[k] += sp.res[k];
+    return (sp.gold || sp.arts.length || sp.lost.length || Object.keys(sp.res).length) ? sp : null;
+  }
+  async function spoilsModal(sp, who) {
+    const lines = [];
+    if (sp.gold) lines.push(`${RES_ICON.gold} <b>${sp.gold}</b> gold`);
+    for (const k in sp.res) lines.push(`${RES_ICON[k]} <b>${sp.res[k]}</b> ${k}`);
+    for (const id of sp.arts) lines.push(`${ART[id].i} <b>${ART[id].n}</b> <span class="small">(${artStats(ART[id])})</span>`);
+    for (const id of sp.lost) lines.push(`<span class="small">${ART[id].i} ${ART[id].n} — backpack full, left behind</span>`);
+    sfx('coin'); if (typeof Celebrate !== 'undefined') Celebrate.loot();
+    await showModal(`<h2>💰 Spoils of war</h2><p>${who} searches the battlefield and claims:</p><div style="line-height:1.8">${lines.join('<br>')}</div>${sp.arts.length ? '<p class="small">Captured artifacts were added to the hero (equipped if a slot was free, otherwise in the backpack).</p>' : ''}`, ['Collect']);
+  }
   async function fight(h, guard, eStats, title, siege, eHero) {
     if (!armyCount(h)) { toast(`${h.name} has no army! Recruit in town first.`); return false; }
     const res = await Battle.run({ hero: { att: eff(h, 'att'), def: eff(h, 'def'), sp: eff(h, 'sp'), mana: h.mana, spells: G.spells, perks: perksOf(h), name: h.name, icon: h.icon, pid: h.pid, morale: heroMorale(h), luck: heroLuck(h) },
@@ -921,6 +948,8 @@
         if (raised > 0 && addToArmy(h, 'necropolis1', raised)) toast(`💀 ${h.name} raises ${raised} skeletons from the fallen (Necromancy ${RANK_NAMES[nec]}).`);
       }
       await gainXp(h, res.xp);
+      const foe = eHero && (eHero.real || (eHero.arts || eHero.pack ? eHero : null));
+      if (!siege || foe) { const sp = collectSpoils(h, guard, foe, !siege || !!foe); if (sp) { renderAll(); await spoilsModal(sp, h.name); } }
     } else {
       const tw = nearestTown(h.x, h.y), foe = armyList(guard.filter(Boolean), true);
       retreat(h); renderAll();
@@ -1349,7 +1378,11 @@
     const res = await Battle.run({ hero: { att: 0, def: 3, sp: 0, mana: 0, spells: [], perks: {}, name: 'Garrison', icon: '🛡️' }, army: gar, enemy: ah.army.map(a => a && ({ ...a })),
       eStats: { att: eff(ah, 'att'), def: eff(ah, 'def') }, eHero: ah, title: `Defending ${o.name}`, siege: siegeOf(o, 0), canRetreat: false });
     res.survivors.forEach((n, i) => { if (gar[i]) { if (n > 0) gar[i].n = n; else gar[i] = null; } });
-    if (res.win) { removeAiHero(ah); toast(`${o.name} held! ${ah.name} is slain.`); return true; }
+    if (res.win) {
+      removeAiHero(ah); toast(`${o.name} held! ${ah.name} is slain.`);
+      const sp = collectSpoils(G.hero, ah.army, ah, true); if (sp) { renderAll(); await spoilsModal(sp, 'Your garrison'); }
+      return true;
+    }
     shrinkArmy(ah.army, 0.5);
     await aiCapture(o, ah);
     return false;
@@ -1623,7 +1656,7 @@
     try { localStorage.setItem(SAVE, saveJSON()); } catch (e) { /* ignore */ }
   }
   async function endGame(win, why) {
-    G.over = true; sfx(win ? 'win' : 'lose');
+    G.over = true; sfx(win ? 'fanfare' : 'lose'); if (win && typeof Celebrate !== 'undefined') Celebrate.game();
     try { localStorage.removeItem(SAVE); } catch (e) { /* ignore */ }
     await showModal(win ? `<h2>🏆 Victory!</h2><p>Every rival has lost its towns: you rule the realm on day ${G.day} (${DF().name}). Well fought!</p>` : `<h2>💀 Defeat</h2><p>${why || 'Your hero has fallen.'}</p>`, ['Main menu']);
     $('title').classList.remove('hide'); refreshTitle();

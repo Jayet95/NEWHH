@@ -103,7 +103,11 @@ const TownArt = (() => {
   const cache = {};
   function sprite(kind, lv, fac, id) {
     const hue = hueOf(fac), key = [kind, lv, hue, id || ''].join('|');
-    return cache[key] || (cache[key] = mk(128, 144, (g) => { g.scale(2, 2); const f = { dwell: () => dwelling(g, +(String(id).match(/(\d)(?:_\d)?$/) || [0, 1])[1], lv, hue, id), hall: () => hall(g, Math.max(1, lv), hue), guild: () => guild(g, Math.max(1, lv), hue), market: () => market(g, 1, hue), ship: () => ship(g, 1, hue), fort: () => fortKind(g, lv, hue), mines: () => minesKind(g, lv), tavern: () => tavern(g, 1, hue), garrison: () => garrison(g, 1, hue) }[kind]; if (f) f(); }));
+    return cache[key] || (cache[key] = mk(128, 144, (g) => {
+      const nm = kind === 'dwell' ? ['buildings/' + id, 'buildings/' + String(id).replace(/_\d$/, '')] : ['buildings/' + fac + '_' + kind + '_' + lv, 'buildings/' + kind + '_' + lv, 'buildings/' + fac + '_' + kind, 'buildings/' + kind];
+      const ai = typeof Assets !== 'undefined' ? Assets.get(...nm) : null;
+      if (ai) { const k = Math.min(128 / ai.width, 144 / ai.height); g.drawImage(ai, 64 - ai.width * k / 2, 144 - ai.height * k, ai.width * k, ai.height * k); return; }
+      g.scale(2, 2); const f = { dwell: () => dwelling(g, +(String(id).match(/(\d)(?:_\d)?$/) || [0, 1])[1], lv, hue, id), hall: () => hall(g, Math.max(1, lv), hue), guild: () => guild(g, Math.max(1, lv), hue), market: () => market(g, 1, hue), ship: () => ship(g, 1, hue), fort: () => fortKind(g, lv, hue), mines: () => minesKind(g, lv), tavern: () => tavern(g, 1, hue), garrison: () => garrison(g, 1, hue) }[kind]; if (f) f(); }));
   }
   const url = {};
   const pic = (kind, lv, fac, px = 40, id) => { const key = [kind, lv, fac, id || ''].join('|'); return `<img class="pic" style="width:${px}px;height:${Math.round(px * 1.12)}px;object-fit:contain" alt="" src="${url[key] || (url[key] = sprite(kind, lv, fac, id).toDataURL())}">`; };
@@ -137,5 +141,6 @@ const TownArt = (() => {
     }
     for (let i = 0; i < (t.minel || 0); i++) { const mx = 120 + i * 220; g.fillStyle = '#2a2a30'; g.beginPath(); g.arc(mx, H - 7, 4.2, 0, 7); g.fill(); g.strokeStyle = '#f0b040'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(mx + 2, H - 10); g.lineTo(mx + 5, H - 14); g.stroke(); }
   }
-  return { sprite, pic, scene, drawFort, hueOf };
+  const reload = () => { for (const k in cache) delete cache[k]; for (const k in url) delete url[k]; };
+  return { reload, sprite, pic, scene, drawFort, hueOf };
 })();

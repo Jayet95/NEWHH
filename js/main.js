@@ -1936,6 +1936,13 @@
   $('mLand').onclick = () => sheetOpen('🗺️ Territory', [$('mini'), $('terr')]);
   $('mMenu').onclick = () => openMenu();
 
+  // custom art from art/ finished loading: rebuild every cached picture, set the title artwork
+  document.addEventListener('assets-ready', () => {
+    try { Art.reload(); TownArt.reload(); Icons.reload(); } catch (e) { /* ignore */ }
+    const bg = Assets.get('ui/title'); if (bg) $('title').style.background = `url(${bg.src}) center / cover no-repeat`;
+    const logo = Assets.get('ui/logo'); if (logo) { const h1 = document.querySelector('#title h1'); if (h1) h1.innerHTML = `<img src="${logo.src}" alt="Day &amp; Night" style="max-width:100%;max-height:150px">`; }
+    if (G) { buildTerrain(); renderAll(); }
+  });
   // ==== UI SCREENS ====
   const modalOpen = (html) => { $('mbox').innerHTML = html; $('modal').classList.remove('hide'); };
   const closeModal = () => { $('modal').classList.add('hide'); renderAll(); };

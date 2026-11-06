@@ -73,6 +73,8 @@ const Icons = (() => {
   }
   function canvas(kind, key) {
     const k = kind + ':' + key; if (cache[k]) return cache[k];
+    const custom = typeof Assets !== 'undefined' ? Assets.get('icons/' + kind + '_' + key) : null;
+    if (custom) { const cc = document.createElement('canvas'); cc.width = cc.height = 64; cc.getContext('2d').drawImage(custom, 0, 0, 64, 64); return cache[k] = cc; }
     const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); g.scale(2, 2);
     let h = 30, s = 40, l = 36, glyph = 'gem', tier = 0;
     if (kind === 'spell') { const sp = SPELLS[key]; h = SCHOOL_H[sp.school]; s = 62; l = 40; glyph = SPELL_G[key] || 'star'; }
@@ -98,5 +100,6 @@ const Icons = (() => {
     return `<img class="ico" draggable="false" width="${px}" height="${px}" alt="" src="${urls[k] || (urls[k] = cache[k].toDataURL())}">`;
   };
   const lockedHtml = (px = 44) => `<span class="ico lockedico" style="width:${px}px;height:${px}px">🔒</span>`;
-  return { canvas, html, glyphHtml, lockedHtml };
+  const reload = () => { for (const k in cache) delete cache[k]; for (const k in urls) delete urls[k]; for (const k in SPELLS) SPELLS[k].i = html('spell', k); for (const k in PERKS) PERKS[k].i = html('perk', k); for (const k in ART) ART[k].i = html('art', k); };
+  return { reload, canvas, html, glyphHtml, lockedHtml };
 })();

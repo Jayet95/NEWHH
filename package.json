@@ -8,7 +8,9 @@
     "build": "node tools/build.js",
     "deploy": "node tools/build.js && npx wrangler deploy",
     "sim": "node tools/sim.js",
-    "android": "node tools/build.js && npx cap sync android"
+    "android": "node tools/build.js && npx cap sync android",
+    "art": "node tools/make_manifest.js",
+    "checklist": "node tools/art_checklist.js"
   },
   "devDependencies": {
     "@capacitor/android": "^8.6.0",

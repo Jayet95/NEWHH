@@ -59,7 +59,7 @@ const Art = (() => {
     },
   };
   const resCache = {};
-  function resCanvas(k, size = 48) { const key = k + size; return resCache[key] || (resCache[key] = mk(size, size, (g) => { g.scale(size / 64, size / 64); g.lineWidth = 1.5; (RES_DRAW[k] || RES_DRAW.gold)(g); })); }
+  function resCanvas(k, size = 48) { const key = k + size; return resCache[key] || (resCache[key] = mk(size, size, (g) => { const ai = typeof Assets !== 'undefined' ? Assets.get('icons/res_' + k) : null; if (ai) { g.drawImage(ai, 0, 0, size, size); return; } g.scale(size / 64, size / 64); g.lineWidth = 1.5; (RES_DRAW[k] || RES_DRAW.gold)(g); })); }
   const resUrl = {};
   function resImg(k) { return `<img class="ri" alt="${k}" src="${resUrl[k] || (resUrl[k] = resCanvas(k).toDataURL())}">`; }
 
@@ -203,19 +203,27 @@ const Art = (() => {
     },
   };
   const spriteCache = {};
+  const contain = (g, img, w, h) => { const k = Math.min(w / img.width, h / img.height); g.drawImage(img, w / 2 - img.width * k / 2, h - img.height * k, img.width * k, img.height * k); };
   function obj(o, fac) {
+    if (typeof Assets !== 'undefined') {
+      const f2 = fac || o.fac || '', kd = o.kind ? '_' + o.kind : '';
+      const names = [o.t + kd + (o.t === 'town' || o.t === 'dwelling' ? '_' + f2 : ''), o.t + kd, o.t].map(n => 'objects/' + n);
+      const ai = Assets.get(...names);
+      if (ai) return spriteCache['A|' + names[0]] || (spriteCache['A|' + names[0]] = mk(64, 64, (g) => contain(g, ai, 64, 64)));
+    }
     const draw = OBJ[o.t]; if (!draw) return null;
     const hue = facHue(fac || o.fac);
     const key = [o.t, o.kind || '', hue, o.tier || '', o.t === 'art' ? o.art : ''].join('|');
     return spriteCache[key] || (spriteCache[key] = mk(64, 64, (g) => { g.lineWidth = 1.5; g.lineJoin = 'round'; draw(g, o, hue); }));
   }
-  const boatC = () => spriteCache.boat || (spriteCache.boat = mk(64, 64, (g) => {
+  const boatC0 = () => spriteCache.boat || (spriteCache.boat = mk(64, 64, (g) => {
     g.lineJoin = 'round'; g.lineWidth = 1.5; ell(g, 32, 54, 26, 5, 'rgba(255,255,255,.35)');
     poly(g, [[6, 40], [58, 40], [50, 54], [14, 54]], lin(g, 0, 40, 0, 54, '#a8743a', '#5e3a14'), '#2b1808');
     g.strokeStyle = '#4a2d12'; g.lineWidth = 3; g.beginPath(); g.moveTo(32, 42); g.lineTo(32, 6); g.stroke(); g.lineWidth = 1.5;
     poly(g, [[34, 8], [56, 36], [34, 36]], '#f5efe0', '#6a6355'); poly(g, [[30, 12], [12, 36], [30, 36]], '#e5dcc4', '#6a6355'); flag(g, 32, 8, '#e0443a');
   }));
 
+  const boatC = () => { const ai = typeof Assets !== 'undefined' ? Assets.get('objects/boat') : null; return ai ? (spriteCache.boatA || (spriteCache.boatA = mk(64, 64, (g) => contain(g, ai, 64, 64)))) : boatC0(); };
   // ---------- terrain (pointy-top hexes, odd-r offset: odd rows are shifted half a hex to the right) ----------
   const HR = 32 / Math.sqrt(3);
   const hexPt = (cx, cy, R, i) => { const a = (60 * i - 30) * Math.PI / 180; return [cx + R * Math.cos(a), cy + R * Math.sin(a)]; };
@@ -223,6 +231,10 @@ const Art = (() => {
   function hexEdge(g, cx, cy, R, i) { const a = hexPt(cx, cy, R, i), b = hexPt(cx, cy, R, (i + 1) % 6); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
   function tile(c, t, x, y, G) {
     const cxp = (x + .5 + (y & 1) * .5) * 32, cyp = y * HR * 1.5 + HR, px = cxp - 16, py = cyp - 16, r = (i) => h2(x * 31 + i * 17, y * 57 + i * 11);
+    if (typeof Assets !== 'undefined') {
+      const tn = { [T.GRASS]: 'grass', [T.FOREST]: 'forest', [T.MOUNT]: 'mountain', [T.WATER]: 'water', [T.ROAD]: 'road', [T.SAND]: 'sand' }[t], ta = Assets.get('terrain/' + tn + '_' + (1 + Math.floor(r(0) * 4)), 'terrain/' + tn);
+      if (ta) { c.save(); hexPath(c, cxp, cyp, HR + .7); c.clip(); c.drawImage(ta, cxp - 17, cyp - HR - 1, 34, HR * 2 + 2); c.restore(); return; }
+    }
     const nb = hexNb(x, y), nt = (i) => { const p = nb[i]; return (p[0] < 0 || p[1] < 0 || p[0] >= G.W || p[1] >= G.H) ? t : G.tiles[p[1]][p[0]]; };
     const base = { [T.GRASS]: [82, 134, 62], [T.FOREST]: [48, 96, 44], [T.MOUNT]: [104, 94, 84], [T.WATER]: [36, 88, 146], [T.ROAD]: [170, 140, 94], [T.SAND]: [206, 184, 114] }[t];
     const v = (r(0) - .5) * 14;
@@ -302,8 +314,9 @@ const Art = (() => {
       ell(g, S * .5, S * .8, S * .3, S * .07, 'rgba(0,0,0,.45)');
       if (c.fly) { g.strokeStyle = 'rgba(255,255,255,.28)'; g.lineWidth = S * .035; g.beginPath(); g.arc(S * .2, S * .45, S * .22, -1.2, 1.0); g.moveTo(S * .8 + S * .22 * Math.cos(2.1), S * .45); g.arc(S * .8, S * .45, S * .22, Math.PI - 1.0, Math.PI + 1.2); g.stroke(); }
       g.restore();
-      const fig = typeof Figures !== 'undefined' ? Figures.sprite(id) : null;
-      if (fig) g.drawImage(fig, S * .09, S * .05, S * .82, S * .82);
+      const ai = typeof Assets !== 'undefined' ? Assets.get('creatures/' + id, 'creatures/' + String(id).replace(/_\d$/, '')) : null;
+      const fig = ai || (typeof Figures !== 'undefined' ? Figures.sprite(id) : null);
+      if (fig) { const kk = Math.min(S * .82 / fig.width, S * .82 / fig.height); g.drawImage(fig, S * .5 - fig.width * kk / 2, S * .87 - fig.height * kk, fig.width * kk, fig.height * kk); }
       else { g.font = Math.round(S * .56) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = 'rgba(0,0,0,.65)'; g.shadowBlur = S * .06; g.shadowOffsetY = S * .03; g.fillStyle = '#fff'; g.fillText(c.i, S * .5, S * .47); g.shadowColor = 'transparent'; }
       for (const [x, y] of [[S * .13, S * .13], [S * .87, S * .13], [S * .13, S * .87], [S * .87, S * .87]]) { g.beginPath(); g.arc(x, y, S * .028, 0, 7); g.fillStyle = m[0]; g.fill(); }
       const n = Math.min(4, lv - 1); for (let k = 0; k < n; k++) star(g, S * .5 + (k - (n - 1) / 2) * S * .15, S * .87, S * .068);
@@ -315,7 +328,7 @@ const Art = (() => {
     return heroCache[key] = mk(S, S, (g) => {
       const c = S / 2; g.beginPath(); g.arc(c, c, c - 1, 0, 7); g.fillStyle = lin(g, 0, 0, S, S, '#fff3b0', '#8a6210'); g.fill(); g.strokeStyle = '#140c04'; g.lineWidth = 1.5; g.stroke();
       g.beginPath(); g.arc(c, c, c * .86, 0, 7); g.fillStyle = col; g.fill();
-      const def = pid && typeof HEROES !== 'undefined' ? HEROES[pid] : null, bust = def && typeof Figures !== 'undefined' && Figures.hero ? Figures.hero(def) : null;
+      const def = pid && typeof HEROES !== 'undefined' ? HEROES[pid] : null, bust = (pid && typeof Assets !== 'undefined' && Assets.get('heroes/' + pid)) || (def && typeof Figures !== 'undefined' && Figures.hero ? Figures.hero(def) : null);
       if (bust) { g.save(); g.beginPath(); g.arc(c, c, c * .74, 0, 7); g.clip(); g.drawImage(bust, c - c * .74, c - c * .74, c * 1.48, c * 1.48); g.restore(); g.beginPath(); g.arc(c, c, c * .74, 0, 7); g.strokeStyle = 'rgba(0,0,0,.5)'; g.lineWidth = 1.2; g.stroke(); return; }
       g.beginPath(); g.arc(c, c, c * .74, 0, 7); const bg = g.createRadialGradient(c * .8, c * .7, 2, c, c, c * .85); bg.addColorStop(0, col); bg.addColorStop(1, '#0c1020'); g.fillStyle = bg; g.fill();
       g.font = Math.round(S * .46) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = 'rgba(0,0,0,.6)'; g.shadowBlur = S * .06; g.fillStyle = '#fff'; g.fillText(icon, c, c + S * .02);
@@ -359,5 +372,7 @@ const Art = (() => {
     return curCache[name] = 'url(' + c.toDataURL() + ') ' + hot + ', ' + (name === 'no' ? 'not-allowed' : name === 'sword' ? 'crosshair' : 'pointer');
   }
 
-  return { tile, hexPath, hexPt, HR, cursor, rarity, portraitCanvas, heroCanvas, pic, heroPic, obj, boat: boatC, resImg, resCanvas, RES_EMOJI, fmtCostTxt, facHue };
+  // after custom art finishes loading: forget everything painted so far and rebuild the icon strings
+  function reload() { for (const o of [resCache, resUrl, spriteCache, portCache, heroCache, urlCache]) for (const k in o) delete o[k]; for (const k of Object.keys(RES_ICON)) RES_ICON[k] = resImg(k); }
+  return { reload, tile, hexPath, hexPt, HR, cursor, rarity, portraitCanvas, heroCanvas, pic, heroPic, obj, boat: boatC, resImg, resCanvas, RES_EMOJI, fmtCostTxt, facHue };
 })();

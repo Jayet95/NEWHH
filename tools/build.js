@@ -15,6 +15,9 @@ const copy = (rel) => fs.copyFileSync(path.join(root, rel), path.join(dist, rel)
 fs.writeFileSync(path.join(dist, 'index.html'), fs.readFileSync(path.join(dist, 'index.html'), 'utf8').replace(/(src="js\/[\w.]+\.js|href="style\.css)"/g, '$1?v=' + version + '"'));
 fs.readdirSync(path.join(root, 'js')).filter((f) => f.endsWith('.js')).forEach((f) => copy('js/' + f));
 if (fs.existsSync(path.join(root, 'icons'))) fs.readdirSync(path.join(root, 'icons')).forEach((f) => copy('icons/' + f));
+// optional hand-made art: write its manifest and copy the folder
+require('./make_manifest')(root);
+if (fs.existsSync(path.join(root, 'art'))) fs.cpSync(path.join(root, 'art'), path.join(dist, 'art'), { recursive: true });
 fs.writeFileSync(path.join(dist, 'sw.js'), fs.readFileSync(path.join(root, 'sw.js'), 'utf8').replace('__VERSION__', version));
 
 const size = (d) => fs.readdirSync(d, { withFileTypes: true }).reduce((s, e) => s + (e.isDirectory() ? size(path.join(d, e.name)) : fs.statSync(path.join(d, e.name)).size), 0);

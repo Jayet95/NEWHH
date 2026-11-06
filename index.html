@@ -23,7 +23,9 @@
       <button id="bSnd" title="Sound on/off">🔊</button>
       <button id="bSave" title="Save game">💾</button>
       <button id="bHelp" title="Help">❓</button>
-      <button id="bMenu" title="Back to the main menu (Esc)">🚪 Menu</button>
+      <button id="bKd" title="Kingdom overview (K)">📋 Kingdom</button>
+      <button id="bSet" title="Settings">⚙</button>
+      <button id="bMenu" title="Menu (Esc)">☰ Menu</button>
     </div>
   </header>
   <div id="game">
@@ -34,6 +36,7 @@
       <div id="tip" class="hide"></div>
       <div id="banner"></div>
       <div id="toast"></div>
+      <div id="autosave" class="hide">💾 Autosaved</div>
     </div>
     <aside id="side">
       <canvas id="mini" width="240" height="168"></canvas>
@@ -70,6 +73,7 @@
     <button id="mEnd" class="primary"><b>⏭</b><span>End turn</span></button>
     <button id="mMenu" title="Menu"><b>☰</b><span>Menu</span></button>
   </nav>
+  <div id="hint" class="hide"><div id="hintTxt"></div><div class="hb"><button id="hintOk" class="primary">Got it</button><button id="hintOff">Hide hints</button></div></div>
   <div id="modal" class="hide"><div id="mres"></div><div id="mbox"></div></div>
   <div id="title">
     <div class="titlebox">
@@ -78,17 +82,23 @@
       <div class="col">
         <button id="tNew" class="primary">New Game</button>
         <button id="tCont">Continue</button>
+        <button id="tLoad">Load game</button>
+        <button id="tAch">🏆 Achievements</button>
+        <button id="tSet">⚙ Settings</button>
         <button id="tHelp">How to Play</button>
       </div>
     </div>
   </div>
 </div>
+<script src="js/settings.js"></script>
 <script src="js/sfx.js"></script>
 <script src="js/fx.js"></script>
 <script src="js/data.js"></script>
 <script src="js/art.js"></script>
 <script src="js/figures.js"></script>
 <script src="js/townart.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/ach.js"></script>
 <script src="js/map.js"></script>
 <script src="js/battle.js"></script>
 <script src="js/main.js"></script>

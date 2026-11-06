@@ -1,21 +1,26 @@
 'use strict';
-// Tiny WebAudio synth: no audio files needed.
+// Tiny WebAudio synth: no audio files needed. Effects + a soft generative background tune (volumes come from Settings).
 const Sfx = (() => {
-  let ac = null, on = true;
+  let ac = null, on = true, master = null, musicGain = null, mood = 'map', musicTimer = null, step = 0;
   try { on = localStorage.getItem('h3js_snd') !== '0'; } catch (e) { /* ignore */ }
+  const sv = () => (typeof Settings !== 'undefined' ? Settings.sfxVol : 0.8), mv = () => (typeof Settings !== 'undefined' ? Settings.musicVol : 0.35);
   const ctx = () => {
-    if (!ac) { const A = window.AudioContext || window.webkitAudioContext; if (A) ac = new A(); }
+    if (!ac) {
+      const A = window.AudioContext || window.webkitAudioContext;
+      if (A) { ac = new A(); master = ac.createGain(); master.connect(ac.destination); musicGain = ac.createGain(); musicGain.connect(ac.destination); }
+    }
     if (ac && ac.state === 'suspended') ac.resume();
     return ac;
   };
-  function tone(f, d = 0.1, type = 'square', vol = 0.05, slide = 0, delay = 0) {
+  function tone(f, d = 0.1, type = 'square', vol = 0.05, slide = 0, delay = 0, bus) {
     if (!on) return;
     const a = ctx(); if (!a) return;
-    const t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain();
+    const t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain(), v = vol * (bus === 'music' ? 1 : sv() * 1.25);
+    if (v <= 0.0002) return;
     o.type = type; o.frequency.setValueAtTime(f, t);
     if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, f + slide), t + d);
-    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
-    o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + d + 0.02);
+    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    o.connect(g); g.connect(bus === 'music' ? musicGain : master); o.start(t); o.stop(t + d + 0.02);
   }
   const seq = (notes, d, type, vol, gap) => notes.forEach((f, i) => tone(f, d, type, vol, 0, i * gap));
   const S = {
@@ -33,10 +38,29 @@ const Sfx = (() => {
     lose: () => seq([392, 330, 262, 196], 0.22, 'sawtooth', 0.05, 0.18),
     turn: () => tone(330, 0.1, 'sine', 0.04),
     day: () => seq([392, 523], 0.12, 'sine', 0.05, 0.1),
+    ach: () => seq([659, 880, 1175, 1568], 0.16, 'triangle', 0.06, 0.1),
   };
+  const BUZZ = { hit: 14, crash: 40, win: [30, 40, 30], level: [20, 30, 20], build: 18, ach: [25, 40, 25] };
+  // gentle generative tune: slow minor-pentatonic notes over a low drone; faster and edgier in battle
+  const SCALE = { map: [220, 261.6, 293.7, 329.6, 392, 440, 523.3], battle: [196, 233.1, 261.6, 293.7, 349.2, 392, 466.2] };
+  function musicTick() {
+    if (!on || mv() <= 0.001 || document.hidden) return;
+    const a = ctx(); if (!a) return;
+    const sc = SCALE[mood], vol = 0.035 * mv() * 2.2;
+    const f = sc[(step * 3 + ((Math.random() * 3) | 0)) % sc.length] * (Math.random() < 0.2 ? 2 : 1);
+    tone(f, mood === 'battle' ? 0.5 : 1.6, 'triangle', vol, 0, 0, 'music');
+    if (step % 4 === 0) tone(sc[0] / 2, 3.2, 'sine', vol * 0.9, 0, 0, 'music');
+    step++;
+  }
+  function startMusic() { if (musicTimer) return; musicTimer = setInterval(musicTick, 900); }
   return {
-    play(n) { try { if (S[n]) S[n](); } catch (e) { /* ignore */ } },
+    play(n) { try { if (S[n]) S[n](); if (BUZZ[n] && typeof Settings !== 'undefined') Settings.buzz(BUZZ[n]); } catch (e) { /* ignore */ } },
     toggle() { on = !on; try { localStorage.setItem('h3js_snd', on ? '1' : '0'); } catch (e) { /* ignore */ } return on; },
     get on() { return on; },
+    mood(m) { mood = m; },
+    refresh() { /* volumes are read live */ },
+    startMusic,
   };
 })();
+// browsers only allow sound after a gesture: start the tune on the first tap or key press
+if (typeof document !== 'undefined') { const go = () => { Sfx.startMusic(); document.removeEventListener('pointerdown', go); document.removeEventListener('keydown', go); }; document.addEventListener('pointerdown', go); document.addEventListener('keydown', go); }

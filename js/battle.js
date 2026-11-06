@@ -5,7 +5,8 @@ const Battle = (() => {
   const EVEN = [[1, 0], [0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1]];
   const ODD = [[1, 0], [1, -1], [0, -1], [-1, 0], [0, 1], [1, 1]];
   const FONT = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
-  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const spd = () => (typeof Settings !== 'undefined' ? Settings.animSpeed : 1);
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms / spd()));
   const raf = () => new Promise(r => requestAnimationFrame(r));
   const $ = (id) => document.getElementById(id);
 
@@ -153,6 +154,7 @@ const Battle = (() => {
 
   async function tweenTo(s, x, y, ms) {
     if (typeof document !== 'undefined' && document.hidden) { s.px = x; s.py = y; return; }
+    ms /= spd();
     const x0 = s.px, y0 = s.py, t0 = performance.now();
     for (;;) {
       const k = Math.min(1, (performance.now() - t0) / ms);
@@ -195,15 +197,15 @@ const Battle = (() => {
   const styleOf = (s) => (typeof Figures !== 'undefined' && Figures.style) ? Figures.style(s.t) : { melee: 'slash', shoot: 'arrow', col: null };
   async function strike(s, t) {
     const a = hexPx(s.c, s.r), p = hexPx(t.c, t.r), now = performance.now();
-    s.anim = { kind: 'lunge', t0: now, dur: 300, dx: p.x - a.x, dy: p.y - a.y };
-    (B.slashes = B.slashes || []).push({ x: p.x, y: p.y, t0: now + 110, dur: 340, style: styleOf(s).melee, ang: Math.atan2(p.y - a.y, p.x - a.x) });
+    s.anim = { kind: 'lunge', t0: now, dur: 300 / spd(), dx: p.x - a.x, dy: p.y - a.y };
+    (B.slashes = B.slashes || []).push({ x: p.x, y: p.y, t0: now + 110 / spd(), dur: 340 / spd(), style: styleOf(s).melee, ang: Math.atan2(p.y - a.y, p.x - a.x) });
     await sleep(120);
   }
   async function fireProj(s, tg) {
-    const a = hexPx(s.c, s.r), p = hexPx(tg.c, tg.r), now = performance.now(), st = styleOf(s), dur = Math.max(220, Math.min(520, Math.hypot(p.x - a.x, p.y - a.y) * 1.1));
-    s.anim = { kind: 'shoot', t0: now, dur: 320, dx: p.x - a.x, dy: p.y - a.y };
-    (B.proj = B.proj || []).push({ ax: a.x, ay: a.y - 6, bx: p.x, by: p.y - 6, t0: now + 130, dur, style: st.shoot, col: st.col });
-    await sleep(130 + dur);
+    const a = hexPx(s.c, s.r), p = hexPx(tg.c, tg.r), now = performance.now(), st = styleOf(s), dur = Math.max(220, Math.min(520, Math.hypot(p.x - a.x, p.y - a.y) * 1.1)) / spd();
+    s.anim = { kind: 'shoot', t0: now, dur: 320 / spd(), dx: p.x - a.x, dy: p.y - a.y };
+    (B.proj = B.proj || []).push({ ax: a.x, ay: a.y - 6, bx: p.x, by: p.y - 6, t0: now + 130 / spd(), dur, style: st.shoot, col: st.col });
+    await sleep(130 + dur * spd());
   }
   async function doMelee(s, e, spot) {
     const origin = { c: s.c, r: s.r }, moved = hexDist(s, spot);
@@ -551,7 +553,7 @@ const Battle = (() => {
     const ks = [...B.hero.spells].sort((a, b) => order[SPELLS[a].school] - order[SPELLS[b].school] || SPELLS[a].lv - SPELLS[b].lv);
     for (const k of ks) {
       const sp = SPELLS[k], b = document.createElement('button'), rk = spellRank(sp), ok = spellOk(sp);
-      b.textContent = `${sp.i} ${sp.n} · ${SCHOOL_ICON[sp.school]}${rk ? ' ' + RANK_NAMES[rk] : ''} · L${sp.lv} (${sp.cost})`;
+      b.innerHTML = `${sp.i} ${sp.n} · ${SCHOOL_ICON[sp.school]}${rk ? ' ' + RANK_NAMES[rk] : ''} · L${sp.lv} (${sp.cost})`;
       b.title = `${sp.desc}${ok ? '' : `\nNeeds Wisdom rank ${sp.lv - 2}`}`;
       b.disabled = B.hero.mana < sp.cost || !ok;
       b.onclick = () => { B.spell = k; list.classList.add('hide'); toast(sp.n + ': pick a ' + (sp.tgt === 'enemy' ? 'enemy' : 'friendly') + ' stack'); };
@@ -805,8 +807,11 @@ const Battle = (() => {
     ctx.fillText(`${c.i} ${s.n} ${c.n}${'★'.repeat((c.lv || 1) - 1)}   Att ${attackOf(s)}  Def ${defenceOf(s)}  Dmg ${c.lo}-${c.hi}  HP ${s.hp}/${c.hp}  Spd ${speedOf(s)}${c.shoot ? `  Archer · Ammo ${s.ammo}` : ''}${c.fly ? '  Flying' : ''}`, 14, 612);
     if (B.cur && B.cur.side === 0 && h && stackAt(h.c, h.r) && stackAt(h.c, h.r).side === 1 && B.input) {
       const e = stackAt(h.c, h.r), a = B.cur;
-      const d = calcDmg(a, e, !canShoot(a), true), kills = Math.floor(Math.min(d, totalHp(e)) / C[e.t].hp);
-      ctx.fillStyle = '#ffb3a8'; ctx.fillText(`${canShoot(a) ? 'Shoot' : 'Attack'}: ~${d} dmg (~${kills} kills)${canShoot(a) ? rangeNote(a, e) : ''}`, 14, 630);
+      const shoot = canShoot(a), d = calcDmg(a, e, !shoot, true) * (abil(a, 'dstrike') && !shoot ? 2 : 1), th = totalHp(e), kills = d >= th ? e.n : Math.max(0, e.n - Math.ceil((th - d) / C[e.t].hp));
+      let ret = 0; if (!shoot && d < th && !abil(a, 'noRet') && (abil(e, 'unlimRet') || e.ret)) ret = calcDmg(e, a, true, true);
+      const rk = ret ? Math.min(a.n, Math.floor(ret / C[a.t].hp)) : 0;
+      ctx.fillStyle = '#ffb3a8'; ctx.fillText(`${shoot ? 'Shoot' : 'Attack'}: ~${d} dmg (~${kills} kills)${ret ? `   ↩ retaliation ~${ret} (~${rk} lost)` : ''}${shoot ? rangeNote(a, e) : ''}`, 14, 630);
+      { const bp = hexPx(e.c, e.r), txt = `-${d}  ☠${kills}${ret ? '  ↩' + rk : ''}`; ctx.font = 'bold 13px sans-serif'; const tw = ctx.measureText(txt).width + 14; ctx.fillStyle = 'rgba(20,8,4,.88)'; ctx.fillRect(bp.x - tw / 2, bp.y - 52, tw, 20); ctx.strokeStyle = kills >= e.n ? '#6fd36f' : '#ffb3a8'; ctx.lineWidth = 1.5; ctx.strokeRect(bp.x - tw / 2, bp.y - 52, tw, 20); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText(txt, bp.x, bp.y - 41); ctx.textAlign = 'left'; ctx.font = '14px sans-serif'; }
       if (canShoot(a) && hexDist(a, e) > 10) { const ep = hexPx(e.c, e.r); ctx.font = '22px ' + FONT; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText('💔', ep.x + 18, ep.y - 22); ctx.textAlign = 'left'; ctx.font = '14px sans-serif'; }
     } else {
       const at = abilityText(s.t);
@@ -817,7 +822,7 @@ const Battle = (() => {
   // ------- setup / finish -------
   function finish(win, fled) {
     if (B.over) return;
-    B.over = true; sfx(win ? 'win' : fled ? 'click' : 'lose');
+    B.over = true; sfx(win ? 'win' : fled ? 'click' : 'lose'); if (typeof Sfx !== 'undefined') Sfx.mood('map');
     const surv = B.armyIn.map((a, i) => { if (!a) return null; const st = B.stacks.find(s => s.side === 0 && s.slot === i); return st && !st.dead ? st.n : 0; });
     const lost = B.armyIn.map((a, i) => a ? a.n - (surv[i] || 0) : 0).reduce((p, v) => p + v, 0);
     const res = { win, fled, survivors: surv, xp: win ? Math.floor(B.xp) : 0, mana: B.hero.mana };
@@ -835,7 +840,7 @@ const Battle = (() => {
   }
 
   function run(opts) {
-    cv = $('bat'); ctx = cv.getContext('2d'); bind();
+    cv = $('bat'); ctx = cv.getContext('2d'); bind(); if (typeof Sfx !== 'undefined') Sfx.mood('battle');
     return new Promise(resolve => {
       const hero = { att: opts.hero.att, def: opts.hero.def, sp: opts.hero.sp, mana: opts.hero.mana, spells: opts.hero.spells || [],
         perks: opts.hero.perks || {}, name: opts.hero.name || 'Hero', icon: opts.hero.icon || '🛡️', pid: opts.hero.pid, morale: opts.hero.morale || 0, luck: opts.hero.luck || 0 };

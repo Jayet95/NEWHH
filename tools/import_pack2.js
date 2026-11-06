@@ -26,6 +26,9 @@ for (const f of Object.keys(FD)) {
     job(from, path.join(OUT, 'objects', 'dwelling_' + id + '.webp'), { w: 150, h: 150, fit: 'inside', trim: true, q: 78 });
   });
 }
+// neutral dwellings reuse the matching castle dwelling picture
+const NDW = { goblin: 'stronghold1', wolf: 'stronghold2', orc: 'stronghold3', ogre: 'stronghold4', golem: 'tower3', naga: 'tower6', troll: 'stronghold5' };
+for (const k in NDW) for (const d of ['buildings', 'objects']) { const a = path.join(OUT, d, (d === 'objects' ? 'dwelling_' : '') + NDW[k] + '.webp'); if (fs.existsSync(a)) fs.copyFileSync(a, path.join(OUT, d, (d === 'objects' ? 'dwelling_' : '') + k + '.webp')); }
 // neutral creatures: one picture each -> portrait + the same picture as every battle pose (mirrored for the enemy side)
 const NEUT = { 'azure-dragon': 'azured', 'crystal-dragon': 'crystald', 'faerie-dragon': 'faerie', 'rust-dragon': 'rustd', kraken: 'kraken', shark: 'shark', troll: 'troll' };
 for (const k in NEUT) {

@@ -306,5 +306,26 @@ const Figures = (() => {
     try { ARCH[spec.b](g, spec); } catch (e) { return cache[key] = null; }
     return cache[key] = cv;
   }
-  return { sprite, FIG };
+  // how a creature fights: melee = slash | stab | smash | claw | gaze, shoot = arrow | orb | fire | ball | rock | gaze
+  const styleCache = {};
+  function style(id) {
+    const base = String(id).replace(/_\d$/, '');
+    if (styleCache[base]) return styleCache[base];
+    const sp = FIG[ALIAS[base] || base] || {}, b = sp.b;
+    let melee = 'slash', shoot = 'arrow', col = null;
+    if (b === 'd') melee = 'claw';
+    else if (b === 'q') melee = sp.rider ? 'stab' : (['wolf', 'lizard', 'eagle', 'lion'].includes(sp.qhead) ? 'claw' : 'smash');
+    else if (b === 'h') melee = { pike: 'stab', spear: 'stab', lance: 'stab', trident: 'stab', club: 'smash', mace: 'smash', rock: 'smash', axe: 'slash', sword: 'slash' }[sp.wp] || (sp.head === 'wolf' || sp.head === 'lizard' ? 'claw' : sp.golem ? 'smash' : 'slash');
+    else if (b === 'bi' || b === 'sh') melee = 'claw';
+    else if (b === 'i') melee = 'stab';
+    else if (b === 'e') melee = 'gaze';
+    else if (b === 'k' || b === 'hy' || b === 'el') melee = 'smash';
+    if (sp.wp === 'staff') { shoot = 'orb'; col = sp.wpc ? K(sp.wpc, 8) : 'hsl(280,80%,65%)'; }
+    else if (sp.wp === 'wand') { if (sp.wpc && sp.wpc[0] < 40) { shoot = 'fire'; } else { shoot = 'ball'; } }
+    else if (sp.wp === 'rock') shoot = 'rock';
+    else if (b === 'e') shoot = 'gaze';
+    else shoot = 'arrow';
+    return styleCache[base] = { melee, shoot, col };
+  }
+  return { sprite, FIG, style };
 })();

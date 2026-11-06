@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Heroes JS</string>
-    <string name="title_activity_main">Heroes JS</string>
+    <string name="app_name">Day &amp; Night</string>
+    <string name="title_activity_main">Day &amp; Night</string>
     <string name="package_name">com.jayet95.heroesjs</string>
     <string name="custom_url_scheme">com.jayet95.heroesjs</string>
 </resources>

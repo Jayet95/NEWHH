@@ -422,6 +422,8 @@ function artTierFor(depth, rng) { return Math.max(1, Math.min(4, 1 + Math.floor(
 
 
 const T = { GRASS: 0, FOREST: 1, MOUNT: 2, WATER: 3, ROAD: 4, SAND: 5 };
+// ground in the harsher climates slows walking: desert and snow ×1.5, ash/lava ×1.5, swamp ×2 (a road is always 50)
+const BIOME_COST = [1, 1.5, 1.5, 2, 1.5], BIOME_NAME = ['', 'Desert', 'Snow', 'Swamp', 'Ash fields'];
 const TCOST = { 0: 100, 4: 50, 5: 150 }; // grass 100, road 50 (half the movement), sand 150
 
 function groupLabel(n) {

@@ -302,7 +302,7 @@ function findPath(G, sx, sy, tx, ty, ignoreObjs, sail, caps) {
   const W = G.W, H = G.H, N = W * H, k = (x, y) => y * W + x;
   if (tx < 0 || ty < 0 || tx >= W || ty >= H) return null;
   const target = k(tx, ty);
-  const tcost = (nx, ny, nk) => {
+  const tcost0 = (nx, ny, nk) => {
     const t = G.tiles[ny][nx], c = TCOST[t];
     if (sail) return t === T.WATER ? 100 - 10 * ((caps && caps.nav) || 0) : (c && nk === target ? c : 0);
     if (t === T.WATER) {
@@ -313,6 +313,8 @@ function findPath(G, sx, sy, tx, ty, ignoreObjs, sail, caps) {
     if (t === T.MOUNT) return caps && caps.mount ? MOUNT_COST[caps.mount] : 0;
     return c || 0;
   };
+  // climate multiplier on the ground cost (roads and boats are unaffected)
+  const tcost = (nx, ny, nk) => { const c = tcost0(nx, ny, nk), t = G.tiles[ny][nx]; if (!c || sail || t === T.ROAD || t === T.WATER || !G.biome) return c; const b = G.biome[ny] && G.biome[ny][nx]; return b ? Math.round(c * BIOME_COST[b] / 10) * 10 : c; };
   if (!tcost(tx, ty, target)) return null;
   const g = new Float32Array(N).fill(Infinity), f = new Float32Array(N).fill(Infinity), bc = new Float32Array(N);
   const prev = new Int32Array(N).fill(-1), closed = new Uint8Array(N);

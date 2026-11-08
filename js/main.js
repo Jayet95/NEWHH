@@ -160,8 +160,7 @@
   // ---------- new game / save ----------
   const DF = () => DIFFICULTY[(G && G.diff) || 'normal'];
   // interface mood follows the player's castle: bright for the human realms, black and ember for the demonic ones
-  const THEME = { castle: 'light', rampart: 'light', tower: 'light', conflux: 'light', inferno: 'dark', necropolis: 'dark', dungeon: 'dark' };
-  function applyTheme(f) { const b = document.body.classList; b.remove('th-light', 'th-dark'); if (THEME[f]) b.add('th-' + THEME[f]); }
+  function applyTheme(f) { const b = document.body; [...b.classList].filter(c => c.indexOf('th-') === 0).forEach(c => b.classList.remove(c)); if (f) b.classList.add('th-' + f); }
   function seedFrom(s) {
     s = String(s || '').trim();
     if (!s) return Math.floor(Math.random() * 1e9);

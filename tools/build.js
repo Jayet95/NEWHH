@@ -19,6 +19,7 @@ if (fs.existsSync(path.join(root, 'icons'))) fs.readdirSync(path.join(root, 'ico
 require('./make_manifest')(root);
 if (fs.existsSync(path.join(root, 'audio'))) fs.cpSync(path.join(root, 'audio'), path.join(dist, 'audio'), { recursive: true });
 if (fs.existsSync(path.join(root, 'fonts'))) fs.cpSync(path.join(root, 'fonts'), path.join(dist, 'fonts'), { recursive: true });
+if (fs.existsSync(path.join(root, 'themes'))) fs.cpSync(path.join(root, 'themes'), path.join(dist, 'themes'), { recursive: true });
 if (fs.existsSync(path.join(root, 'art'))) fs.cpSync(path.join(root, 'art'), path.join(dist, 'art'), { recursive: true });
 fs.writeFileSync(path.join(dist, 'sw.js'), fs.readFileSync(path.join(root, 'sw.js'), 'utf8').replace('__VERSION__', version));
 

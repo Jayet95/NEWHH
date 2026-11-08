@@ -130,22 +130,29 @@
     const old = h.arts[slot]; h.arts[slot] = id; h.pack.splice(idx, 1); if (old) h.pack.push(old); h.av++;
   }
   function unequip(h, slot) { if (h.pack.length >= MAX_PACK) return toast('Backpack is full.'); h.pack.push(h.arts[slot]); h.arts[slot] = null; h.av++; }
-  function openEquip(h) {
+  function openEquip(h, sel) {
     const b = artBonus(h), others = heroesAt(h.x, h.y).filter(x => x !== h);
-    const slots = SLOT_ORDER.map(s => { const id = h.arts[s], a = id && ART[id];
-      return `<div class="trow" style="grid-template-columns:96px 1fr auto"><div class="small">${SLOT_NAMES[s]}</div>
-        <div>${a ? `${a.i} <b>${a.n}</b><br><span class="small">${artStats(a)}</span>` : '<span class="small">— empty —</span>'}</div>
-        <div class="acts">${a ? `<button data-un="${s}">Unequip</button>` : ''}</div></div>`; }).join('');
-    const pack = h.pack.map((id, i) => { const a = ART[id];
-      return `<div class="trow" style="grid-template-columns:30px 1fr auto"><div class="ic">${a.i}</div><div><b>${a.n}</b> <span class="small">${SLOT_NAMES[a.slot === 'ring' ? 'ring1' : a.slot]}</span><br><span class="small">${artStats(a)}</span></div>
-        <div class="acts"><button data-eq="${i}">Equip</button>${others.map(o => `<button data-give="${i}:${G.heroes.indexOf(o)}" title="Give to ${o.name}">→ ${o.icon}</button>`).join('')}</div></div>`; }).join('');
+    const TIERC = ['#8a8a8a', '#8a8a8a', '#5fbf5f', '#4a90e0', '#b060e8', '#f0a030'];
+    const tile = (kind, k, a, label, glyph = '') => `<button class="eqt${a ? ' full' : ''}${sel && sel.kind === kind && sel.k === k ? ' on' : ''}" data-${kind === 'slot' ? 'sl' : 'pk'}="${k}" style="--tc:${a ? TIERC[Math.min(5, a.tier || 1)] : 'transparent'}" title="${a ? a.n : label}"><span class="eqi">${a ? a.i : `<span class="ghost">${glyph}</span>`}</span><small>${a ? '' : label}</small></button>`;
+    const slotLabel = (s) => SLOT_NAMES[s].replace(/^\S+\s/, ''), slotGlyph = (s) => { const id = GI.idOf(SLOT_NAMES[s].split(' ')[0]); return id ? GI.html(id) : ''; };
+    const slotTile = (s) => { const id = h.arts[s], a = id && ART[id]; return `<div class="eqs" style="grid-area:${s}">${tile('slot', s, a, slotLabel(s), slotGlyph(s))}</div>`; };
+    const doll = `<div class="doll"><div class="eqhero" style="grid-area:hero">${Art.heroPic(h.icon, ownCol(0), 92, h.pid)}<b>${h.name}</b><small>Level ${h.lvl}</small></div>${SLOT_ORDER.map(slotTile).join('')}</div>`;
+    const pack = h.pack.map((id, i) => tile('pack', i, ART[id], '')).join('') + Array.from({ length: Math.max(0, MAX_PACK - h.pack.length) }, () => '<span class="eqt empty"></span>').join('');
+    let info = '<div class="eqinfo muted">Tap an item to see what it does.</div>';
+    if (sel) {
+      const id = sel.kind === 'slot' ? h.arts[sel.k] : h.pack[sel.k], a = id && ART[id];
+      if (a) info = `<div class="eqinfo"><div class="eqbig" style="--tc:${TIERC[Math.min(5, a.tier || 1)]}">${a.i}</div><div class="eqtxt"><b>${a.n}</b><span class="small">${SLOT_NAMES[a.slot === 'ring' ? 'ring1' : a.slot].replace(/^\S+\s/, '')} · tier ${a.tier || 1}</span><span>${artStats(a)}</span></div>
+        <div class="acts">${sel.kind === 'slot' ? `<button data-un="${sel.k}">Take off</button>` : `<button class="primary" data-eq="${sel.k}">Equip</button>${others.map(o => `<button data-give="${sel.k}:${G.heroes.indexOf(o)}">Give to ${o.name}</button>`).join('')}`}</div></div>`;
+    }
+    const bonus = ['att', 'def', 'sp', 'kn', 'morale', 'luck'].filter(k => b[k]).map(k => `<span class="eqb">${b[k] > 0 ? '+' : ''}${b[k]} ${{ att: 'Attack', def: 'Defense', sp: 'Spell', kn: 'Knowledge', morale: 'Morale', luck: 'Luck' }[k]}</span>`).join('') + (b.move ? `<span class="eqb">+${b.move}% move</span>` : '') + (b.mana ? `<span class="eqb">+${b.mana} mana</span>` : '');
     const sets = Object.entries(ART_SETS).map(([sid, st]) => { const have = st.parts.filter(p => Object.values(h.arts).includes(p)).length;
-      return `<div class="small">${st.n}: ${have}/${st.parts.length} ${have === st.parts.length ? '✅ active' : '· ' + st.parts.map(p => ART[p].n).join(', ')}</div>`; }).join('');
-    $('mbox').innerHTML = `<h2>🎒 ${h.name} — Equipment</h2>
-      <div class="small">Bonus from artifacts: ${['att', 'def', 'sp', 'kn', 'morale', 'luck'].filter(k => b[k]).map(k => `${b[k] > 0 ? '+' : ''}${b[k]} ${k}`).join(', ') || 'none'}${b.move ? `, +${b.move}% move` : ''}${b.mana ? `, +${b.mana} mana` : ''}</div>
-      ${slots}<h4>Backpack (${h.pack.length}/${MAX_PACK})</h4>${pack || '<div class="small">Empty.</div>'}<h4>Sets</h4>${sets}
+      return `<div class="eqset${have === st.parts.length ? ' on' : ''}"><b>${st.n}</b> <span>${have}/${st.parts.length}</span> <small>${have === st.parts.length ? '✔ active' : st.parts.map(p => ART[p].n).join(' · ')}</small></div>`; }).join('');
+    $('mbox').innerHTML = `<h2>🎒 Equipment</h2><div class="eqbon">${bonus || '<span class="small">No bonus from artifacts yet</span>'}</div>
+      ${doll}${info}<h4>Backpack (${h.pack.length}/${MAX_PACK})</h4><div class="eqpack">${pack}</div><h4>Sets</h4><div class="eqsets">${sets}</div>
       <div class="mb"><button class="primary" id="eClose">Close</button></div>`;
     $('eClose').onclick = () => { $('modal').classList.add('hide'); renderAll(); };
+    $('mbox').querySelectorAll('[data-sl]').forEach(x => x.onclick = () => openEquip(h, { kind: 'slot', k: x.dataset.sl }));
+    $('mbox').querySelectorAll('[data-pk]').forEach(x => x.onclick = () => openEquip(h, { kind: 'pack', k: +x.dataset.pk }));
     $('mbox').querySelectorAll('[data-un]').forEach(x => x.onclick = () => { unequip(h, x.dataset.un); renderAll(); openEquip(h); });
     $('mbox').querySelectorAll('[data-eq]').forEach(x => x.onclick = () => { equipFromPack(h, +x.dataset.eq); sfx('build'); renderAll(); openEquip(h); });
     $('mbox').querySelectorAll('[data-give]').forEach(x => x.onclick = () => { const [i, hi] = x.dataset.give.split(':').map(Number), t = G.heroes[hi]; if (t.pack.length >= MAX_PACK) return toast(`${t.name}'s backpack is full.`); t.pack.push(h.pack.splice(i, 1)[0]); openEquip(h); });
@@ -450,7 +457,7 @@
       const spr = o.t === 'monster' ? null : Art.obj(o, o.fac);
       if (spr && o.t === 'town') { const sz = 100; cx.drawImage(spr, px + 16 - sz / 2, py + 12 - sz * 0.62, sz, sz); }
       else if (spr) { const sz = o.t === 'town' ? 50 : o.t === 'fort' || o.t === 'lair' ? 46 : o.t === 'dwelling' ? 44 : o.t === 'pile' ? 30 : 38; cx.drawImage(spr, px - sz / 2, py - sz / 2 - (o.t === 'town' ? 5 : 2), sz, sz); }
-      else if (o.t !== 'monster') { cx.font = `26px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(objIcon(o), px, py + 1); }
+      else if (o.t !== 'monster') { if (typeof GI !== 'undefined') GI.text(cx, objIcon(o), px, py + 1, 28, { fill: '#fff' }); else { cx.font = `26px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(objIcon(o), px, py + 1); } }
       if (o.t === 'fort') {
         drawFlag(px + 13, py - 8, ownCol(o.owner), relOf(o.owner), 1.1);
         const gn = o.garrison.reduce((s, a) => s + (a ? a.n : 0), 0);
@@ -2243,7 +2250,7 @@
     ['Broken arrow', 'Archers shoot best point-blank; beyond 10 hexes their damage is halved.'],
   ];
   function openHelp(g) {
-    modalOpen(HELP.replace('</p>\n', '</p>\n') + `<div class="mb"><button id="hlGl">📖 Glossary</button><button class="primary" id="hlOk">Close</button></div>`);
+    modalOpen(HELP.replace('</h2>', '</h2><div class="helpbody">') + `</div><div class="mb"><button id="hlGl">📖 Glossary</button><button class="primary" id="hlOk">Close</button></div>`);
     $('hlOk').onclick = () => { if (G && $('title').classList.contains('hide')) openMenu(); else $('modal').classList.add('hide'); };
     $('hlGl').onclick = () => {
       modalOpen(`<h2>📖 Glossary</h2>${GLOSSARY.map(([t, d]) => `<details><summary><b>${t}</b></summary><p class="small" style="margin:4px 0 8px">${d}</p></details>`).join('')}<div class="mb"><button class="primary" id="glBack">Back</button></div>`);

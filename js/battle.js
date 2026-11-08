@@ -817,7 +817,7 @@ const Battle = (() => {
         ctx.fillStyle = '#fff'; ctx.fillText(lab, bx + w / 2, by + h / 2 + 1); ctx.textBaseline = 'alphabetic';
       }
       let tags = ''; if (s.weak > 0) tags += '🥀'; if (s.disr > 0) tags += '💥'; if (s.noshoot > 0) tags += '🌫️'; if (s.berserk > 0) tags += '😤'; if (s.hyp > 0) tags += '🌀'; if (s.haste) tags += '💨'; if (s.bless) tags += '✨'; if (s.stone) tags += '🪨'; if (s.defb) tags += '🛡'; if (s.slow) tags += '🐌'; if (s.curse) tags += '☠️'; if (s.bloodlust) tags += '😡'; if (s.shield) tags += '🌀'; if (s.stunned > 0) tags += '🙈';
-      if (tags) { ctx.font = '12px ' + FONT; ctx.fillText(tags, p.x, p.y - HR * 0.78); }
+      if (tags) { if (typeof GI !== 'undefined') GI.text(ctx, tags, p.x, p.y - HR * 0.78, 14, { fill: '#fff', font: '12px ' + FONT }); else { ctx.font = '12px ' + FONT; ctx.fillText(tags, p.x, p.y - HR * 0.78); } }
     }
     drawProjectiles(now);
     if (B.shot && now - B.shot.t0 < 260) {
@@ -828,7 +828,7 @@ const Battle = (() => {
     for (const f of B.fx) {
       const k = (now - f.t0) / 1000;
       ctx.globalAlpha = 1 - k; ctx.fillStyle = f.col; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center';
-      ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeText(f.txt, f.x, f.y - k * 30); ctx.fillText(f.txt, f.x, f.y - k * 30);
+      if (typeof GI !== 'undefined') GI.text(ctx, f.txt, f.x, f.y - k * 30, 20, { fill: f.col, stroke: '#000' }); else { ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeText(f.txt, f.x, f.y - k * 30); ctx.fillText(f.txt, f.x, f.y - k * 30); }
       ctx.globalAlpha = 1;
     }
     // highlight enemies the active stack can reach / shoot

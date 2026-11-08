@@ -453,3 +453,21 @@ body.skin .seg button { border-radius: 0; }
 .dtDiff, .dtGoal { font-size: 12px; border: 1px solid #5a4423; background: rgba(0, 0, 0, .35); border-radius: 12px; padding: 2px 9px; white-space: nowrap; }
 .dtGoal { color: #f1d98a; border-color: var(--gold-d); max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 760px) { .dtIco { font-size: 18px; } .dtMain b { font-size: 15px; } .dtMain small { font-size: 9px; } .dtTurn { display: none; } .dtDiff, .dtGoal { font-size: 10px; padding: 1px 6px; } }
+
+/* ---------- interface mood: bright for the human castles, black and ember for the demonic ones ---------- */
+body.th-light { --gold: #ffd766; --gold-d: #c9a23a; --edge: #7f9cc6; --edge-l: #aec4e6; --panel: #31435f; --panel2: #405578; --txt: #fffaf0; --mut: #cdd8ee; --shadow: 0 4px 14px rgba(20, 40, 80, .5); }
+html:has(body.th-light), body.th-light { background: radial-gradient(ellipse at 50% -10%, #5d7fb0 0%, #1d2c46 75%) fixed; }
+body.th-dark { --gold: #ff8a45; --gold-d: #a84a1c; --edge: #6e2323; --edge-l: #a63535; --panel: #130d0d; --panel2: #1d1313; --txt: #eadada; --mut: #a88e8e; --shadow: 0 4px 16px rgba(0, 0, 0, .8); }
+html:has(body.th-dark), body.th-dark { background: radial-gradient(ellipse at 50% -10%, #3a1212 0%, #050303 72%) fixed; }
+body.skin.th-light #top { border-image-source: url(art/ui/topbar_light.webp); }
+body.skin.th-dark #top { border-image-source: url(art/ui/topbar_dark.webp); }
+body.th-light .dtMain b, body.th-light #hero h3, body.th-light #batui h3 { text-shadow: 0 1px 0 rgba(0, 0, 0, .55); }
+body.th-light #top { color: #fff; }
+body.th-dark .dtIco { filter: drop-shadow(0 0 6px #ff5a1a); }
+/* the rivals' turn: the whole interface dulls until it is yours again */
+#app { transition: filter .35s; }
+body.aiturn #app { filter: saturate(.35) brightness(.78); }
+body.aiturn #top::after { content: "Rivals are moving…"; position: absolute; left: 50%; bottom: -22px; transform: translateX(-50%); font-size: 12px; color: var(--mut); background: rgba(0, 0, 0, .6); border-radius: 10px; padding: 2px 12px; z-index: 5; }
+
+/* minimap frame */
+#mini { image-rendering: auto; border: 3px solid var(--edge-l); border-radius: 10px; box-shadow: var(--shadow), inset 0 0 0 1px #000, 0 0 0 2px #140e07; touch-action: none; cursor: crosshair; }

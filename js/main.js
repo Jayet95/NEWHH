@@ -159,6 +159,9 @@
 
   // ---------- new game / save ----------
   const DF = () => DIFFICULTY[(G && G.diff) || 'normal'];
+  // interface mood follows the player's castle: bright for the human realms, black and ember for the demonic ones
+  const THEME = { castle: 'light', rampart: 'light', tower: 'light', conflux: 'light', inferno: 'dark', necropolis: 'dark', dungeon: 'dark' };
+  function applyTheme(f) { const b = document.body.classList; b.remove('th-light', 'th-dark'); if (THEME[f]) b.add('th-' + THEME[f]); }
   function seedFrom(s) {
     s = String(s || '').trim();
     if (!s) return Math.floor(Math.random() * 1e9);
@@ -180,7 +183,7 @@
     const nAI = Math.max(1, Math.min(4, map.ais || { small: 1, medium: 1, large: 2, huge: 3, giant: 4 }[size] || 1));
     const aiFacs = shuffle(Object.keys(FACTIONS).filter(f => f !== faction)).slice(0, nAI);
     const m = genMap(seed, aiFacs, diff, { preset, size, biome: map.biome });
-    setFaction(faction);
+    setFaction(faction); applyTheme(faction);
     G = { seed, preset, size, W: m.W, H: m.H, scn: map.scn ? { id: map.scn.id, name: map.scn.name, goal: map.scn.goal } : null, tiles: m.tiles, biome: m.biome, zone: m.zone, objs: m.objs, dock: m.dock, boats: [], nextBoat: 1, day: 1, over: false, path: null, faction, diff,
       res: { gold: D.gold, wood: r(20), ore: r(20), mercury: r(5), sulfur: r(5), crystal: r(5), gems: r(5) }, spells: [...START_SPELLS],
       wk: {}, heroes: [], sel: 0, hero: null, tavern: [], noTown: 0,
@@ -211,7 +214,7 @@
       const s = localStorage.getItem(key); if (!s) return false;
       G = JSON.parse(s); if (!G.zone || !G.heroes || !G.ais) return false;
       G.tavern = (G.tavern || []).filter(id => HEROES[id]);
-      G.path = null; G.boats = G.boats || []; setFaction(G.faction); setActive(Math.min(G.sel, G.heroes.length - 1));
+      G.path = null; G.boats = G.boats || []; setFaction(G.faction); applyTheme(G.faction); setActive(Math.min(G.sel, G.heroes.length - 1));
       initFog(); reindex(G); buildTerrain(); sizeMini(); centerOn(G.hero.x, G.hero.y); renderAll(); recentreSoon(); return true;
     } catch (e) { return false; }
   }
@@ -256,10 +259,15 @@
   let MV = 5;
   const mxp = (x, y, k) => (x + 0.5 * (y & 1)) * k;
   function sizeMini() {
-    MK = Math.max(3, Math.floor(240 / (G.W + 0.5))); MV = MK * 0.866; mini.width = Math.ceil((G.W + 0.5) * MK); mini.height = Math.ceil(G.H * MV + MV * 0.4); miniSig = '';
+    MK = Math.max(4, Math.floor(480 / (G.W + 0.5))); MV = MK * 0.866; mini.width = Math.ceil((G.W + 0.5) * MK); mini.height = Math.ceil(G.H * MV + MV * 0.4); miniSig = '';
     miniTerr = document.createElement('canvas'); miniTerr.width = mini.width; miniTerr.height = mini.height;
     const t = miniTerr.getContext('2d');
-    for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) { t.fillStyle = MC[G.tiles[y][x]]; t.fillRect(mxp(x, y, MK), y * MV, MK + 0.7, MV + 0.7); }
+    const BIO = [null, { 0: '#d8b865', 1: '#a8863c', 2: '#8a7a55', 4: '#c9a964', 5: '#e0c577' }, { 0: '#dfe9f2', 1: '#9fb4c6', 2: '#b9c6d4', 4: '#c8d4e0', 5: '#cfdbe6' }, { 0: '#5f6b3a', 1: '#3f4a26', 2: '#4a4a42', 4: '#7a7448', 5: '#6e7242' }, { 0: '#4a4a50', 1: '#34343a', 2: '#242428', 4: '#5c4a44', 5: '#55504c' }];
+    for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) {
+      const tt = G.tiles[y][x], bm = G.biome && G.biome[y] ? G.biome[y][x] : 0; let col = (bm && BIO[bm][tt]) || MC[tt];
+      t.fillStyle = col; t.fillRect(mxp(x, y, MK), y * MV, MK + 0.7, MV + 0.7);
+      const j = ((x * 73 + y * 151) % 7) - 3; if (j) { t.fillStyle = j > 0 ? `rgba(255,255,255,${j * 0.018})` : `rgba(0,0,0,${-j * 0.03})`; t.fillRect(mxp(x, y, MK), y * MV, MK + 0.7, MV + 0.7); }
+    }
     miniCache = document.createElement('canvas'); miniCache.width = mini.width; miniCache.height = mini.height;
     miniFog = document.createElement('canvas'); miniFog.width = mini.width; miniFog.height = mini.height; fogDirty = true;
   }
@@ -488,15 +496,23 @@
       }
       mx.drawImage(miniFog, 0, 0);
     }
+    const s = k / 4, T0 = performance.now(), px = (o) => mxp(o.x, o.y, k) + k / 2, py = (o) => o.y * MV + MV / 2;
+    const dot = (x, y, rad, fill, line) => { mx.beginPath(); mx.arc(x, y, rad, 0, 7); mx.fillStyle = fill; mx.fill(); mx.lineWidth = Math.max(1, s * 0.9); mx.strokeStyle = line; mx.stroke(); };
     for (const o of G.objs) {
       if (fogOn() && (!isExpl(o.x, o.y) || (o.t === 'monster' && !isVis(o.x, o.y)))) continue;
-      mx.fillStyle = (o.t === 'fort' || o.t === 'town') ? ownCol(o.owner) : o.t === 'lair' ? '#ff6a00' : o.t === 'monster' ? '#a33' : o.t === 'mine' ? (o.owner !== null ? ownCol(o.owner) : '#ddd') : o.t === 'merchant' ? '#fa0' : '#ee6';
-      mx.fillRect(mxp(o.x, o.y, k) - (o.t === 'town' ? 1 : 0), o.y * MV - (o.t === 'town' ? 1 : 0), k + (o.t === 'town' ? 2 : 0), MV + (o.t === 'town' ? 2 : 0));
+      if (o.t === 'town') { dot(px(o), py(o), 3.3 * s, ownCol(o.owner), '#120a04'); mx.fillStyle = '#fff'; mx.fillRect(px(o) - 1 * s, py(o) - 1.2 * s, 2 * s, 2 * s); }
+      else if (o.t === 'fort') dot(px(o), py(o), 2.3 * s, ownCol(o.owner), '#120a04');
+      else if (o.t === 'monster') dot(px(o), py(o), 1.1 * s, '#c33', 'rgba(0,0,0,.6)');
+      else { mx.fillStyle = o.t === 'lair' ? '#ff6a00' : o.t === 'mine' ? (o.owner !== null ? ownCol(o.owner) : '#f4f0e0') : o.t === 'merchant' ? '#fa0' : '#ffe86a'; const w = (o.t === 'mine' ? 1.9 : 1.3) * s; mx.fillRect(px(o) - w / 2, py(o) - w / 2, w, w); mx.strokeStyle = 'rgba(0,0,0,.55)'; mx.lineWidth = 1; mx.strokeRect(px(o) - w / 2, py(o) - w / 2, w, w); }
     }
-    mx.fillStyle = '#8df'; for (const b of G.boats) mx.fillRect(mxp(b.x, b.y, k), b.y * MV, k, MV);
-    for (const ai of G.ais) for (const eh of ai.heroes) { if (!isVis(eh.x, eh.y)) continue; mx.fillStyle = ownCol(ai.id); mx.fillRect(mxp(eh.x, eh.y, k) - 1, eh.y * MV - 1, k + 2, MV + 2); mx.strokeStyle = '#000'; mx.strokeRect(mxp(eh.x, eh.y, k) - 1, eh.y * MV - 1, k + 2, MV + 2); }
-    mx.fillStyle = '#fff'; for (const h of G.heroes) mx.fillRect(mxp(h.x, h.y, k) - 1, h.y * MV - 1, k + 2, MV + 2);
-    mx.strokeStyle = '#fff'; mx.lineWidth = 1; mx.strokeRect(cam.x / TS * k, cam.y / RH * MV, VW / TS * k, VH / RH * MV);
+    for (const b of G.boats) dot(px(b), py(b), 1.5 * s, '#8df', '#05213a');
+    for (const ai of G.ais) for (const eh of ai.heroes) { if (!isVis(eh.x, eh.y)) continue; const x = px(eh), y = py(eh), q = 2.6 * s; mx.beginPath(); mx.moveTo(x, y - q); mx.lineTo(x + q, y); mx.lineTo(x, y + q); mx.lineTo(x - q, y); mx.closePath(); mx.fillStyle = ownCol(ai.id); mx.fill(); mx.lineWidth = Math.max(1, s); mx.strokeStyle = '#000'; mx.stroke(); }
+    for (const h of G.heroes) { const x = px(h), y = py(h), pu = 0.5 + 0.5 * Math.sin(T0 / 380); mx.beginPath(); mx.arc(x, y, (3.6 + pu * 2.2) * s, 0, 7); mx.strokeStyle = `rgba(255,215,90,${0.85 - pu * 0.5})`; mx.lineWidth = Math.max(1.4, s * 1.1); mx.stroke(); dot(x, y, 2.4 * s, '#fff', '#a37a1c'); }
+    // viewport: dim everything outside it, frame it in gold
+    { const vx = cam.x / TS * k, vy = cam.y / RH * MV, vw = VW / TS * k, vh = VH / RH * MV;
+      mx.save(); mx.beginPath(); mx.rect(0, 0, mini.width, mini.height); mx.rect(vx, vy, vw, vh); mx.fillStyle = 'rgba(0,0,0,.34)'; mx.fill('evenodd'); mx.restore();
+      mx.lineWidth = Math.max(3, s * 2.2); mx.strokeStyle = 'rgba(0,0,0,.75)'; mx.strokeRect(vx, vy, vw, vh); mx.lineWidth = Math.max(1.5, s * 1.1); mx.strokeStyle = '#ffd766'; mx.strokeRect(vx, vy, vw, vh); }
+    { let seen = 0; for (let i = 0; i < G.expl.length; i++) if (G.expl[i]) seen++; const pct = fogOn() ? Math.round(seen / G.expl.length * 100) + '% explored' : ''; if (pct) { mx.font = 'bold ' + Math.round(6 * s + 2) + 'px Georgia, serif'; mx.textBaseline = 'bottom'; mx.lineWidth = 3; mx.strokeStyle = 'rgba(0,0,0,.85)'; mx.strokeText(pct, 6, mini.height - 4); mx.fillStyle = '#f3e7c6'; mx.fillText(pct, 6, mini.height - 4); } }
   }
   function loop() {
     if (G && !document.body.classList.contains('inbattle')) {
@@ -728,12 +744,12 @@
     if (!p || !p.length) { G.path = null; return toast(G.hero.boat != null ? 'Cannot sail there — disembark on a shore tile.' : "Can't reach there. (Water needs a boat.)"); }
     G.path = p;
   });
-  mini.addEventListener('click', (ev) => {
-    if (!G) return; const r = mini.getBoundingClientRect();
-    const py = (ev.clientY - r.top) / r.height * mini.height / MV, px = (ev.clientX - r.left) / r.width * mini.width / MK - 0.5 * (Math.floor(py) & 1);
-    centerOn(Math.max(0, Math.min(G.W - 1, px)), Math.max(0, Math.min(G.H - 1, py)));
-    if (!$('modal').classList.contains('hide')) $('modal').classList.add('hide');
-  });
+  { let md = false;
+    const jump = (ev) => { if (!G) return; const r = mini.getBoundingClientRect(), py = (ev.clientY - r.top) / r.height * mini.height / MV, px = (ev.clientX - r.left) / r.width * mini.width / MK - 0.5 * (Math.floor(py) & 1); centerOn(Math.max(0, Math.min(G.W - 1, px)), Math.max(0, Math.min(G.H - 1, py))); };
+    mini.addEventListener('pointerdown', (ev) => { md = true; try { mini.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ } jump(ev); });
+    mini.addEventListener('pointermove', (ev) => { if (md) jump(ev); });
+    const up = () => { if (md) { md = false; if (!$('modal').classList.contains('hide') && !document.body.classList.contains('inbattle')) $('modal').classList.add('hide'); } };
+    mini.addEventListener('pointerup', up); mini.addEventListener('pointercancel', () => { md = false; }); }
   document.addEventListener('keydown', (e) => {
     if (!G || document.body.classList.contains('inbattle') || !$('modal').classList.contains('hide') || !$('title').classList.contains('hide')) return;
     const k = e.key.toLowerCase(), s = TS * 2;
@@ -1839,7 +1855,8 @@
     if (!G || busy || G.over) return;
     busy = true; G.path = null; selSlot = -1;
     G.report = [];
-    await aiPhase();
+    document.body.classList.add('aiturn');
+    try { await aiPhase(); } finally { document.body.classList.remove('aiturn'); }
     if (G.over) { busy = false; return; }
     G.day++;
     await turnReport();

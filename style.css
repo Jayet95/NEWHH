@@ -483,3 +483,74 @@ body.skin #top > :not(.sky) { position: relative; z-index: 1; }
 body.night #orb .sun { transform: rotate(-60deg) translateY(-30px); opacity: 0; } body.night #orb .moon { transform: rotate(0) translateY(0); opacity: 1; }
 #stage::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 2; background: radial-gradient(ellipse at 50% 45%, rgba(20, 30, 90, .1), rgba(8, 14, 60, .42)); opacity: 0; transition: opacity 2.4s ease; mix-blend-mode: multiply; }
 body.night:not(.inbattle) #stage::after { opacity: 1; }
+
+/* =====================================================================
+   MEDIEVAL LAYER — fonts, parchment & leather textures, riveted frames
+   ===================================================================== */
+:root {
+  --f-head: 'Cinzel', 'Palatino Linotype', Georgia, serif;
+  --f-flav: 'IM Fell English', Georgia, serif;
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .05  0 0 0 0 .03  0 0 0 0 .01  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  --fibre: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='f' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.012 .35' numOctaves='4' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .25  0 0 0 0 .16  0 0 0 0 .06  0 0 0 .38 0'/></filter><rect width='100%' height='100%' filter='url(%23f)'/></svg>");
+  --rivets: radial-gradient(circle at 10px 10px, #f6e0a0 0 1.5px, #b88a2a 3px, #4a3208 4.5px, transparent 5.5px) top left / 20px 20px no-repeat,
+            radial-gradient(circle at 10px 10px, #f6e0a0 0 1.5px, #b88a2a 3px, #4a3208 4.5px, transparent 5.5px) top right / 20px 20px no-repeat,
+            radial-gradient(circle at 10px 10px, #f6e0a0 0 1.5px, #b88a2a 3px, #4a3208 4.5px, transparent 5.5px) bottom left / 20px 20px no-repeat,
+            radial-gradient(circle at 10px 10px, #f6e0a0 0 1.5px, #b88a2a 3px, #4a3208 4.5px, transparent 5.5px) bottom right / 20px 20px no-repeat;
+}
+body { font-family: Georgia, "Palatino Linotype", serif; }
+h1, h2, h3, h4, .titlebox h1, #banner b, .ttab, .htile span, .ribbon, .hspan h3, .dtMain b, button { font-family: var(--f-head); }
+button { letter-spacing: .5px; font-weight: 700; text-shadow: 0 1px 0 rgba(0, 0, 0, .7); }
+.small, .sub, .hscls, .blurb, .scnb, .card .small, #loadmsg, .titlebox .sub { font-family: var(--f-flav); font-size: 13.5px; letter-spacing: .1px; }
+.titlebox h1 { font-family: 'Cinzel Decorative', var(--f-head); letter-spacing: 2px; }
+.titlebox .sub { font-size: 16px; font-style: italic; }
+
+/* riveted leather panels */
+#hero, #army, #terr, #batui, .panel {
+  background: var(--rivets), var(--grain), var(--fibre), linear-gradient(180deg, var(--panel2), var(--panel));
+  border: 2px solid #0d0803; border-radius: 6px;
+  box-shadow: inset 0 0 0 2px var(--edge), inset 0 0 0 4px #0d0803, inset 0 0 26px rgba(0, 0, 0, .65), var(--shadow);
+  padding: 14px 15px;
+}
+#hero h3, #terr h3, #batui h3 { font-family: var(--f-head); letter-spacing: 1.2px; text-transform: uppercase; font-size: 15px; }
+.slot { box-shadow: inset 0 0 0 1px #0d0803, inset 0 0 0 2px var(--edge), inset 0 0 10px rgba(0, 0, 0, .55); border-radius: 5px; }
+
+/* dialogs: aged scroll */
+#mbox { background: var(--grain), var(--fibre), radial-gradient(ellipse at 50% 0%, rgba(120, 82, 36, .35), transparent 70%), linear-gradient(180deg, var(--panel2), var(--panel)); }
+#mbox h2 { font-family: var(--f-head); font-size: 24px; letter-spacing: 1.5px; text-transform: uppercase; position: relative; padding-bottom: 12px; margin-bottom: 12px; text-align: center; text-shadow: 0 2px 0 #000, 0 0 14px rgba(230, 191, 85, .25); }
+#mbox h2::after { content: ""; position: absolute; left: 6%; right: 6%; bottom: 0; height: 9px; background: linear-gradient(90deg, transparent, var(--gold-d) 25%, var(--gold) 50%, var(--gold-d) 75%, transparent) center 4px / 100% 1px no-repeat; }
+#mbox h2::before { content: ""; position: absolute; left: 50%; bottom: 0; width: 9px; height: 9px; transform: translateX(-50%) rotate(45deg); background: var(--gold); box-shadow: 0 0 0 2px #140e07, 0 0 8px rgba(230, 191, 85, .6); z-index: 1; }
+#mbox h2 .small { display: block; font-size: 13px; letter-spacing: 0; text-transform: none; margin-top: 2px; color: var(--mut); text-shadow: none; }
+#mbox h4 { font-family: var(--f-head); letter-spacing: 1.5px; text-transform: uppercase; font-size: 12px; color: var(--gold-d); border-bottom: 1px solid #4a381c; padding-bottom: 3px; }
+
+/* cards, rows, tiles: stitched leather */
+.card, .htile, .hspan, .setrow, .achrow {
+  background: var(--grain), linear-gradient(#2a1d12, #1a1209);
+  box-shadow: inset 0 0 0 1px #0d0803, inset 0 0 0 3px rgba(140, 106, 51, .35), inset 0 0 14px rgba(0, 0, 0, .55), 0 3px 8px rgba(0, 0, 0, .45);
+  border: 2px solid #4a381c; border-radius: 7px;
+}
+.setup .card, .setup .htile { background: var(--grain), linear-gradient(#271b10, #181008); }
+.card:hover, .htile:hover { box-shadow: inset 0 0 0 1px #0d0803, inset 0 0 0 3px rgba(230, 191, 85, .5), 0 0 14px rgba(230, 191, 85, .3), 0 3px 8px rgba(0, 0, 0, .5); }
+.card.on, .htile.on, .setup .card.on { box-shadow: inset 0 0 0 1px #0d0803, inset 0 0 0 3px var(--gold), 0 0 16px rgba(230, 191, 85, .4), 0 3px 8px rgba(0, 0, 0, .5); }
+.trow { border-bottom: 1px dashed rgba(140, 106, 51, .55); }
+.trow:hover { background: linear-gradient(90deg, rgba(230, 191, 85, .07), transparent); }
+
+/* inputs: ink on parchment */
+input, select, textarea { background: linear-gradient(#e6d7ae, #cfbd8c); color: #2a1b0a; border: 2px solid #5a4423; box-shadow: inset 0 2px 5px rgba(60, 35, 10, .45); font-family: var(--f-head); font-weight: 600; border-radius: 3px; }
+input::placeholder { color: #7a6544; font-family: var(--f-flav); font-style: italic; font-weight: 400; }
+input[type=range] { background: none; box-shadow: none; border: none; }
+
+/* resource chips: coin pouches */
+.chip, #res .chip, #mres .chip { background: var(--grain), linear-gradient(#1c130b, #0c0804); border: 2px solid #5a4423; box-shadow: inset 0 0 0 1px #000, inset 0 2px 5px rgba(0, 0, 0, .8), 0 1px 0 rgba(255, 220, 140, .15); font-family: var(--f-head); font-weight: 600; letter-spacing: .3px; }
+.pill { font-family: var(--f-head); background: linear-gradient(#1c130b, #0c0804); border: 1px solid #5a4423; }
+
+/* toasts and tooltips: pinned parchment */
+#toast div, #tip { background: var(--fibre), linear-gradient(#eadcb2, #d3bf8a); color: #2a1b0a; border: 2px solid #5a4423; box-shadow: inset 0 0 0 1px rgba(255, 245, 210, .6), inset 0 0 12px rgba(120, 80, 30, .45), 0 4px 12px rgba(0, 0, 0, .6); font-family: var(--f-flav); font-size: 15px; border-radius: 4px; text-shadow: none; }
+#tip b, #toast div b { color: #5a1a0a; }
+
+/* banners and big titles */
+#banner b { font-family: 'Cinzel Decorative', var(--f-head); }
+.titlebox { background: var(--rivets), var(--grain), var(--fibre), linear-gradient(180deg, rgba(40, 28, 16, .94), rgba(16, 11, 6, .95)); border: 3px double var(--gold); box-shadow: inset 0 0 0 2px #0d0803, inset 0 0 40px rgba(0, 0, 0, .65), 0 0 40px rgba(163, 122, 28, .45); padding: 40px 58px 34px; }
+
+/* page background: dark worn stone */
+html, body { background-image: var(--grain), radial-gradient(ellipse at 50% -10%, #2f2216 0%, #0d0905 72%); background-attachment: fixed; }
+#mbox .mb { background: linear-gradient(transparent, rgba(14, 9, 5, .88) 55%); }

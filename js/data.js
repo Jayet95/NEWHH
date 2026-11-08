@@ -432,3 +432,16 @@ function fmtCost(c) { return Object.keys(c).map(k => RES_ICON[k] + c[k]).join(' 
 function canAfford(res, c) { return Object.keys(c).every(k => res[k] >= c[k]); }
 function pay(res, c, mul = 1) { for (const k in c) res[k] -= c[k] * mul; }
 function armyValue(arr) { return arr.reduce((s, a) => s + (a ? C[a.t].v * a.n : 0), 0); }
+
+// ---------- scenarios: ready-made games with a fixed map, rivals and an objective ----------
+// goal: conquer = eliminate every rival (default) · survive = still hold a town on day n · gold = hold n gold before day `days` · towns = own n towns before day `days`
+const SCENARIOS = [
+  { id: 'first', icon: '🌱', name: 'First Steps', blurb: 'A small, friendly valley and a single rival. The best place to learn the game.', diff: 'easy', goal: { type: 'conquer' }, map: { preset: 'plains', size: 'small', seed: 'first-steps', ais: 1, fog: false, biome: 'none' } },
+  { id: 'gold', icon: '💰', name: 'Gold Rush', blurb: 'The crown wants a treasury, not a war. Hold 60,000 gold before day 70 — rivals will try to stop you.', diff: 'normal', goal: { type: 'gold', n: 60000, days: 70 }, bonus: { gold: 2000 }, map: { preset: 'plains', size: 'medium', seed: 'gold-rush', ais: 2, teams: ['enemy', 'enemy'], biome: 'mixed' } },
+  { id: 'sand', icon: '🏜️', name: 'Sandstorm Crossing', blurb: 'A scorched steppe of dunes and dry wells. Two rival realms march together against you.', diff: 'normal', goal: { type: 'conquer' }, map: { preset: 'steppe', size: 'medium', seed: 'sandstorm', ais: 2, teams: ['bloc', 'bloc'], biome: 'desert' } },
+  { id: 'frost', icon: '❄️', name: 'The Frozen Frontier', blurb: 'Snowbound passes and few towns. Claim four of them before day 55 — the cold is not your only enemy.', diff: 'normal', goal: { type: 'towns', n: 4, days: 55 }, map: { preset: 'highland', size: 'large', seed: 'frozen-frontier', ais: 2, biome: 'snow' } },
+  { id: 'isles', icon: '🏝️', name: 'Island Kingdom', blurb: 'A sea of islands. One neighbour offers an alliance; the other wants your harbour. Build ships.', diff: 'normal', goal: { type: 'conquer' }, map: { preset: 'isles', size: 'large', seed: 'island-kingdom', ais: 2, teams: ['ally', 'enemy'], biome: 'mixed' } },
+  { id: 'fever', icon: '🐸', name: 'Fever Swamp', blurb: 'Mist, mud and undead. Capture three towns before day 40 and escape the swamp.', diff: 'hard', goal: { type: 'towns', n: 3, days: 40 }, map: { preset: 'plains', size: 'medium', seed: 'fever-swamp', ais: 1, biome: 'swamp' } },
+  { id: 'embers', icon: '🌋', name: 'Siege of Embers', blurb: 'Ash and lava. Three realms close in; simply outlast them — hold a town on day 45.', diff: 'hard', goal: { type: 'survive', days: 45 }, map: { preset: 'highland', size: 'medium', seed: 'embers', ais: 3, teams: ['bloc', 'bloc', 'bloc'], biome: 'lava' } },
+  { id: 'warlords', icon: '👑', name: 'War of the Warlords', blurb: 'A huge realm, three rivals, every one for themselves. Only one crown will remain.', diff: 'expert', goal: { type: 'conquer' }, map: { preset: 'plains', size: 'huge', seed: 'warlords', ais: 3, biome: 'mixed' } },
+];

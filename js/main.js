@@ -179,9 +179,9 @@
     const preset = map.preset || 'plains', size = map.size || 'medium', seed = seedFrom(map.seed);
     const nAI = Math.max(1, Math.min(4, map.ais || { small: 1, medium: 1, large: 2, huge: 3, giant: 4 }[size] || 1));
     const aiFacs = shuffle(Object.keys(FACTIONS).filter(f => f !== faction)).slice(0, nAI);
-    const m = genMap(seed, aiFacs, diff, { preset, size });
+    const m = genMap(seed, aiFacs, diff, { preset, size, biome: map.biome });
     setFaction(faction);
-    G = { seed, preset, size, W: m.W, H: m.H, tiles: m.tiles, biome: m.biome, zone: m.zone, objs: m.objs, dock: m.dock, boats: [], nextBoat: 1, day: 1, over: false, path: null, faction, diff,
+    G = { seed, preset, size, W: m.W, H: m.H, scn: map.scn ? { id: map.scn.id, name: map.scn.name, goal: map.scn.goal } : null, tiles: m.tiles, biome: m.biome, zone: m.zone, objs: m.objs, dock: m.dock, boats: [], nextBoat: 1, day: 1, over: false, path: null, faction, diff,
       res: { gold: D.gold, wood: r(20), ore: r(20), mercury: r(5), sulfur: r(5), crystal: r(5), gems: r(5) }, spells: [...START_SPELLS],
       wk: {}, heroes: [], sel: 0, hero: null, tavern: [], noTown: 0,
       col: (() => { const pc = Math.max(0, Math.min(7, map.color || 0)), free = PALETTE.map((p, i) => i).filter(i => i !== pc); return [PALETTE[pc][1], ...aiFacs.map((f, i) => PALETTE[free[i % free.length]][1])]; })(),
@@ -196,6 +196,7 @@
     h.army = [{ t: ti[0], n: 20 }, { t: ti[1], n: 10 }, { t: ti[2], n: 5 }, null, null, null, null];
     h.move = maxMove(h);
     G.heroes.push(h); setActive(0); learn(def.spells); rollTavern();
+    if (map.scn && map.scn.bonus) for (const k in map.scn.bonus) G.res[k] = (G.res[k] || 0) + map.scn.bonus[k];
     G.fog = map.fog !== false; initFog();
     reindex(G); buildTerrain(); sizeMini(); centerOn(h.x, h.y); renderAll(); recentreSoon();
     toast(`${MAPS[preset].name} (${SIZES[size].name}, seed ${seed}) · ${D.name}: defeat ${nAI > 1 ? 'all ' + nAI + ' rivals by capturing their towns' : 'the rival by capturing their towns'}. Good luck, ${h.name}!`);
@@ -519,6 +520,7 @@
     $('income').innerHTML = `📈 ${RES.filter(k => gn[k]).map(k => `+${fmtN(gn[k])}${RES_ICON[k]}`).join(' ') || 'no income'}<small>/day</small>`;
     const d = G.day - 1;
     $('date').textContent = `Month ${Math.floor(d / 28) + 1} · Week ${Math.floor(d % 28 / 7) + 1} · Day ${d % 7 + 1} · ${DF().icon} ${DF().name}`;
+    { const gt = goalText(); if (gt) $('date').textContent += ' · 🎯 ' + gt; }
     const h = G.hero;
     const ab = artBonus(h), plus = (v) => v ? ` <span class="bonus">(${v > 0 ? '+' : ''}${v})</span>` : '';
     const perkTxt = Object.keys(PERKS).filter(k => perk(h, k) > 0).map(k => `<span title="${PERKS[k].d}">${PERKS[k].i}${PERKS[k].n} ${RANK_NAMES[perk(h, k)]}${ab.sk[k] ? '*' : ''}</span>`).join(' · ');
@@ -1792,6 +1794,21 @@
     }
     return out.slice(0, 5);
   }
+  // scenario objectives
+  const ownedTowns = () => G.objs.filter(x => x.t === 'town' && x.owner === 0).length;
+  function goalText() {
+    const g = G && G.scn && G.scn.goal; if (!g) return '';
+    const left = g.days ? ` · day ${Math.min(G.day, g.days)}/${g.days}` : '';
+    return g.type === 'gold' ? `${G.res.gold.toLocaleString()} / ${g.n.toLocaleString()} gold${left}` : g.type === 'towns' ? `${ownedTowns()}/${g.n} towns${left}` : g.type === 'survive' ? `survive to day ${g.days} (day ${G.day})` : 'defeat every rival' + (g.days ? left : '');
+  }
+  async function goalCheck() {
+    const g = G && G.scn && G.scn.goal; if (!g || G.over) return false;
+    if (g.type === 'gold' && G.res.gold >= g.n) { busy = false; await endGame(true); return true; }
+    if (g.type === 'towns' && ownedTowns() >= g.n) { busy = false; await endGame(true); return true; }
+    if (g.type === 'survive' && G.day > g.days) { busy = false; await endGame(true); return true; }
+    if ((g.type === 'gold' || g.type === 'towns' || (g.type === 'conquer' && g.days)) && G.day > g.days) { busy = false; await endGame(false, `The scenario "${G.scn.name}" ran out of time: ${goalText().replace(/ · day.*/, '')}.`); return true; }
+    return false;
+  }
   async function endTurn() {
     if (!G || busy || G.over) return;
     if (Settings.confirmEnd) {
@@ -1832,6 +1849,7 @@
     for (const h of G.heroes) { h.move = maxMove(h); h.mana = Math.min(maxMana(h), h.mana + 4 + 2 * perk(h, 'mysticism')); if (heroAtTown(h)) h.mana = maxMana(h); }
     const gain = computeGain();
     RES.forEach(k => { G.res[k] += gain[k]; });
+    if (await goalCheck()) return;
     gst('gold', gain.gold || 0);
     Ach.event('day', { day: G.day, gold: gain.gold || 0, towns: myTowns().length, mines: G.objs.filter(x => x.t === 'mine' && x.owner === 0).length, azure: G.heroes.some(x => x.army.some(a => a && a.t === 'azured')) });
     moveCaravans();
@@ -1926,8 +1944,9 @@
   const FLAGS = ['blue', 'red', 'green', 'orange', 'purple', 'teal', 'pink', 'tan'];
   const flagImg = (i, px = 36) => { const u = Assets.url('flags/' + FLAGS[i]); return u ? `<img class="flagimg" src="${u}" alt="" draggable="false" style="height:${px}px">` : `<span class="zdot" style="background:${PALETTE[i][1]};width:${px * 0.5}px;height:${px * 0.5}px"></span>`; };
   const prevCache = {};
-  function mapPreview(kind) {
-    if (prevCache[kind] && prevCache[kind].full) return prevCache[kind].url;
+  function mapPreview(kind0, biome) {
+    const kind = kind0, ck = kind0 + (biome || '');
+    if (prevCache[ck] && prevCache[ck].full) return prevCache[ck].url;
     const W = 300, H = 150, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
     const T = (n) => Assets.get('terrain/' + n), full = !!(T('grass') && T('water'));
     const fill = (img, col) => { g.fillStyle = img ? g.createPattern(img, 'repeat') : col; g.fillRect(0, 0, W, H); };
@@ -1949,9 +1968,25 @@
       fill(T('grass'), '#5b8a3a'); blob(T('water'), '#2f6fb0', 40, 130, 90, 36, -0.2); blob(T('sand'), '#d8c07a', 150, 135, 40, 12); mounts(4, 170, 30, 285, 60); trees(9, 100, 45, 270, 115); stamp('objects/town_castle', 95, 118, 40); stamp('objects/mine_wood', 205, 90, 24); stamp('objects/chest', 255, 120, 20);
     }
     const sh = g.createLinearGradient(0, H * 0.55, 0, H); sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,.45)'); g.fillStyle = sh; g.fillRect(0, 0, W, H);
-    const url = c.toDataURL('image/jpeg', 0.82); prevCache[kind] = { url, full }; return url;
+    const tint = { desert: '224,160,64', snow: '225,236,255', swamp: '70,90,40', lava: '200,70,20' }[biome]; if (tint) { g.fillStyle = `rgba(${tint},.34)`; g.fillRect(0, 0, W, H); }
+    const url = c.toDataURL('image/jpeg', 0.82); prevCache[ck] = { url, full }; return url;
   }
   const facBanner = (k) => { const h = Art.facHue(k); return h === null ? '#6b4f24' : `hsl(${h},48%,30%)`; };
+  const goalLine = (g) => g.type === 'gold' ? `Hold <b>${g.n.toLocaleString()}</b> gold before day ${g.days}` : g.type === 'towns' ? `Own <b>${g.n}</b> towns before day ${g.days}` : g.type === 'survive' ? `Hold a town until <b>day ${g.days}</b>` : 'Defeat every rival realm';
+  function showScenarios(pick) {
+    const cur = SCENARIOS.find(s => s.id === pick) || SCENARIOS[0];
+    const tiles = SCENARIOS.map(s => `<div class="card scn${s === cur ? ' on' : ''}" data-sc="${s.id}"><img class="mprev" src="${mapPreview(s.map.preset, s.map.biome)}" alt="" draggable="false"><b>${s.icon} ${s.name}</b><div class="small">${DIFFICULTY[s.diff].icon} ${DIFFICULTY[s.diff].name} · ${SIZES[s.map.size].name} · ${s.map.ais} rival${s.map.ais > 1 ? 's' : ''}</div></div>`).join('');
+    const tm = (cur.map.teams || []).filter(Boolean), ally = tm.filter(t => t === 'ally').length, bloc = tm.filter(t => t === 'bloc').length;
+    const panel = `<div class="hspan scnpan"><img class="mprev" src="${mapPreview(cur.map.preset, cur.map.biome)}" alt="" draggable="false"><h3>${cur.icon} ${cur.name}</h3><div class="hscls">${DIFFICULTY[cur.diff].icon} ${DIFFICULTY[cur.diff].name}</div><p class="scnb">${cur.blurb}</p>
+      <h4>Objective</h4><div class="scngoal">🎯 ${goalLine(cur.goal)}</div>
+      <h4>Setup</h4><div class="hsspells"><span>${MAPS[cur.map.preset].name}</span><span>${SIZES[cur.map.size].name} ${SIZES[cur.map.size].w}×${SIZES[cur.map.size].h}</span><span>${cur.map.ais} rival${cur.map.ais > 1 ? 's' : ''}</span>${ally ? '<span>🤝 ally</span>' : ''}${bloc ? '<span>⚔⚔ allied rivals</span>' : ''}<span>Fog ${cur.map.fog === false ? 'off' : 'on'}</span>${cur.map.biome && cur.map.biome !== 'mixed' && cur.map.biome !== 'none' ? `<span>${cur.map.biome} lands</span>` : ''}${cur.bonus ? `<span>+${cur.bonus.gold} gold</span>` : ''}</div>
+      <button class="primary hsgo" id="scGo">Choose your castle →</button></div>`;
+    $('mbox').innerHTML = `<div class="setup"><h2>Scenarios <span class="small">ready-made maps with an objective</span></h2><div class="hsbody"><div class="grid scngrid">${tiles}</div>${panel}</div><div class="mb"><button id="sBack">Back</button></div></div>`;
+    $('sBack').onclick = () => $('modal').classList.add('hide');
+    $('mbox').querySelectorAll('[data-sc]').forEach(c => { c.onclick = () => showScenarios(c.dataset.sc); c.ondblclick = () => go(); });
+    const go = () => showFactionSelect(cur.diff, { ...cur.map, color: 0, scn: cur });
+    $('scGo').onclick = go; $('modal').classList.remove('hide');
+  }
   function showFactionSelect(diff = 'normal', map = {}) {
     const need = Object.keys(FACTIONS).map(k => 'ui/town_' + k);
     const draw = () => {
@@ -1959,7 +1994,7 @@
         <div class="small blurb">${f.blurb}</div>
         <div class="crow">${factionTiers(k).map(id => `<span title="${C[id].n} → ${C[lineType(id, 2)].n}">${Art.pic(id, 44)}</span>`).join('')}</div></div>`).join('');
       $('mbox').innerHTML = `<div class="setup"><span data-bg="castle_select"></span><h2>Choose your castle <span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid facgrid">${cards}</div><div class="mb"><button id="sBack">Back</button></div></div>`;
-      $('sBack').onclick = () => showMapSelect(diff, map.preset ? map : undefined);
+      $('sBack').onclick = () => map.scn ? showScenarios(map.scn.id) : showMapSelect(diff, map.preset ? map : undefined);
       $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => showHeroSelect(c.dataset.f, diff, map));
     };
     draw(); $('modal').classList.remove('hide');
@@ -1983,6 +2018,7 @@
     $('hsGo').onclick = () => go(cur.key);
   }
   $('tNew').onclick = showDifficultySelect;
+  $('tScn').onclick = () => showScenarios();
   $('tCont').onclick = () => { if (load()) $('title').classList.add('hide'); };
   $('tLoad').onclick = () => openSlots();
   $('tSet').onclick = () => openSettings();

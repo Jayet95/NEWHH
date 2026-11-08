@@ -277,8 +277,8 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
   }
 
   // climate regions: patches of desert, snow, swamp and lava ground scattered over the map (never around the player's castle); fights fought there use the matching battlefield
-  const biome = []; { const BR = rng(seed ^ 0x5bd1e995), kinds = [1, 2, 3, 4], span = Math.max(W, H), cs = []; const warp = noise(BR, W, H, 5 * fs);
-    const nC = Math.max(3, Math.round(3 + sc * 1.6)); for (let i = 0; i < nC * 4 && cs.length < nC; i++) { const c = { x: Math.floor(BR() * W), y: Math.floor(BR() * H), k: kinds[(cs.length + Math.floor(BR() * 2)) % 4], r: span * (0.14 + BR() * 0.12) }; if (Math.hypot(c.x - P.x, c.y - P.y) > Math.max(12, span * 0.38)) cs.push(c); }
+  const biome = []; { const BR = rng(seed ^ 0x5bd1e995), one = { desert: 1, snow: 2, swamp: 3, lava: 4 }[mo.biome], kinds = one ? [one] : [1, 2, 3, 4], span = Math.max(W, H), cs = []; const warp = noise(BR, W, H, 5 * fs);
+    const nC = mo.biome === 'none' ? 0 : Math.max(3, Math.round(3 + sc * 1.6)); for (let i = 0; i < nC * 4 && cs.length < nC; i++) { const c = { x: Math.floor(BR() * W), y: Math.floor(BR() * H), k: kinds[(cs.length + Math.floor(BR() * 2)) % kinds.length], r: span * (0.14 + BR() * 0.12) * (one ? 1.5 : 1) }; if (Math.hypot(c.x - P.x, c.y - P.y) > Math.max(12, span * 0.38)) cs.push(c); }
     for (let y = 0; y < H; y++) { biome[y] = []; for (let x = 0; x < W; x++) { let best = 0, bd = 1e9; for (const c of cs) { const d = Math.hypot(c.x - x, (c.y - y) * 1.15) + (warp[y][x] - 0.5) * 7; if (d < c.r && d < bd) { bd = d; best = c.k; } } biome[y][x] = best; } } }
   return { W, H, tiles, biome, objs, P, E, aiStarts, zone, dock };
 }

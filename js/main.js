@@ -1514,7 +1514,7 @@
     const tabs = mt.length > 1 ? `<div class="hlist">${mt.map((x, i) => `<button class="hbtn${x === t ? ' on' : ''}" data-tab="${i}" title="${x.name}">${FACTIONS[x.fac].icon}</button>`).join('')}</div>` : '';
     let html = `${tabs}<h2>🏰 ${t.name} <span class="small">${FACTIONS[t.fac].name} · ${t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Settlement'}</span></h2><span class="townwide"></span><canvas id="tcv" width="1040" height="290" style="width:100%;height:auto;aspect-ratio:1040/290;border-radius:8px;border:2px solid #8c6a33;display:block"></canvas>
       <div class="small">${here ? `${th.name} is in town — recruits join the hero's army.` : 'No hero in this town — recruits join the town garrison (a hero can pick them up later).'} Higher Town Hall levels unlock new dwellings and creature upgrades.</div>`;
-    let war = '', dwc = '';
+    let war = '', dwc = '', wc = '';
     tiersOf(t).forEach((id, i) => {
       const tier = i + 1, lv = t.up[tier], c = C[lineType(id, lv)], built = t.b[tier], av = t.avail[tier] || 0;
       const needHall = TIER_HALL[tier], locked = t.b.hall < needHall;
@@ -1527,6 +1527,10 @@
       }
       dwc += `<div class="bcard${built ? ' built' : ''}${!built && locked ? ' lockedrow' : ''}"><div class="bpic">${TownArt.pic('dwell', lv, t.fac, 112, lineType(id, lv))}<span class="bcr">${Art.pic(lineType(id, lv), 34)}</span></div><div><b>${c.n} dwelling</b> <span class="stars">${built ? starStr(lv) : ''}</span><br><span class="small">${built ? `Recruits <b>${av}</b> now · +${c.gr}/week · ${fmtCost(c.cost)} each` : locked ? `Needs the ${HALL_LEVELS[needHall].n}` : `Not built yet — ${fmtCost(DWELL_COST[tier])}`}</span></div>
         <div class="bacts">${built ? (upC ? (upLocked ? `<span class="lockpill">Lv${nextLv} · Hall ${UP_HALL[nextLv]}</span>` : `<button data-up="${tier}" title="${Art.fmtCostTxt(upC)}">⬆ Lv${nextLv} ${fmtCost(upC)}</button>`) : '<span class="small">MAX</span>') : (locked ? `<span class="lockpill">🔒 Hall ${needHall}</span>` : `<button class="primary" data-build="${tier}">Build ${fmtCost(DWELL_COST[tier])}</button>`)}</div></div>`;
+      wc += `<div class="bcard wcard${built ? ' built' : ''}${!built && locked ? ' lockedrow' : ''}"><div class="bpic wpic">${Art.pic(lineType(id, lv), 112)}<span class="bcr">${TownArt.pic('dwell', lv, t.fac, 44, lineType(id, lv))}</span>${built ? `<span class="wav" title="Ready to recruit">${av}</span>` : ''}</div>
+        <div><b>${c.n}</b> <span class="stars">${built ? starStr(lv) : ''}</span><div class="wstats"><span>⚔ ${c.a}</span><span>🛡 ${c.d}</span><span>HP ${c.hp}</span><span>👢 ${c.s}</span><span>${c.lo}-${c.hi} dmg</span>${c.shoot ? '<span>🏹 archer</span>' : ''}${c.fly ? '<span>flying</span>' : ''}</div>
+        <span class="small">${built ? `${fmtCost(c.cost)} each · +${c.gr}/week` : locked ? `🔒 Needs the ${HALL_LEVELS[needHall].n}` : `Dwelling not built — ${fmtCost(DWELL_COST[tier])}`}</span></div>
+        <div class="bacts">${built ? `<input type="number" min="1" max="${av}" value="${av}" id="n${tier}"><button class="primary" data-buy="${tier}">Recruit</button>${upC ? (upLocked ? `<span class="lockpill" title="Requires Town Hall level ${UP_HALL[nextLv]}">Lv${nextLv} · Hall ${UP_HALL[nextLv]}</span>` : `<button data-up="${tier}" title="${Art.fmtCostTxt(upC)}">⬆ Lv${nextLv} ${fmtCost(upC)}</button>`) : ''}${upArmy ? `<button data-uparmy="${tier}">🪖 Upgrade ${upArmy.count} troops ${RES_ICON.gold}${upArmy.cost}</button>` : ''}` : (locked ? `<span class="lockpill">🔒 Hall ${needHall}</span>` : `<button class="primary" data-build="${tier}">Build</button>`)}</div></div>`;
       war += `<div class="trow big${!built && locked ? ' lockedrow' : ''}"><div class="ic">${Art.pic(lineType(id, lv), 68)}</div>
         <div><b>${c.n}</b> <span class="stars">${built ? starStr(lv) : ''}</span> <span class="small">Att ${c.a} Def ${c.d} Dmg ${c.lo}-${c.hi} HP ${c.hp} Spd ${c.s}${c.shoot ? ' · Archer' : ''}${c.fly ? ' · Flying' : ''}</span><br>
         <span class="small">${built ? `Available: <b>${av}</b> · ${fmtCost(c.cost)} each · +${c.gr}/week` : locked ? `🔒 Requires ${HALL_LEVELS[needHall].n} (Town Hall level ${needHall})` : `Dwelling not built — ${fmtCost(DWELL_COST[tier])}`}</span></div>
@@ -1564,7 +1568,7 @@
         <div class="acts"><button data-garr="1">Manage garrison</button></div></div>
 `;
     const tabBar = `<div class="ttabs"><button class="ttab${townTab === 'war' ? ' on' : ''}" data-ttab="war">⚔️ Warriors</button><button class="ttab${townTab === 'bld' ? ' on' : ''}" data-ttab="bld">🏗️ Buildings</button></div>`;
-    html += tabBar + (townTab === 'war' ? war + garrRow + outpostHtml(t) + caravanHtml(t, mt) : `<h4>Creature dwellings</h4><div class="bgrid">${dwc}</div><h4>Town buildings</h4><div class="bgrid">${cardify(garrRow + bld + smithy)}</div>`) + `<div class="small" style="margin-top:8px">${RES.map(k => RES_ICON[k] + ' ' + G.res[k]).join('  ')}</div>
+    html += tabBar + (townTab === 'war' ? `<div class="bgrid wgrid">${wc}</div><div class="bgrid">${cardify(garrRow)}</div>` + outpostHtml(t) + caravanHtml(t, mt) : `<h4>Creature dwellings</h4><div class="bgrid">${dwc}</div><h4>Town buildings</h4><div class="bgrid">${cardify(garrRow + bld + smithy)}</div>`) + `<div class="small" style="margin-top:8px">${RES.map(k => RES_ICON[k] + ' ' + G.res[k]).join('  ')}</div>
       <div class="mb"><button class="primary" id="tClose">Leave town</button></div>`;
     $('mbox').innerHTML = html; $('modal').classList.remove('hide');
     if (!townLoop) { townLoop = true; requestAnimationFrame(drawTown); }

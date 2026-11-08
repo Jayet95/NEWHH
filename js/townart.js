@@ -104,7 +104,12 @@ const TownArt = (() => {
   function sprite(kind, lv, fac, id) {
     const hue = hueOf(fac), key = [kind, lv, hue, id || ''].join('|');
     return cache[key] || (cache[key] = mk(128, 144, (g) => {
-      const nm = kind === 'dwell' ? ['buildings/' + id, 'buildings/' + String(id).replace(/_\d$/, '')] : ['buildings/' + fac + '_' + kind + '_' + lv, 'buildings/' + kind + '_' + lv, 'buildings/' + fac + '_' + kind, 'buildings/' + kind];
+      // every building can come in two pictures: <name> (regular) and <name>_up (upgraded: dwellings at level 2+, town hall level 3+, lodge level 2+, walls and minefield level 2+)
+      const UPFROM = { hall: 3, guild: 2, fort: 2, mines: 2 };
+      const base = String(id).replace(/_\d$/, ''), isUp = kind === 'dwell' ? /_\d$/.test(String(id)) : (UPFROM[kind] !== undefined && lv >= UPFROM[kind]);
+      const nm = kind === 'dwell'
+        ? (isUp ? ['buildings/' + base + '_up', 'buildings/' + id, 'buildings/' + base] : ['buildings/' + id, 'buildings/' + base])
+        : [...(isUp ? ['buildings/' + fac + '_' + kind + '_up', 'buildings/' + kind + '_up'] : []), 'buildings/' + fac + '_' + kind + '_' + lv, 'buildings/' + kind + '_' + lv, 'buildings/' + fac + '_' + kind, 'buildings/' + kind];
       const ai = typeof Assets !== 'undefined' ? Assets.get(...nm) : null;
       if (ai) { const k = Math.min(128 / ai.width, 144 / ai.height); g.drawImage(ai, 64 - ai.width * k / 2, 144 - ai.height * k, ai.width * k, ai.height * k); return; }
       g.scale(2, 2); const f = { dwell: () => dwelling(g, +(String(id).match(/(\d)(?:_\d)?$/) || [0, 1])[1], lv, hue, id), hall: () => hall(g, Math.max(1, lv), hue), guild: () => guild(g, Math.max(1, lv), hue), market: () => market(g, 1, hue), ship: () => ship(g, 1, hue), fort: () => fortKind(g, lv, hue), mines: () => minesKind(g, lv), tavern: () => tavern(g, 1, hue), garrison: () => garrison(g, 1, hue) }[kind]; if (f) f(); }));

@@ -464,7 +464,7 @@ body.th-light #top { color: #fff; }
 body.th-dark .dtIco { filter: drop-shadow(0 0 6px #ff5a1a); }
 /* the rivals' turn: the whole interface dulls until it is yours again */
 #app { transition: filter .35s; }
-body.aiturn #app { filter: saturate(.35) brightness(.78); }
+
 body.aiturn #top::after { content: "Rivals are moving…"; position: absolute; left: 50%; bottom: -22px; transform: translateX(-50%); font-size: 12px; color: var(--mut); background: rgba(0, 0, 0, .6); border-radius: 10px; padding: 2px 12px; z-index: 5; }
 
 /* minimap frame */

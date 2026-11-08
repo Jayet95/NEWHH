@@ -535,7 +535,6 @@
     $('res').innerHTML = resHtml; $('mres').innerHTML = resHtml; syncMres();
     $('income').innerHTML = `📈 ${RES.filter(k => gn[k]).map(k => `+${fmtN(gn[k])}${RES_ICON[k]}`).join(' ') || 'no income'}<small>/day</small>`;
     const d = G.day - 1;
-    document.body.classList.toggle('night', G.day % 2 === 0);
     { const gt = goalText(), mo = Math.floor(d / 28) + 1, wk = Math.floor(d % 28 / 7) + 1, dw = d % 7 + 1;
       $('date').innerHTML = `<span class="dtMain"><small>Month ${mo} · Week ${wk}</small><b>Day ${dw}</b></span><span class="dtTurn" title="Turns played">Turn<br><b>${G.day}</b></span><span class="dtDiff">${DF().icon} ${DF().name}</span>${gt ? `<span class="dtGoal" title="Scenario objective">🎯 ${gt}</span>` : ''}`; }
     const h = G.hero;
@@ -1856,8 +1855,9 @@
     if (!G || busy || G.over) return;
     busy = true; G.path = null; selSlot = -1;
     G.report = [];
-    document.body.classList.add('aiturn');
-    try { await aiPhase(); } finally { document.body.classList.remove('aiturn'); }
+    document.body.classList.add('aiturn', 'night');   // the rivals move at night
+    const nt0 = Date.now();
+    try { await aiPhase(); await new Promise(r => setTimeout(r, Math.max(0, 1700 - (Date.now() - nt0)))); } finally { document.body.classList.remove('aiturn', 'night'); }
     if (G.over) { busy = false; return; }
     G.day++;
     await turnReport();

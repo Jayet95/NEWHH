@@ -6,7 +6,7 @@
   const HR = TS / Math.sqrt(3), RH = HR * 1.5, HH = HR * 2;
   const hcx = (x, y) => (x + 0.5 + (y & 1) * 0.5) * TS, hcy = (y) => y * RH + HR;
   const COARSE = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-  let VW = 960, VH = 640, Z = (COARSE || window.innerWidth < 700) ? 1.5 : 1;
+  let VW = 960, VH = 640, Z = (COARSE || window.innerWidth < 700) ? 1.5 : window.innerWidth > 1100 ? 1.3 : 1;
   const SAVE = 'h3js_save_v7';
   const MOVE_PER_DAY = 1700;
   const FLEE_RATIO = 3;
@@ -197,7 +197,7 @@
     h.move = maxMove(h);
     G.heroes.push(h); setActive(0); learn(def.spells); rollTavern();
     G.fog = map.fog !== false; initFog();
-    reindex(G); buildTerrain(); sizeMini(); centerOn(h.x, h.y); renderAll();
+    reindex(G); buildTerrain(); sizeMini(); centerOn(h.x, h.y); renderAll(); recentreSoon();
     toast(`${MAPS[preset].name} (${SIZES[size].name}, seed ${seed}) · ${D.name}: defeat ${nAI > 1 ? 'all ' + nAI + ' rivals by capturing their towns' : 'the rival by capturing their towns'}. Good luck, ${h.name}!`);
   }
   const saveJSON = () => JSON.stringify(G, (k, v) => (k === 'omap' || k === 'hero' || k[0] === '_') ? undefined : v);
@@ -211,7 +211,7 @@
       G = JSON.parse(s); if (!G.zone || !G.heroes || !G.ais) return false;
       G.tavern = (G.tavern || []).filter(id => HEROES[id]);
       G.path = null; G.boats = G.boats || []; setFaction(G.faction); setActive(Math.min(G.sel, G.heroes.length - 1));
-      initFog(); reindex(G); buildTerrain(); sizeMini(); centerOn(G.hero.x, G.hero.y); renderAll(); return true;
+      initFog(); reindex(G); buildTerrain(); sizeMini(); centerOn(G.hero.x, G.hero.y); renderAll(); recentreSoon(); return true;
     } catch (e) { return false; }
   }
 
@@ -264,9 +264,13 @@
   }
   function clampCam() {
     const WW = (G.W + 0.5) * TS, WH = G.H * RH + HR * 0.5;
-    cam.x = WW <= VW ? -(VW - WW) / 2 : Math.max(0, Math.min(WW - VW, cam.x));
-    cam.y = WH <= VH ? -(VH - WH) / 2 : Math.max(0, Math.min(WH - VH, cam.y));
+    // a little overscroll past the map edge so a hero standing in a corner can still be centred
+    const mx = VW * 0.45, my = VH * 0.45;
+    cam.x = WW <= VW ? -(VW - WW) / 2 : Math.max(-mx, Math.min(WW - VW + mx, cam.x));
+    cam.y = WH <= VH ? -(VH - WH) / 2 : Math.max(-my, Math.min(WH - VH + my, cam.y));
   }
+  // the page layout settles a moment after a game starts (title/dialogs close), so centre on the hero again once it has
+  const recentreSoon = () => { const g = G; [60, 250].forEach(ms => setTimeout(() => { if (G === g && G && G.hero && !G.path) { centerOn(G.hero.x, G.hero.y); renderAll(); } }, ms)); };
   function centerOn(x, y) { resizeMap(); cam.x = hcx(x, Math.floor(y)) - VW / 2; cam.y = hcy(y) - VH / 2; clampCam(); }
   function resizeMap() {
     const w = cmap.clientWidth, h = cmap.clientHeight; if (w < 50 || h < 50) return;
@@ -1368,7 +1372,7 @@
     curTown = t; (G.flags = G.flags || {}).town = true; Assets.need(['ui/town_' + t.fac]);
     const th = townHero(t), here = !!th, mt = myTowns(), coastal = !!G.dock && t === mt[0];
     const tabs = mt.length > 1 ? `<div class="hlist">${mt.map((x, i) => `<button class="hbtn${x === t ? ' on' : ''}" data-tab="${i}" title="${x.name}">${FACTIONS[x.fac].icon}</button>`).join('')}</div>` : '';
-    let html = `${tabs}<h2>🏰 ${t.name} <span class="small">${FACTIONS[t.fac].name} · ${t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Settlement'}</span></h2><canvas id="tcv" width="780" height="190" style="width:100%;border-radius:6px;border:1px solid #6b4f24"></canvas>
+    let html = `${tabs}<h2>🏰 ${t.name} <span class="small">${FACTIONS[t.fac].name} · ${t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Settlement'}</span></h2><span class="townwide"></span><canvas id="tcv" width="1040" height="290" style="width:100%;height:auto;aspect-ratio:1040/290;border-radius:8px;border:2px solid #8c6a33;display:block"></canvas>
       <div class="small">${here ? `${th.name} is in town — recruits join the hero's army.` : 'No hero in this town — recruits join the town garrison (a hero can pick them up later).'} Higher Town Hall levels unlock new dwellings and creature upgrades.</div>`;
     let war = '';
     tiersOf(t).forEach((id, i) => {
@@ -1381,14 +1385,14 @@
         for (const s of th.army) if (s && C[s.t].line === id && C[s.t].lv < lv) { cost += (c.cost.gold - C[s.t].cost.gold) * s.n; count += s.n; }
         if (count) upArmy = { cost, count };
       }
-      war += `<div class="trow"><div class="ic">${Art.pic(lineType(id, lv), 38)}</div>
+      war += `<div class="trow big${!built && locked ? ' lockedrow' : ''}"><div class="ic">${Art.pic(lineType(id, lv), 68)}</div>
         <div><b>${c.n}</b> <span class="stars">${built ? starStr(lv) : ''}</span> <span class="small">Att ${c.a} Def ${c.d} Dmg ${c.lo}-${c.hi} HP ${c.hp} Spd ${c.s}${c.shoot ? ' · Archer' : ''}${c.fly ? ' · Flying' : ''}</span><br>
         <span class="small">${built ? `Available: <b>${av}</b> · ${fmtCost(c.cost)} each · +${c.gr}/week` : locked ? `🔒 Requires ${HALL_LEVELS[needHall].n} (Town Hall level ${needHall})` : `Dwelling not built — ${fmtCost(DWELL_COST[tier])}`}</span></div>
         <div class="acts">${built
           ? `<input type="number" min="1" max="${av}" value="${av}" id="n${tier}"><button data-buy="${tier}">Recruit</button>
-             ${upC ? (upLocked ? `<button disabled title="Requires Town Hall level ${UP_HALL[nextLv]}">🔒 Lv${nextLv} (Hall ${UP_HALL[nextLv]})</button>` : `<button data-up="${tier}" title="${Art.fmtCostTxt(upC)}">⬆ Lv${nextLv} ${fmtCost(upC)}</button>`) : '<span class="small">MAX</span>'}
+             ${upC ? (upLocked ? `<span class="lockpill" title="Requires Town Hall level ${UP_HALL[nextLv]}">Lv${nextLv} · Hall ${UP_HALL[nextLv]}</span>` : `<button data-up="${tier}" title="${Art.fmtCostTxt(upC)}">⬆ Lv${nextLv} ${fmtCost(upC)}</button>`) : '<span class="small">MAX</span>'}
              ${upArmy ? `<button data-uparmy="${tier}">🪖 Upgrade ${upArmy.count} troops ${RES_ICON.gold}${upArmy.cost}</button>` : ''}`
-          : (locked ? `<button disabled>🔒 Hall ${needHall}</button>` : `<button data-build="${tier}">Build</button>`)}</div></div>`;
+          : (locked ? `<span class="lockpill">🔒 Hall ${needHall}</span>` : `<button data-build="${tier}">Build</button>`)}</div></div>`;
     });
     const hl = t.b.hall, hNext = hl < 5 ? HALL_LEVELS[hl + 1] : null;
     const gl = t.b.guild, gNext = gl < 3 ? GUILD_COST[gl + 1] : null;
@@ -1893,16 +1897,16 @@
     $('modal').classList.remove('hide');
   }
   function showMapSelect(diff, st = { preset: 'plains', size: 'medium', seed: '' }) {
-    const cards = Object.entries(MAPS).map(([k, m]) => `<div class="card${st.preset === k ? ' on' : ''}" data-m="${k}"><div class="big">${m.icon}</div><b>${m.name}</b><div class="small">${m.desc}</div></div>`).join('');
+    const cards = Object.entries(MAPS).map(([k, m]) => `<div class="card${st.preset === k ? ' on' : ''}" data-m="${k}"><img class="mprev" src="${mapPreview(k)}" alt="" draggable="false"><b>${m.name}</b><div class="small">${m.desc}</div></div>`).join('');
     const sizes = Object.entries(SIZES).map(([k, s]) => `<button class="${st.size === k ? 'primary' : ''}" data-s="${k}">${s.name} (${s.w}×${s.h})</button>`).join(' ');
-    $('mbox').innerHTML = `<h2>Choose your map <span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid two">${cards}</div>
+    $('mbox').innerHTML = `<div class="setup"><h2>Choose your map <span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid two">${cards}</div>
       <p>Size: ${sizes}</p>
       <p>Fog of war: ${[[true, 'On'], [false, 'Off']].map(([v, n]) => `<button class="${(st.fog !== false) === v ? 'primary' : ''}" data-fog="${v}">${n}</button>`).join(' ')} <span class="small">Unexplored land is hidden; scouts, towers and your heroes reveal it.</span></p>
       <p>Rivals: ${[0, 1, 2, 3, 4].map(n => `<button class="${(st.ais || 0) === n ? 'primary' : ''}" data-a="${n}">${n ? n : 'Auto'}</button>`).join(' ')} <span class="small">AI players that expand and fight you.</span></p><p>Seed: <input id="mSeed" placeholder="empty = random map" value="${st.seed}" style="width:230px;background:#120d08;color:#f1e6c4;border:1px solid #6b4f24;padding:4px"> <span class="small">Share a seed to replay the same map.</span></p>
-      <h4>Colours &amp; teams</h4><p>Your flag: ${PALETTE.map((p, i) => `<button class="swatch${(st.color || 0) === i ? ' on' : ''}" data-col="${i}" style="background:${p[1]}" title="${p[0]}"></button>`).join('')}</p>
+      <h4>Colours &amp; teams</h4><p>Your flag: ${PALETTE.map((p, i) => `<button class="swatch flagbtn${(st.color || 0) === i ? ' on' : ''}" data-col="${i}" title="${p[0]}">${flagImg(i, 40)}</button>`).join('')}</p>
       <div class="small">Allies never attack you, share vision and let you swap troops; an enemy bloc fights together. You win when every enemy realm is gone.</div>
-      ${(() => { const n = st.ais || ({ small: 1, medium: 1, large: 2, huge: 3, giant: 4 }[st.size] || 1), free = PALETTE.map((p, i) => i).filter(i => i !== (st.color || 0)); st.teams = st.teams || []; return Array.from({ length: n }, (_, i) => `<div class="setrow"><div><span class="zdot" style="background:${PALETTE[free[i % free.length]][1]};color:${PALETTE[free[i % free.length]][1]}"></span> <b>Rival ${i + 1}</b></div><div class="seg">${[['enemy', '⚔ Enemy'], ['ally', '🤝 Ally'], ['bloc', '⚔⚔ Bloc']].map(([v, l]) => `<button data-tm="${i}:${v}" class="${(st.teams[i] || 'enemy') === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>`).join(''); })()}
-      <div class="mb"><button id="sBack">Back</button><button class="primary" id="sNext">Next: castle</button></div>`;
+      ${(() => { const n = st.ais || ({ small: 1, medium: 1, large: 2, huge: 3, giant: 4 }[st.size] || 1), free = PALETTE.map((p, i) => i).filter(i => i !== (st.color || 0)); st.teams = st.teams || []; return Array.from({ length: n }, (_, i) => `<div class="setrow"><div>${flagImg(free[i % free.length], 30)} <b>Rival ${i + 1}</b></div><div class="seg">${[['enemy', '⚔ Enemy'], ['ally', '🤝 Ally'], ['bloc', '⚔⚔ Bloc']].map(([v, l]) => `<button data-tm="${i}:${v}" class="${(st.teams[i] || 'enemy') === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>`).join(''); })()}
+      <div class="mb"><button id="sBack">Back</button><button class="primary" id="sNext">Next: castle</button></div></div>`;
     const keep = () => { st.seed = $('mSeed').value; };
     $('mbox').querySelectorAll('[data-col]').forEach(b => b.onclick = () => { keep(); st.color = +b.dataset.col; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-tm]').forEach(b => b.onclick = () => { keep(); const [i, v] = b.dataset.tm.split(':'); (st.teams = st.teams || [])[+i] = v; showMapSelect(diff, st); });
@@ -1913,25 +1917,67 @@
     $('sBack').onclick = showDifficultySelect;
     $('sNext').onclick = () => { keep(); showFactionSelect(diff, { ...st }); };
     $('modal').classList.remove('hide');
+    Assets.need(['terrain/grass', 'terrain/water']).then(() => { if (!prevCache[Object.keys(MAPS)[0]] || !prevCache[Object.keys(MAPS)[0]].full) { const d = $('mbox').querySelectorAll('.mprev'); Object.keys(MAPS).forEach((k, i) => { delete prevCache[k]; if (d[i]) d[i].src = mapPreview(k); }); } });
   }
+  // ---------- setup screens (wide layout): painted map previews, castle pictures with banners, hero chooser with detail panel ----------
+  const FLAGS = ['blue', 'red', 'green', 'orange', 'purple', 'teal', 'pink', 'tan'];
+  const flagImg = (i, px = 36) => { const u = Assets.url('flags/' + FLAGS[i]); return u ? `<img class="flagimg" src="${u}" alt="" draggable="false" style="height:${px}px">` : `<span class="zdot" style="background:${PALETTE[i][1]};width:${px * 0.5}px;height:${px * 0.5}px"></span>`; };
+  const prevCache = {};
+  function mapPreview(kind) {
+    if (prevCache[kind] && prevCache[kind].full) return prevCache[kind].url;
+    const W = 300, H = 150, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+    const T = (n) => Assets.get('terrain/' + n), full = !!(T('grass') && T('water'));
+    const fill = (img, col) => { g.fillStyle = img ? g.createPattern(img, 'repeat') : col; g.fillRect(0, 0, W, H); };
+    const blob = (img, col, cx, cy, rx, ry, rot = 0) => { g.save(); g.beginPath(); g.ellipse(cx, cy, rx, ry, rot, 0, 7); g.clip(); g.fillStyle = img ? g.createPattern(img, 'repeat') : col; g.fillRect(0, 0, W, H); g.restore(); g.beginPath(); g.ellipse(cx, cy, rx, ry, rot, 0, 7); g.lineWidth = 3; g.strokeStyle = 'rgba(235,225,190,.55)'; g.stroke(); };
+    const stamp = (name, x, y, h) => { const im = Assets.get(name); if (im) { const w = im.width * h / im.height; g.drawImage(im, x - w / 2, y - h, w, h); } };
+    let seed = kind.length * 7 + 3; const R = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+    const trees = (n, x0, y0, x1, y1) => { for (let i = 0; i < n; i++) stamp('terrain/forest_overlay', x0 + R() * (x1 - x0), y0 + R() * (y1 - y0), 26 + R() * 8); };
+    const mounts = (n, x0, y0, x1, y1) => { const a = []; for (let i = 0; i < n; i++) a.push([x0 + R() * (x1 - x0), y0 + R() * (y1 - y0)]); a.sort((p, q) => p[1] - q[1]).forEach(([x, y]) => stamp('terrain/mountain_overlay', x, y, 38 + R() * 12)); };
+    if (kind === 'isles') {
+      fill(T('water'), '#2f6fb0');
+      blob(T('grass'), '#5b8a3a', 80, 90, 62, 36, -0.2); blob(T('grass'), '#5b8a3a', 215, 55, 52, 30, 0.3); blob(T('sand'), '#d8c07a', 235, 118, 34, 18); blob(T('grass'), '#5b8a3a', 150, 128, 28, 14);
+      trees(5, 45, 70, 110, 100); trees(4, 190, 40, 245, 70); stamp('objects/town_castle', 82, 92, 40); stamp('objects/boat', 150, 40, 26); stamp('objects/chest', 235, 118, 20);
+    } else if (kind === 'highland') {
+      fill(T('grass'), '#5b8a3a'); mounts(8, 15, 40, 285, 75); trees(14, 15, 70, 285, 140); blob(T('water'), '#2f6fb0', 255, 125, 55, 24); stamp('objects/town_castle', 60, 128, 40); stamp('objects/mine_ore', 175, 120, 26);
+    } else if (kind === 'steppe') {
+      fill(T('grass'), '#6f9a3a'); blob(T('sand'), '#d8c07a', 210, 100, 56, 22, 0.2); trees(4, 20, 30, 140, 70); stamp('objects/town_castle', 70, 118, 40); stamp('objects/dwelling_stronghold1', 190, 70, 30); stamp('objects/mine_gold', 250, 40, 24);
+      for (let i = 0; i < 4; i++) stamp('poses/left/idle/orc', 30 + R() * 250, 70 + R() * 70, 30);
+    } else {
+      fill(T('grass'), '#5b8a3a'); blob(T('water'), '#2f6fb0', 40, 130, 90, 36, -0.2); blob(T('sand'), '#d8c07a', 150, 135, 40, 12); mounts(4, 170, 30, 285, 60); trees(9, 100, 45, 270, 115); stamp('objects/town_castle', 95, 118, 40); stamp('objects/mine_wood', 205, 90, 24); stamp('objects/chest', 255, 120, 20);
+    }
+    const sh = g.createLinearGradient(0, H * 0.55, 0, H); sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,.45)'); g.fillStyle = sh; g.fillRect(0, 0, W, H);
+    const url = c.toDataURL('image/jpeg', 0.82); prevCache[kind] = { url, full }; return url;
+  }
+  const facBanner = (k) => { const h = Art.facHue(k); return h === null ? '#6b4f24' : `hsl(${h},48%,30%)`; };
   function showFactionSelect(diff = 'normal', map = {}) {
-    const cards = Object.entries(FACTIONS).map(([k, f]) => `<div class="card" data-f="${k}"><div class="big">${Assets.url('ui/town_' + k) ? `<img class="townpic" src="${Assets.url('ui/town_' + k)}" alt="">` : f.icon}</div><b>${f.name}</b><div class="small">${f.blurb}</div>
-      <div class="crow">${factionTiers(k).map(id => `<span title="${C[id].n} → ${C[lineType(id, 2)].n}">${Art.pic(id, 28)}</span>`).join('')}</div></div>`).join('');
-    $('mbox').innerHTML = `<span data-bg="castle_select"></span><h2>Choose your castle <span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid">${cards}</div><div class="mb"><button id="sBack">Back</button></div>`;
-    $('sBack').onclick = () => showMapSelect(diff, map.preset ? map : undefined);
-    $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => showHeroSelect(c.dataset.f, diff, map));
-    $('modal').classList.remove('hide');
+    const need = Object.keys(FACTIONS).map(k => 'ui/town_' + k);
+    const draw = () => {
+      const cards = Object.entries(FACTIONS).map(([k, f]) => `<div class="card fac" data-f="${k}" style="--ban:${facBanner(k)}"><div class="facpic">${Assets.url('ui/town_' + k) ? `<img src="${Assets.url('ui/town_' + k)}" alt="" draggable="false">` : `<span class="facicon">${f.icon}</span>`}<div class="ribbon">${f.icon} ${f.name}</div></div>
+        <div class="small blurb">${f.blurb}</div>
+        <div class="crow">${factionTiers(k).map(id => `<span title="${C[id].n} → ${C[lineType(id, 2)].n}">${Art.pic(id, 44)}</span>`).join('')}</div></div>`).join('');
+      $('mbox').innerHTML = `<div class="setup"><span data-bg="castle_select"></span><h2>Choose your castle <span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid facgrid">${cards}</div><div class="mb"><button id="sBack">Back</button></div></div>`;
+      $('sBack').onclick = () => showMapSelect(diff, map.preset ? map : undefined);
+      $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => showHeroSelect(c.dataset.f, diff, map));
+    };
+    draw(); $('modal').classList.remove('hide');
+    Assets.need(need).then(() => { if ($('mbox').querySelector('.facgrid')) draw(); });
   }
-  function showHeroSelect(f, diff = 'normal', map = {}) {
-    const ti = factionTiers(f);
-    const cards = FACTIONS[f].heroes.map(([n]) => { const d = HEROES[n];
-      return `<div class="card" data-hid="${n}"><div class="big">${Art.heroPic(d.i, ownCol(0), 64, d.id)}</div><b>${d.name}</b><div class="small">${d.cls}${d.sk ? ' · ' + PERKS[d.sk].i + ' ' + PERKS[d.sk].n : ''}</div>
-        <div class="small">⚔️${d.att} 🛡${d.def} ✨${d.sp} 📚${d.kn}</div><div class="small">Spells: ${[...START_SPELLS, ...d.spells].map(k => SPELLS[k].i).join(' ')}</div>
-        <div class="small">Army: ${ti.slice(0, 3).map(id => Art.pic(id, 26)).join(' ')}</div></div>`; }).join('');
-    $('mbox').innerHTML = `<span data-bg="hero_select"></span><h2>${FACTIONS[f].icon} ${FACTIONS[f].name} — choose your hero</h2><div class="grid">${cards}</div>
-      <div class="small">Your rival will command a different castle. Fight them across zones, forts and sieges.</div><div class="mb"><button id="sBack">Back</button></div>`;
+  function showHeroSelect(f, diff = 'normal', map = {}, pick) {
+    const ti = factionTiers(f), list = FACTIONS[f].heroes.map(([n]) => Object.assign({ key: n }, HEROES[n])); pick = pick || list[0].key;
+    const cur = list.find(d => d.key === pick) || list[0];
+    const tiles = list.map(d => `<button class="htile${d === cur ? ' on' : ''}" data-hid="${d.key}">${Art.heroPic(d.i, ownCol(0), 84, d.id)}<span>${d.name}</span><small>${d.cls}</small></button>`).join('');
+    const army = [[ti[0], 20], [ti[1], 10], [ti[2], 5]];
+    const panel = `<div class="hspan"><div class="hsbig">${Art.heroPic(cur.i, ownCol(0), 150, cur.id)}</div><h3>${cur.name}</h3><div class="hscls">${cur.cls}${cur.sk ? ` · ${PERKS[cur.sk].i} ${PERKS[cur.sk].n}` : ''}</div>
+      <div class="hsstats"><div><b>${cur.att}</b><span>Attack</span></div><div><b>${cur.def}</b><span>Defence</span></div><div><b>${cur.sp}</b><span>Spell power</span></div><div><b>${cur.kn}</b><span>Knowledge</span></div></div>
+      <h4>Spells</h4><div class="hsspells">${[...START_SPELLS, ...cur.spells].map(k => `<span>${SPELLS[k].i} ${SPELLS[k].n}</span>`).join('')}</div>
+      <h4>Starting army</h4><div class="hsarmy">${army.map(([id, n]) => `<div>${Art.pic(id, 60)}<small>${n} ${C[id].n}</small></div>`).join('')}</div>
+      <button class="primary hsgo" id="hsGo">Play as ${cur.name}</button></div>`;
+    $('mbox').innerHTML = `<div class="setup"><span data-bg="hero_select"></span><h2>${FACTIONS[f].icon} ${FACTIONS[f].name} — choose your hero</h2><div class="hsbody"><div class="hsgrid">${tiles}</div>${panel}</div>
+      <div class="small">Your rival will command a different castle. Fight them across zones, forts and sieges.</div><div class="mb"><button id="sBack">Back</button></div></div>`;
     $('sBack').onclick = () => showFactionSelect(diff, map);
-    $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => { $('modal').classList.add('hide'); $('title').classList.add('hide'); newGame(f, c.dataset.hid, diff, map); });
+    const go = (id) => { $('modal').classList.add('hide'); $('title').classList.add('hide'); newGame(f, id, diff, map); };
+    $('mbox').querySelectorAll('.htile').forEach(b => { b.onclick = () => showHeroSelect(f, diff, map, b.dataset.hid); b.ondblclick = () => go(b.dataset.hid); });
+    $('hsGo').onclick = () => go(cur.key);
   }
   $('tNew').onclick = showDifficultySelect;
   $('tCont').onclick = () => { if (load()) $('title').classList.add('hide'); };

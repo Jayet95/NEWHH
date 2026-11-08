@@ -26,7 +26,7 @@ const Ach = (() => {
     ['tycoon', 'Realm', 'Tycoon', 'Earn 100,000 gold from income.', 'gold', 100000, 'gem', 50],
     ['builder', 'Realm', 'Master Builder', 'Build a Capitol.', 'maxHall', 4, 'house', 25],
     ['stronghold', 'Realm', 'Unbreakable', 'Build the Fortress upgrade of a castle.', 'maxFort', 3, 'shield', 215],
-    ['archmage', 'Realm', 'Archmage', 'Build the third Mage Guild level.', 'maxGuild', 3, 'book', 265],
+    ['archmage', 'Realm', 'Archmage', 'Build the third Arcane Lodge level.', 'maxGuild', 3, 'book', 265],
     ['dragon_tamer', 'Dragons', 'Dragon Tamer', 'Conquer a Dragon Lair.', 'lairs', 1, 'flame', 8],
     ['dragon_master', 'Dragons', 'Dragon Master', 'Recruit 10 dragons from a lair.', 'lairDragons', 10, 'flames', 20],
     ['azure_rider', 'Dragons', 'Sapphire Rider', 'Command a Sapphire Wyrm.', 'azure', 1, 'drop', 200],

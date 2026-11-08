@@ -540,8 +540,8 @@
     const h = G.hero;
     const ab = artBonus(h), plus = (v) => v ? ` <span class="bonus">(${v > 0 ? '+' : ''}${v})</span>` : '';
     const perkTxt = Object.keys(PERKS).filter(k => perk(h, k) > 0).map(k => `<span title="${PERKS[k].d}">${PERKS[k].i}${PERKS[k].n} ${RANK_NAMES[perk(h, k)]}${ab.sk[k] ? '*' : ''}</span>`).join(' · ');
-    $('hero').innerHTML = `<div class="hlist">${G.heroes.map((x, i) => `<button class="hbtn${x === h ? ' on' : ''}" data-h="${i}" title="${x.name} (${x.cls})">${Art.heroPic(x.icon, ownCol(0), 34, x.pid)}</button>`).join('')}</div>
-      <h3>${Art.heroPic(h.icon, ownCol(0), 34, h.pid)} ${h.name} <span class="small">${h.cls} — Level ${h.lvl}</span></h3>
+    $('hero').innerHTML = `<div class="hlist">${G.heroes.map((x, i) => `<button class="hbtn${x === h ? ' on' : ''}" data-h="${i}" title="${x.name} (${clsLabel(x.cls)})">${Art.heroPic(x.icon, ownCol(0), 34, x.pid)}</button>`).join('')}</div>
+      <h3>${Art.heroPic(h.icon, ownCol(0), 34, h.pid)} ${h.name} <span class="small">${clsLabel(h.cls)} — Level ${h.lvl}</span></h3>
       <div class="stats"><span>⚔️ Attack ${h.att}${plus(ab.att)}</span><span>🛡 Defense ${h.def}${plus(ab.def)}</span><span>✨ Spell Pow ${h.sp}${plus(ab.sp)}</span><span>📚 Knowledge ${h.kn}${plus(ab.kn)}</span></div>
       <div class="small" title="Morale: each point = 4% chance of an extra turn (negative: of skipping a turn). Mixing creatures from different castles lowers it; undead and golems are immune. Luck: each point = 4% chance of double damage.">😀 Morale ${sgn(heroMorale(h))} · 🍀 Luck ${sgn(heroLuck(h))}</div>
       <div class="small">Movement ${h.move}/${maxMove(h)}</div><div class="bar mv"><i style="width:${Math.min(100, h.move / maxMove(h) * 100)}%"></i></div>
@@ -620,11 +620,11 @@
     if (!isExpl(x, y)) return 'Unexplored territory';
     const seen = isVis(x, y);
     const ah = seen ? aiHeroAt(x, y) : null; if (ah) return `<b>${ah.name}</b> (${allyOfPlayer(ah.ai) ? 'allied' : 'rival'} ${FACTIONS[aiById(ah.ai).fac].name} hero, L${ah.lvl})<br>${armyList(ah.army, true)}`;
-    const hs = heroesAt(x, y); if (hs.length) return hs.map(h => `<b>${h.name}</b> (${h.cls} L${h.lvl})${h.boat != null ? ' ⛵ sailing' : ''}`).join('<br>');
+    const hs = heroesAt(x, y); if (hs.length) return hs.map(h => `<b>${h.name}</b> (${clsLabel(h.cls)} L${h.lvl})${h.boat != null ? ' ⛵ sailing' : ''}`).join('<br>');
     if (G.boats.some(b => b.x === x && b.y === y)) return '<b>⛵ Your boat</b><br>Walk onto it from the shore to set sail.';
     let o = objAt(G, x, y);
     if (o && o.t === 'monster' && !seen) o = null;
-    if (!o) { const tt = G.tiles[y][x], bm = G.biome && G.biome[y] ? G.biome[y][x] : 0, base = ['Grass', 'Forest (needs Forester)', 'Mountains (needs Mountaineer)', 'Water (needs a boat or Water Walk)', 'Road (half the movement cost)', 'Sand (slow)'][tt]; return bm && tt !== T.ROAD && tt !== T.WATER ? `${BIOME_NAME[bm]} — ${base.replace(/ (.*)/, '')} (slower: ×${BIOME_COST[bm]} movement)` : base; }
+    if (!o) { const tt = G.tiles[y][x], bm = G.biome && G.biome[y] ? G.biome[y][x] : 0, base = ['Grass', 'Forest (needs Woodcraft)', 'Mountains (needs Cragwalking)', 'Water (needs a boat or Wave Treading)', 'Road (half the movement cost)', 'Sand (slow)'][tt]; return bm && tt !== T.ROAD && tt !== T.WATER ? `${BIOME_NAME[bm]} — ${base.replace(/ (.*)/, '')} (slower: ×${BIOME_COST[bm]} movement)` : base; }
     const g = o.guard && o.guard.length ? `<br>Guarded by: ${armyList(o.guard, true)}` : '';
     switch (o.t) {
       case 'town': {
@@ -915,7 +915,7 @@
   const SPRING = {
     mana: { n: '⛲ Magic Spring', d: 'Restores all mana and adds 50% more.' },
     oasis: { n: '🌴 Oasis', d: '+800 movement now and +1 Morale in the next battle.' },
-    fortune: { n: '🍀 Fountain of Fortune', d: '+1 Luck in the next battle (+2 for a hero with Fortune).' },
+    fortune: { n: '🍀 Fountain of Fortune', d: '+1 Luck in the next battle (+2 for a hero with Providence).' },
   };
   function drinkSpring(o, h) {
     const week = Math.floor((G.day - 1) / 7);
@@ -992,7 +992,7 @@
         const names = armyList(o.guard, true);
         const pct = Math.round((0.5 + 0.25 * (cr - 1)) * 100);
         const i = await showModal(`<h2>😨 They tremble before you</h2><p>${names} cower before ${h.name}'s army (${ratio.toFixed(1)}× stronger).</p>
-          <p class="small">${canJoin ? `Your Charisma lets ${pct}% of them join your army.` : 'You may spare them — no fight, no experience.'}${cr ? '' : ' (The Charisma perk would let them join you.)'}</p>`, opts);
+          <p class="small">${canJoin ? `Your Silver Tongue lets ${pct}% of them join your army.` : 'You may spare them — no fight, no experience.'}${cr ? '' : ' (The Silver Tongue perk would let them join you.)'}</p>`, opts);
         const act = acts[i];
         if (act === 'go') { Ach.event('spare'); G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return toast('The monsters scatter and flee.'); }
         if (act === 'tribute') { Ach.event('tribute'); G.res.gold += tribute; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); sfx('coin'); renderAll(); return toast(`The monsters hand over ${tribute} gold and scatter.`); }
@@ -1089,7 +1089,7 @@
       const nec = perk(h, 'necromancy');
       if (nec && res.xp > 0) {
         const raised = Math.floor(res.xp * 0.1 * nec / 6);
-        if (raised > 0 && addToArmy(h, 'necropolis1', raised)) toast(`💀 ${h.name} raises ${raised} bonewalkers from the fallen (Necromancy ${RANK_NAMES[nec]}).`);
+        if (raised > 0 && addToArmy(h, 'necropolis1', raised)) toast(`💀 ${h.name} raises ${raised} bonewalkers from the fallen (Grave Craft ${RANK_NAMES[nec]}).`);
       }
       await gainXp(h, res.xp);
       const foe = eHero && (eHero.real || (eHero.arts || eHero.pack ? eHero : null));
@@ -1358,7 +1358,7 @@
     const ids = premium ? shuffle(Object.keys(HEROES).filter(id => !G.heroes.some(h => h.id === id))).slice(0, 8) : G.tavern, price = premium ? HIRE_COST * 2 : HIRE_COST;
     const cards = ids.map(id => { const d = HEROES[id];
       return `<div class="trow" style="grid-template-columns:42px 1fr auto"><div class="ic">${Art.heroPic(d.i, ownCol(0), 36, d.id)}</div>
-        <div><b>${d.name}</b> <span class="small">${d.cls} (${FACTIONS[d.fac].name})${d.sk ? ' · ' + PERKS[d.sk].i + ' ' + PERKS[d.sk].n : ''}</span><br><span class="small">⚔️${d.att} 🛡${d.def} ✨${d.sp} 📚${d.kn}${d.spells.length ? ' · knows ' + d.spells.map(k => SPELLS[k].n).join(', ') : ''}</span></div>
+        <div><b>${d.name}</b> <span class="small">${clsLabel(d.cls)} (${FACTIONS[d.fac].name})${d.sk ? ' · ' + PERKS[d.sk].i + ' ' + PERKS[d.sk].n : ''}</span><br><span class="small">⚔️${d.att} 🛡${d.def} ✨${d.sp} 📚${d.kn}${d.spells.length ? ' · knows ' + d.spells.map(k => SPELLS[k].n).join(', ') : ''}</span></div>
         <div class="acts"><button data-hire="${id}">Hire ${RES_ICON.gold}${price}</button></div></div>`; }).join('');
     $('mbox').innerHTML = `<h2>🍺 Tavern</h2><p class="small">Heroes: ${G.heroes.length}/${MAX_HEROES}. New heroes arrive at the castle without an army — recruit troops and use the exchange to equip them. Heroes level up independently. The tavern offers new heroes every week.</p>${premium ? `<p>No heroes are waiting at the tavern right now — mercenary captains from across the realm will serve for <b>double</b> the price (${RES_ICON.gold}${price}).</p>` : ''}${cards}
       <div class="mb"><button class="primary" id="hBack">Back to town</button></div>`;
@@ -1420,10 +1420,10 @@
     const bld = `<div class="trow"><div class="ic">${TownArt.pic('hall', Math.max(1, hl), t.fac, 42)}</div><div><b>${hl ? HALL_LEVELS[hl].n : 'Town Hall'}</b> <span class="stars">${starStr(hl, 5)}</span><br>
         <span class="small">${hl ? `+${HALL_LEVELS[hl].inc} 🪙/day.` : 'No income yet.'}${hNext ? ` Next: ${hNext.n} (+${hNext.inc} 🪙/day) — unlocks ${hl + 1 >= 1 && TIER_HALL.indexOf(hl + 1) > 0 ? 'tier ' + TIER_HALL.indexOf(hl + 1) + ' dwelling' : ''}${UP_HALL[hl + 2] ? ' and Lv' + (hl + 2) + ' upgrades' : ''}.` : ''}</span></div>
         <div class="acts">${hNext ? `<button data-hall="1" title="${Art.fmtCostTxt(hNext.cost)}">${hl ? 'Upgrade' : 'Build'} ${fmtCost(hNext.cost)}</button>` : '<span class="small">MAX</span>'}</div></div>
-      <div class="trow"><div class="ic">${TownArt.pic('guild', Math.max(1, gl), t.fac, 42)}</div><div><b>Mage Guild</b> <span class="stars">${starStr(gl, 3)}</span><br>
+      <div class="trow"><div class="ic">${TownArt.pic('guild', Math.max(1, gl), t.fac, 42)}</div><div><b>Arcane Lodge</b> <span class="stars">${starStr(gl, 3)}</span><br>
         <span class="small">Spellbook: ${G.spells.map(k => SPELLS[k].i + ' ' + SPELLS[k].n).join(', ')}${gl < 3 ? `<br>Next level teaches: ${GUILD_SPELLS[gl + 1].map(k => SPELLS[k].i + ' ' + SPELLS[k].n).join(', ')}` : ''}</span></div>
         <div class="acts">${gNext ? `<button data-guild="1" title="${Art.fmtCostTxt(gNext)}">${gl ? 'Upgrade' : 'Build'} ${fmtCost(gNext)}</button>` : '<span class="small">MAX</span>'}</div></div>
-      <div class="trow"><div class="ic">${TownArt.pic('market', 1, t.fac, 42)}</div><div><b>Marketplace</b><br><span class="small">${t.b.market ? `Buy missing resources at ${Math.round(MARKET_RATE * 100)}% rate.` : `Trade resources — ${fmtCost(MARKET_COST)}`}</span></div>
+      <div class="trow"><div class="ic">${TownArt.pic('market', 1, t.fac, 42)}</div><div><b>Merchant Row</b><br><span class="small">${t.b.market ? `Buy missing resources at ${Math.round(MARKET_RATE * 100)}% rate.` : `Trade resources — ${fmtCost(MARKET_COST)}`}</span></div>
         <div class="acts">${t.b.market ? '<button data-trade="1">Trade</button>' : '<button data-build="market">Build</button>'}</div></div>
       <div class="trow"><div class="ic">${TownArt.pic('ship', 1, t.fac, 42)}</div><div><b>Shipyard</b><br><span class="small">${t.b.ship ? `Boats ${G.boats.length}/${MAX_BOATS}. A new boat appears at the port by the bay (${fmtCost(BOAT_COST)} each). Walk a hero onto a boat to sail; collect treasures at sea.` : coastal ? `Build boats to sail the sea and collect its treasures — ${fmtCost(SHIPYARD_COST)}` : 'There is no coast near this town.'}</span></div>
         <div class="acts">${!coastal ? '' : t.b.ship ? `<button data-boat="1" ${G.boats.length >= MAX_BOATS ? 'disabled' : ''}>⛵ Build boat</button>` : '<button data-build="ship">Build</button>'}</div></div>
@@ -1493,7 +1493,7 @@
       if (!canAfford(G.res, cost)) return toast('Not enough resources.');
       pay(G.res, cost); t.b.guild++; Ach.event('guild', { lv: t.b.guild });
       const learned = GUILD_SPELLS[t.b.guild].filter(k => !G.spells.includes(k)); learn(learned);
-      toast(`Mage Guild level ${t.b.guild}! Learned: ${learned.map(k => SPELLS[k].n).join(', ')}`);
+      toast(`Arcane Lodge level ${t.b.guild}! Learned: ${learned.map(k => SPELLS[k].n).join(', ')}`);
       startTownAnim('build', 8); again();
     });
     q('[data-up]', b => b.onclick = () => {
@@ -1529,7 +1529,7 @@
       pay(G.res, BOAT_COST); G.boats.push({ id: G.nextBoat++, x: spot.x, y: spot.y });
       toast(`A boat is launched at (${spot.x}, ${spot.y}). Walk a hero onto it to sail.`); again();
     });
-    q('[data-trade]', b => b.onclick = () => openMarket(MARKET_RATE + ((G.wk && G.wk.rateBonus) || 0), 'Marketplace', true));
+    q('[data-trade]', b => b.onclick = () => openMarket(MARKET_RATE + ((G.wk && G.wk.rateBonus) || 0), 'Merchant Row', true));
     q('[data-tavern]', b => b.onclick = openTavern);
     q('[data-xhero]', b => b.onclick = () => {
       const hs = heroesAt(t.x, t.y), a = hs[0], c2 = hs[1];
@@ -1914,17 +1914,17 @@
   // ---------- title / selection / help ----------
   const HELP = `<h2>How to Play</h2><p><b>Goal:</b> eliminate every rival by capturing all of their towns. Rival AI players build, recruit, hire several heroes and expand across the map — and they will attack your forts and towns. If you hold no town for 7 days you lose.</p>
     <p><b>Towns:</b> capture neutral and rival towns for more castles (each keeps its own faction, creatures and buildings). Use the tabs in the town screen to switch towns, and station a garrison so a town defends itself when no hero is inside.</p>
-    <p><b>Map:</b> click a tile to preview the path (green = reachable today, red = next turn), click again to walk. Click another hero to select it (Tab cycles). Monsters facing an army ${FLEE_RATIO}× stronger offer to flee (or pay tribute); with the Charisma perk they can join you instead. A rival hero who is hopelessly outmatched may offer gold to be let go, and if you are the outmatched one you can pay a ransom to retreat to your nearest castle with your army intact. Walk onto resources to grab them; mines give daily income; monsters, mines and artifacts are guarded. Merchants ⛺ sell missing resources.<br>
+    <p><b>Map:</b> click a tile to preview the path (green = reachable today, red = next turn), click again to walk. Click another hero to select it (Tab cycles). Monsters facing an army ${FLEE_RATIO}× stronger offer to flee (or pay tribute); with the Silver Tongue perk they can join you instead. A rival hero who is hopelessly outmatched may offer gold to be let go, and if you are the outmatched one you can pay a ransom to retreat to your nearest castle with your army intact. Walk onto resources to grab them; mines give daily income; monsters, mines and artifacts are guarded. Merchants ⛺ sell missing resources.<br>
     Keys: arrows/WASD scroll · +/- zoom · H center hero · Space go · E end turn · T town · Tab next hero. Drag the map to pan, mouse wheel / pinch to zoom.<br>
     <b>On a phone:</b> drag to pan, pinch to zoom, tap a tile to preview the path and tap it again to go; in battle, tap a hex twice to confirm. Use the bottom bar for End Turn, Town and heroes.</p>
     <p><b>Sea:</b> build a Shipyard in town, then boats at the port by the bay. Walk a hero onto a boat to sail; collect floating treasures, salvage shipwrecks, fight sea monsters, and disembark on any shore tile. Pick the map type, size and seed when starting a game.</p>
     <p><b>Events:</b> every new week brings a weekly event (double growth for a creature, plague, bountiful harvest, merchant caravans, heroic training...) and most days a random event may strike — treasure, bandits, mercenaries, storms, rumors.</p>
     <p><b>Territory:</b> the map is split into zones, each ruled by a fort. Capture a fort to own the zone: +${FORT_INCOME} gold/day, your mines there pay, +${MILITIA} militia/week. <b>Station troops in forts</b> — the enemy hero raids undefended forts.</p>
-    <p><b>Town:</b> Town Hall levels 1-5 raise income and unlock dwellings (tiers 3-7) and creature upgrades (up to 5 levels). Mage Guild teaches spells, the Marketplace trades resources, the Tavern hires up to ${MAX_HEROES} heroes.</p>
-    <p><b>Fog of war:</b> unexplored land is black; explored land you no longer see is dimmed and hides monsters and rival heroes. Heroes see 6 tiles (+1 per Scouting rank), towns 9, forts 6. Observation towers and scouts reveal large areas. <b>Adventure sites:</b> dwellings (capture, then recruit weekly), windmills / water wheels / gardens (weekly resources), learning stones (experience), shrines (spells), creature banks (guarded treasure), monoliths (teleport pairs), seers (trade resources for an artifact) and springs (mana, movement or luck).</p>
+    <p><b>Town:</b> Town Hall levels 1-5 raise income and unlock dwellings (tiers 3-7) and creature upgrades (up to 5 levels). Arcane Lodge teaches spells, the Merchant Row trades resources, the Tavern hires up to ${MAX_HEROES} heroes.</p>
+    <p><b>Fog of war:</b> unexplored land is black; explored land you no longer see is dimmed and hides monsters and rival heroes. Heroes see 6 tiles (+1 per Far-Sight rank), towns 9, forts 6. Observation towers and scouts reveal large areas. <b>Adventure sites:</b> dwellings (capture, then recruit weekly), windmills / water wheels / gardens (weekly resources), learning stones (experience), shrines (spells), creature banks (guarded treasure), monoliths (teleport pairs), seers (trade resources for an artifact) and springs (mana, movement or luck).</p>
     <p><b>Defenses:</b> build Fortifications (Citadel → Castle → Fortress) to strengthen walls, gate and arrow towers, and a Minefield for hidden mines in front of the walls — mines hurt and halt attackers. When you defend, you can also lay mines yourself (💣 button, key M); even without a minefield you get ${EMERGENCY_MINES}. Forts can be fortified too.</p>
-    <p><b>Spells:</b> 18 spells in four schools — 🌬️ Air, ⛰️ Earth, 🔥 Fire, 💧 Water. Each school is a skill (Basic → Expert) that makes its spells stronger; at <b>Expert</b> buffs and debuffs become mass spells and areas grow. A spell of level L needs Wisdom rank L-2 (levels 1-2 are free). The Mage Guild teaches higher-level spells; shrines teach one each. You cast one spell per round.</p>
-    <p><b>Skills &amp; artifacts:</b> each hero starts with two skills and, at every level-up, picks one of two offered skills (Basic → Advanced → Expert; up to ${MAX_SKILLS} skills; the offers favour the hero's class). Artifacts are equipment: they have slots (head, neck, armor, weapon, shield, feet, cape, two rings), tiers, special effects (movement, mana, morale, luck, extra skill ranks such as Water Walk) and <b>sets</b> that give bonuses when completed. Use 🎒 Equipment on the hero panel; heroes standing together can hand artifacts to each other.</p>
+    <p><b>Spells:</b> 18 spells in four schools — 🌬️ Air, ⛰️ Earth, 🔥 Fire, 💧 Water. Each school is a skill (Basic → Expert) that makes its spells stronger; at <b>Expert</b> buffs and debuffs become mass spells and areas grow. A spell of level L needs Insight rank L-2 (levels 1-2 are free). The Arcane Lodge teaches higher-level spells; shrines teach one each. You cast one spell per round.</p>
+    <p><b>Skills &amp; artifacts:</b> each hero starts with two skills and, at every level-up, picks one of two offered skills (Basic → Advanced → Expert; up to ${MAX_SKILLS} skills; the offers favour the hero's class). Artifacts are equipment: they have slots (head, neck, armor, weapon, shield, feet, cape, two rings), tiers, special effects (movement, mana, morale, luck, extra skill ranks such as Wave Treading) and <b>sets</b> that give bonuses when completed. Use 🎒 Equipment on the hero panel; heroes standing together can hand artifacts to each other.</p>
     <p><b>Battle:</b> click a green hex to move, click an enemy to attack (archers shoot — +25% at close range, weaker the farther the target, and <b>half damage beyond 10 hexes: the broken arrow 💔</b>; flyers ignore obstacles). Your hero stands beside the field: cast one spell per round and make one Hero Strike per round. Castle assaults are <b>sieges</b>: break the gate or walls (your catapult helps), beware arrow towers and the moat; flyers can cross the walls. Level-ups let you pick one of two perks.</p>`;
   function refreshTitle() { $('tCont').disabled = !localStorage.getItem(SAVE); $('tLoad').disabled = !['h3js_save_v7', 'h3js_slot_1', 'h3js_slot_2', 'h3js_slot_3'].some(k => localStorage.getItem(k)); }
   function showDifficultySelect() {
@@ -2021,9 +2021,9 @@
   function showHeroSelect(f, diff = 'normal', map = {}, pick) {
     const ti = factionTiers(f), list = FACTIONS[f].heroes.map(([n]) => Object.assign({ key: n }, HEROES[n])); pick = pick || list[0].key;
     const cur = list.find(d => d.key === pick) || list[0];
-    const tiles = list.map(d => `<button class="htile${d === cur ? ' on' : ''}" data-hid="${d.key}">${Art.heroPic(d.i, ownCol(0), 84, d.id)}<span>${d.name}</span><small>${d.cls}</small></button>`).join('');
+    const tiles = list.map(d => `<button class="htile${d === cur ? ' on' : ''}" data-hid="${d.key}">${Art.heroPic(d.i, ownCol(0), 84, d.id)}<span>${d.name}</span><small>${clsLabel(d.cls)}</small></button>`).join('');
     const army = [[ti[0], 20], [ti[1], 10], [ti[2], 5]];
-    const panel = `<div class="hspan"><div class="hsbig">${Art.heroPic(cur.i, ownCol(0), 150, cur.id)}</div><h3>${cur.name}</h3><div class="hscls">${cur.cls}${cur.sk ? ` · ${PERKS[cur.sk].i} ${PERKS[cur.sk].n}` : ''}</div>
+    const panel = `<div class="hspan"><div class="hsbig">${Art.heroPic(cur.i, ownCol(0), 150, cur.id)}</div><h3>${cur.name}</h3><div class="hscls">${clsLabel(cur.cls)}${cur.sk ? ` · ${PERKS[cur.sk].i} ${PERKS[cur.sk].n}` : ''}</div>
       <div class="hsstats"><div><b>${cur.att}</b><span>Attack</span></div><div><b>${cur.def}</b><span>Defence</span></div><div><b>${cur.sp}</b><span>Spell power</span></div><div><b>${cur.kn}</b><span>Knowledge</span></div></div>
       <h4>Spells</h4><div class="hsspells">${[...START_SPELLS, ...cur.spells].map(k => `<span>${SPELLS[k].i} ${SPELLS[k].n}</span>`).join('')}</div>
       <h4>Starting army</h4><div class="hsarmy">${army.map(([id, n]) => `<div>${Art.pic(id, 60)}<small>${n} ${C[id].n}</small></div>`).join('')}</div>
@@ -2149,8 +2149,8 @@
     ['Rarity colours', 'The frame of a creature portrait shows its rarity: Common (bronze), Uncommon (green), Rare (blue), Epic (purple), Legendary (gold), Mythic (red), Ancient (silver), Divine (prismatic). Stars show the upgrade level.'],
     ['Surrender & ransom', 'A hopelessly outmatched rival hero may offer gold to be let go. If you are the outmatched one, you can pay a ransom and retreat to your nearest castle with your army intact.'],
     ['Siege', 'Attacking a town or fort means storming walls, a gate, a moat and arrow towers; Fortifications make them stronger and minefields hurt attackers.'],
-    ['Spell schools', 'Air, Earth, Fire and Water skills raise the rank of their spells. Wisdom unlocks higher-level spells; Sorcery and Mysticism help spell power and mana.'],
-    ['Charisma', 'Weak monsters can join you instead of fighting when your army is much stronger.'],
+    ['Spell schools', 'Air, Earth, Fire and Water skills raise the rank of their spells. Insight unlocks higher-level spells; Sorcery and Mysticism help spell power and mana.'],
+    ['Silver Tongue', 'Weak monsters can join you instead of fighting when your army is much stronger.'],
     ['Broken arrow', 'Archers shoot best point-blank; beyond 10 hexes their damage is halved.'],
   ];
   function openHelp(g) {
@@ -2221,7 +2221,7 @@
   function openIncome(back) {
     const mm = (G.wk && G.wk.mineMul) || 1, mul = DF().income, lines = [];
     for (const t of myTowns()) if (t.b.hall) lines.push({ l: `🏛 ${t.name} — ${HALL_LEVELS[t.b.hall].n}`, r: { gold: HALL_LEVELS[t.b.hall].inc } });
-    for (const h of G.heroes) if (perk(h, 'estates')) lines.push({ l: `🏠 ${h.name} — Estates`, r: { gold: 300 * perk(h, 'estates') } });
+    for (const h of G.heroes) if (perk(h, 'estates')) lines.push({ l: `🏠 ${h.name} — Stewardship`, r: { gold: 300 * perk(h, 'estates') } });
     for (const o of G.objs) {
       if (o.t === 'mine' && o.owner === 0) { const ok = zoneOwner(G, G.zone[o.y][o.x]) === 0; lines.push({ l: `⛏ ${cap(o.kind)} mine`, r: ok ? { [o.kind]: MINE_YIELD[o.kind] * mm } : {}, warn: ok ? '' : 'pays nothing — you do not hold its zone (capture the fort or town of that zone)', x: o.x, y: o.y }); }
       if (o.t === 'fort' && o.owner === 0) lines.push({ l: `🏯 ${o.name}`, r: { gold: FORT_INCOME } });
@@ -2240,7 +2240,7 @@
     const power = G.heroes.reduce((p, h) => p + armyValue(h.army), 0) + towns.reduce((p, t) => p + armyValue(t.garrison), 0);
     const tRows = towns.map(t => { const rec = Object.entries(t.avail || {}).filter(([k]) => t.b[k]).reduce((p, [, v]) => p + v, 0), gar = t.garrison.reduce((p, a) => p + (a ? a.n : 0), 0);
       return `<div class="trow" style="grid-template-columns:42px 1fr auto"><div class="ic">${TownArt.pic('hall', Math.max(1, t.b.hall), t.fac, 38)}</div><div><b>${t.name}</b> <span class="small">${FACTIONS[t.fac].name} · ${t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Settlement'} · ${FORT_LEVELS[t.fort || 0].n}</span><br><span class="small">Garrison ${gar} · recruits waiting ${rec}</span></div><div class="acts"><button data-kt="${towns.indexOf(t)}">Open</button>${locBtn(t.x, t.y)}</div></div>`; }).join('');
-    const hRows = G.heroes.map((h, i) => `<div class="trow" style="grid-template-columns:42px 1fr auto"><div class="ic">${Art.heroPic(h.icon, ownCol(0), 38, h.pid)}</div><div><b>${h.name}</b> <span class="small">${h.cls} L${h.lvl}${h.sleep ? ' · 💤' : ''}</span><br><span class="small">${armyList(h.army, false) || 'no army'} · move ${Math.round(100 * h.move / maxMove(h))}%</span></div><div class="acts"><button data-kh="${i}">Select</button>${locBtn(h.x, h.y)}</div></div>`).join('');
+    const hRows = G.heroes.map((h, i) => `<div class="trow" style="grid-template-columns:42px 1fr auto"><div class="ic">${Art.heroPic(h.icon, ownCol(0), 38, h.pid)}</div><div><b>${h.name}</b> <span class="small">${clsLabel(h.cls)} L${h.lvl}${h.sleep ? ' · 💤' : ''}</span><br><span class="small">${armyList(h.army, false) || 'no army'} · move ${Math.round(100 * h.move / maxMove(h))}%</span></div><div class="acts"><button data-kh="${i}">Select</button>${locBtn(h.x, h.y)}</div></div>`).join('');
     const holds = G.objs.filter(o => o.owner === 0 && (o.t === 'mine' || o.t === 'fort' || o.t === 'dwelling' || o.t === 'lair')).map(o => {
       const nm = o.t === 'mine' ? `⛏ ${cap(o.kind)} mine${zoneOwner(G, G.zone[o.y][o.x]) === 0 ? '' : ' ⚠ not paying'}` : o.t === 'fort' ? `🏯 ${o.name}` : o.t === 'lair' ? '🐲 Dragon Lair' : `🛖 ${C[dwId(o)].n} dwelling (${o.avail})`;
       return `<div class="trow" style="grid-template-columns:1fr auto"><div>${nm}</div><div class="acts">${locBtn(o.x, o.y)}</div></div>`; }).join('');

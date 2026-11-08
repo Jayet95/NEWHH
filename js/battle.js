@@ -482,13 +482,13 @@ const Battle = (() => {
     return r && r.d > 0 ? Art.cursor('boot') : Art.cursor('no');
   }
   function onMove(ev) { if (!B) return; B.hover = mouseHex(ev); if (!COARSE) { try { cv.style.cursor = battleCursor(B.hover) || ''; } catch (e) { /* ignore */ } } }
-  // spell school rank (0 = untrained) and Wisdom gate: spell level <= 2 + Wisdom rank
+  // spell school rank (0 = untrained) and Insight gate: spell level <= 2 + Insight rank
   const spellRank = (sp) => perk(SCHOOL_SKILL[sp.school]);
   const spellOk = (sp) => sp.lv <= 2 + perk('wisdom');
   function castSpell(k, t) {
     const sp = SPELLS[k];
     if (!t || (sp.tgt === 'enemy') !== (t.side === 1)) return toast('Invalid target.');
-    if (!spellOk(sp)) return toast(`${sp.n} needs Wisdom (rank ${sp.lv - 2}).`);
+    if (!spellOk(sp)) return toast(`${sp.n} needs Insight (rank ${sp.lv - 2}).`);
     if (B.hero.mana < sp.cost) return toast('Not enough mana.');
     B.hero.mana -= sp.cost; B.castUsed = true; B.spell = null; sfx('spell');
     const r = spellRank(sp), P = B.hero.sp;
@@ -568,7 +568,7 @@ const Battle = (() => {
     for (const k of ks) {
       const sp = SPELLS[k], b = document.createElement('button'), rk = spellRank(sp), ok = spellOk(sp);
       b.innerHTML = `${sp.i} ${sp.n} · ${SCHOOL_ICON[sp.school]}${rk ? ' ' + RANK_NAMES[rk] : ''} · L${sp.lv} (${sp.cost})`;
-      b.title = `${sp.desc}${ok ? '' : `\nNeeds Wisdom rank ${sp.lv - 2}`}`;
+      b.title = `${sp.desc}${ok ? '' : `\nNeeds Insight rank ${sp.lv - 2}`}`;
       b.disabled = B.hero.mana < sp.cost || !ok;
       b.onclick = () => { B.spell = k; list.classList.add('hide'); toast(sp.n + ': pick a ' + (sp.tgt === 'enemy' ? 'enemy' : 'friendly') + ' stack'); };
       list.appendChild(b);

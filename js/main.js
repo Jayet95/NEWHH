@@ -181,7 +181,7 @@
     const aiFacs = shuffle(Object.keys(FACTIONS).filter(f => f !== faction)).slice(0, nAI);
     const m = genMap(seed, aiFacs, diff, { preset, size });
     setFaction(faction);
-    G = { seed, preset, size, W: m.W, H: m.H, tiles: m.tiles, zone: m.zone, objs: m.objs, dock: m.dock, boats: [], nextBoat: 1, day: 1, over: false, path: null, faction, diff,
+    G = { seed, preset, size, W: m.W, H: m.H, tiles: m.tiles, biome: m.biome, zone: m.zone, objs: m.objs, dock: m.dock, boats: [], nextBoat: 1, day: 1, over: false, path: null, faction, diff,
       res: { gold: D.gold, wood: r(20), ore: r(20), mercury: r(5), sulfur: r(5), crystal: r(5), gems: r(5) }, spells: [...START_SPELLS],
       wk: {}, heroes: [], sel: 0, hero: null, tavern: [], noTown: 0,
       col: (() => { const pc = Math.max(0, Math.min(7, map.color || 0)), free = PALETTE.map((p, i) => i).filter(i => i !== pc); return [PALETTE[pc][1], ...aiFacs.map((f, i) => PALETTE[free[i % free.length]][1])]; })(),
@@ -1047,7 +1047,8 @@
     await showModal(`<h2>💰 Spoils of war</h2><p>${who} searches the battlefield and claims:</p><div style="line-height:1.8">${lines.join('<br>')}</div>${sp.arts.length ? '<p class="small">Captured artifacts were added to the hero (equipped if a slot was free, otherwise in the backpack).</p>' : ''}`, ['Collect']);
   }
   // ground type under the fighting hero, used to pick the battle backdrop
-  const battleTerrain = (h) => { if (h.boat != null) return 'water'; const t = G.tiles && G.tiles[h.y] && G.tiles[h.y][h.x]; return t === T.SAND ? 'sand' : t === T.MOUNT ? 'mount' : t === T.WATER ? 'water' : 'grass'; };
+  const battleTerrainAt = (x, y, boat) => { if (boat) return 'water'; const t = G.tiles && G.tiles[y] && G.tiles[y][x]; if (t === T.WATER) return 'water'; const b = G.biome && G.biome[y] && G.biome[y][x]; return ['grass', 'desert', 'snow', 'swamp', 'lava'][b || 0] === 'grass' && t === T.SAND ? 'desert' : ['grass', 'desert', 'snow', 'swamp', 'lava'][b || 0]; };
+  const battleTerrain = (h) => battleTerrainAt(h.x, h.y, h.boat != null);
   let fightFromAi = false, fightCancelled = false;
   async function fight(h, guard, eStats, title, siege, eHero) {
     fightCancelled = false;
@@ -1544,7 +1545,7 @@
     if (!gar.some(Boolean)) { await aiCapture(o, ah); return false; }
     centerOn(o.x, o.y); toast(`${ah.name} assaults ${o.name}!`);
     const res = await Battle.run({ hero: { att: 0, def: 3, sp: 0, mana: 0, spells: [], perks: {}, name: 'Garrison', icon: '🛡️' }, army: gar, enemy: ah.army.map(a => a && ({ ...a })),
-      eStats: { att: eff(ah, 'att'), def: eff(ah, 'def') }, eHero: ah, title: `Defending ${o.name}`, siege: siegeOf(o, 0), canRetreat: false });
+      eStats: { att: eff(ah, 'att'), def: eff(ah, 'def') }, eHero: ah, title: `Defending ${o.name}`, siege: siegeOf(o, 0), terrain: battleTerrainAt(o.x, o.y, false), canRetreat: false });
     res.survivors.forEach((n, i) => { if (gar[i]) { if (n > 0) gar[i].n = n; else gar[i] = null; } });
     if (res.win) {
       removeAiHero(ah); toast(`${o.name} held! ${ah.name} is slain.`); note(`🛡 ${o.name} held against ${ah.name}`, o.x, o.y);

@@ -619,11 +619,7 @@ const Battle = (() => {
     const c = document.createElement('canvas'); c.width = c.height = 256; c.getContext('2d').drawImage(im, im.width * crop[0], im.height * crop[1], im.width * crop[2], im.height * crop[3], 0, 0, 256, 256); return texCache[k] = c;
   }
   // painted battlefield backdrop chosen by where the fight happens (terrain) or who defends (inferno = lava, undead/dungeon = swamp)
-  function bgName() {
-    const o = B.opts || {}, fac = String(((o.enemy || []).find(Boolean) || {}).t || '').replace(/d.*$/, '');
-    if (fac === 'inferno') return 'lava'; if (fac === 'necropolis' || fac === 'dungeon') return 'swamp';
-    return { water: 'ship', sand: 'desert', mount: 'snow' }[o.terrain] || 'grass';
-  }
+  function bgName() { const t = (B.opts || {}).terrain; return { water: 'ship', sand: 'desert', desert: 'desert', snow: 'snow', swamp: 'swamp', lava: 'lava' }[t] || 'grass'; }
   function buildBoard() {
     const bgi = typeof Assets !== 'undefined' ? Assets.get('battle/bg_' + bgName(), 'battle/bg_grass') : null;
     if (bgi) { const c = document.createElement('canvas'); c.width = 960; c.height = 640; const g = c.getContext('2d'), k = Math.max(960 / bgi.width, 640 / bgi.height), w = bgi.width * k, h = bgi.height * k; g.drawImage(bgi, (960 - w) / 2, (640 - h) / 2, w, h); B._bg = true; return c; }

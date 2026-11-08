@@ -232,7 +232,7 @@ const Art = (() => {
   function tile(c, t, x, y, G) {
     const cxp = (x + .5 + (y & 1) * .5) * 32, cyp = y * HR * 1.5 + HR, px = cxp - 16, py = cyp - 16, r = (i) => h2(x * 31 + i * 17, y * 57 + i * 11);
     if (typeof Assets !== 'undefined') {
-      const tn0 = { [T.GRASS]: 'grass', [T.FOREST]: 'forest', [T.MOUNT]: 'mountain', [T.WATER]: 'water', [T.ROAD]: 'road', [T.SAND]: 'sand' }[t], tn = (t === T.ROAD && Assets.get('roads/dirt_straight')) ? 'grass' : tn0, ta = Assets.get('terrain/' + tn + '_' + (1 + Math.floor(r(0) * 4)), 'terrain/' + tn);
+      const tn0 = { [T.GRASS]: 'grass', [T.FOREST]: 'forest', [T.MOUNT]: 'mountain', [T.WATER]: 'water', [T.ROAD]: 'road', [T.SAND]: 'sand' }[t], tn = (t === T.ROAD && Assets.get('roads/dirt_straight')) ? 'grass' : tn0, bm = G && G.biome && G.biome[y] ? G.biome[y][x] : 0, bn = bm && (t === T.GRASS || t === T.FOREST || t === T.SAND || t === T.ROAD) ? 'biome_' + ['', 'desert', 'snow', 'swamp', 'lava'][bm] : null, ta = bn && !(t === T.ROAD && !Assets.get('roads/dirt_straight')) && Assets.get('terrain/' + bn) ? Assets.get('terrain/' + bn) : Assets.get('terrain/' + tn + '_' + (1 + Math.floor(r(0) * 4)), 'terrain/' + tn);
       if (ta) {
         const sw = Math.min(ta.width, 100), sh = Math.min(ta.height, Math.round(sw * (HR * 2 + 2) / 34)), sx = r(5) * (ta.width - sw), sy = r(6) * (ta.height - sh);
         c.save(); hexPath(c, cxp, cyp, HR + .7); c.clip(); c.drawImage(ta, sx, sy, sw, sh, cxp - 17, cyp - HR - 1, 34, HR * 2 + 2);

@@ -5,5 +5,7 @@ const SRC = process.argv[2], names = ['desert', 'grass', 'ship', 'snow', 'swamp'
 if (!SRC || files.length !== 6) { console.error('usage: node tools/import_battle_bg.js <folder> f1 f2 f3 f4 f5 f6   (desert grass ship snow swamp lava)'); process.exit(1); }
 (async () => {
   for (let i = 0; i < 6; i++) { const to = path.join(__dirname, '..', 'art', 'battle', 'bg_' + names[i] + '.webp'); const info = await sharp(path.join(SRC, files[i])).resize(1280, 726, { fit: 'cover' }).webp({ quality: 74, effort: 4 }).toFile(to); console.log(names[i], Math.round(info.size / 1024) + ' KB'); }
+  // ground textures for the map biomes, cropped from the middle of each field
+  for (let i = 0; i < 6; i++) { if (names[i] === 'grass' || names[i] === 'ship') continue; const src = path.join(SRC, files[i]); await sharp(src).extract({ left: 700, top: 520, width: 520, height: 520 }).resize(256, 256).webp({ quality: 72 }).toFile(path.join(__dirname, '..', 'art', 'terrain', 'biome_' + names[i] + '.webp')); }
   require('./make_manifest')(path.join(__dirname, '..'));
 })();

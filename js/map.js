@@ -231,7 +231,7 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
     const c = pick(); if (!c) break; const d = depthOf(c), neutral = R() < 0.25;
     if (neutral) {
       const ids = Object.keys(NEUTRAL_DW), cid = ids[Math.min(ids.length - 1, Math.floor(d * ids.length * (0.7 + R() * 0.6)))];
-      objs.push({ t: 'dwelling', fac: null, cid, tier: 0, owner: null, avail: NEUTRAL_DW[cid], x: c.x, y: c.y, guard: R() < 0.3 ? [] : [guard(c, 0.9)] });
+      objs.push({ t: 'dwelling', fac: null, cid, tier: 0, owner: null, avail: NEUTRAL_DW[cid], x: c.x, y: c.y, guard: R() < 0.45 ? [] : [guard(c, 0.9)] });
     } else {
       const tier = 1 + Math.min(5, Math.floor(R() * (2 + d * 5))), free = tier <= 2 ? R() < 0.4 : tier <= 4 ? R() < 0.12 : false;
       objs.push({ t: 'dwelling', fac: facKeys3[Math.floor(R() * facKeys3.length)], tier, owner: null, avail: GROWTH[tier - 1], x: c.x, y: c.y, guard: free ? [] : [guard(c, 0.8 + 0.1 * tier)] });
@@ -263,21 +263,21 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
   }
 
   // prisons: free a captive hero (a jailor stack guards each one)
-  { const heroKeys = Object.keys(HEROES); for (let i = 0, n = Math.max(1, Math.round(1.3 * sc)); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'prison', hero: heroKeys[Math.floor(R() * heroKeys.length)], x: c.x, y: c.y, guard: [guard(c, 0.9)] }); } }
+  { const heroKeys = Object.keys(HEROES); for (let i = 0, n = Math.max(1, Math.round(1.3 * sc)); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'prison', hero: heroKeys[Math.floor(R() * heroKeys.length)], x: c.x, y: c.y, guard: R() < 0.5 ? [] : [guard(c, 0.9)] }); } }
   // obelisks: visit them all to piece the map together and unearth a relic
   { const nO = Math.max(4, Math.round(4 * Math.sqrt(sc))); for (let i = 0; i < nO; i++) { const c = pick(); if (!c) break; objs.push({ t: 'obelisk', seen: false, x: c.x, y: c.y }); } }
   // quest guardians: a hero of enough level earns a reward
   for (let i = 0, n = Math.max(1, Math.round(1.5 * sc)); i < n; i++) { const c = pick(); if (!c) break; const d = depthOf(c); objs.push({ t: 'questgate', need: 3 + Math.round(d * 5) + Math.floor(R() * 2), art: randomArt(R, Math.max(2, artTierFor(d, R))), gold: 2000 + Math.round(d * 4000), x: c.x, y: c.y }); }
   // key masters and border gates: the tent of a colour hands out its key, the gate of the same colour guards a vault
-  { const cols = ['red', 'blue', 'green', 'gold'], nK = Math.min(4, Math.max(1, Math.round(1.2 * sc))); for (let i = 0; i < nK; i++) { const a = pick(), b = pick(); if (!a || !b) break; const d = depthOf(b); objs.push({ t: 'keytent', col: cols[i], x: a.x, y: a.y, guard: [guard(a, 0.7)] }, { t: 'gate', col: cols[i], gold: 3000 + Math.round(d * 5000), res: RES[1 + Math.floor(R() * (RES.length - 1))], art: randomArt(R, Math.max(3, artTierFor(d, R))), x: b.x, y: b.y }); } }
+  { const cols = ['red', 'blue', 'green', 'gold'], nK = Math.min(4, Math.max(1, Math.round(1.2 * sc))); for (let i = 0; i < nK; i++) { const a = pick(), b = pick(); if (!a || !b) break; const d = depthOf(b); objs.push({ t: 'keytent', col: cols[i], x: a.x, y: a.y, guard: R() < 0.6 ? [] : [guard(a, 0.7)] }, { t: 'gate', col: cols[i], gold: 3000 + Math.round(d * 5000), res: RES[1 + Math.floor(R() * (RES.length - 1))], art: randomArt(R, Math.max(3, artTierFor(d, R))), x: b.x, y: b.y }); } }
 
   const kindsBase = ['gold', 'gold', 'gold', 'wood', 'wood', 'ore', 'ore', 'mercury', 'sulfur', 'crystal', 'gems'];
   const nMines = Math.max(8, Math.round(11 * Math.pow(sc, 0.8)));
   const mineKinds = Array.from({ length: nMines }, (_, i) => kindsBase[i % kindsBase.length]);
-  for (const k of mineKinds) { const c = pick(); if (!c) break; objs.push({ t: 'mine', kind: k, owner: null, x: c.x, y: c.y, guard: [guard(c, 0.8)] }); }
+  for (const k of mineKinds) { const c = pick(); if (!c) break; objs.push({ t: 'mine', kind: k, owner: null, x: c.x, y: c.y, guard: R() < (k === 'gold' ? 0.3 : 0.5) ? [] : [guard(c, 0.8)] }); }
   for (let i = 0, n = sc < 0.8 ? 2 : Math.round(3 * Math.sqrt(sc)); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'merchant', x: c.x, y: c.y }); }
   for (let i = 0, n = Math.round(28 * sc * MP.density); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'monster', x: c.x, y: c.y, guard: [guard(c)] }); }
-  for (let i = 0, n = Math.round(5 * Math.sqrt(sc)); i < n; i++) { const c = pick(); if (c) objs.push({ t: 'art', art: randomArt(R, artTierFor(depthOf(c), R)), x: c.x, y: c.y, guard: [guard(c, 1.1)] }); }
+  for (let i = 0, n = Math.round(5 * Math.sqrt(sc)); i < n; i++) { const c = pick(); if (c) objs.push({ t: 'art', art: randomArt(R, artTierFor(depthOf(c), R)), x: c.x, y: c.y, guard: R() < 0.4 ? [] : [guard(c, 1.1)] }); }
   for (let i = 0, n = Math.round(20 * sc); i < n; i++) { const c = pick(); if (!c) break; const k = RES[Math.floor(R() * RES.length)]; objs.push({ t: 'pile', kind: k, amt: k === 'gold' ? 500 + 250 * Math.floor(R() * 5) : 3 + Math.floor(R() * 6), x: c.x, y: c.y }); }
   for (let i = 0, n = Math.round(5 * sc); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'chest', x: c.x, y: c.y, gold: 1000 + 500 * Math.floor(R() * 4) }); }
 

@@ -107,6 +107,19 @@
     for (const s of h.army) if (s) { const f = out.find(o => o.t === s.t); if (f) f.n += s.n; else out.push({ ...s }); }
     h.army = out.concat(Array(7 - out.length).fill(null));
   }
+  // every hero starts with a different band: 3 stacks from tiers 1-4 chosen by the hero (might heroes lean on the front line,
+  // magic heroes on shooters and flyers), all worth about the same as the old 20/10/5 start
+  function startArmy(def, fac, mul = 1) {
+    const ti = factionTiers(fac), hs = (s) => { let h = 7; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) | 0; return Math.abs(h); }, r = hs(def.id + def.name);
+    const V0 = (20 * C[ti[0]].v + 10 * C[ti[1]].v + 5 * C[ti[2]].v) * mul, arch = CLASS_ARCH[def.cls] || 'might';
+    const PERM = []; for (const p of [1, 2, 3, 4]) for (const q of [1, 2, 3, 4]) for (const s of [1, 2, 3, 4]) if (p !== q && q !== s && p !== s) PERM.push([p, q, s]);
+    const need = arch === 'magic' ? 2 : arch === 'ranger' ? 3 : 1, SETS = PERM.filter(s => s.includes(need));
+    const set = SETS[r % SETS.length].slice(); if (arch === 'magic' && r % 5 === 0) set[2] = 5;
+    const SH = [[0.42, 0.33, 0.25], [0.42, 0.25, 0.33], [0.33, 0.42, 0.25], [0.25, 0.42, 0.33], [0.33, 0.25, 0.42], [0.25, 0.33, 0.42]], shares = SH[(r >> 5) % 6];
+    const army = set.map((t, i) => ({ t: ti[t - 1], n: Math.max(1, Math.round(V0 * shares[i] / C[ti[t - 1]].v)) }));
+    while (army.length < 7) army.push(null);
+    return army;
+  }
   function makeHero(def, x, y) {
     return { id: def.id, pid: def.id, name: def.name, cls: def.cls, icon: def.i, x, y, att: def.att, def: def.def, sp: def.sp, kn: def.kn,
       lvl: 1, xp: 0, mana: def.kn * 10, move: MOVE_PER_DAY, army: emptyArmy(), perks: Object.fromEntries([...(START_SKILLS[def.cls] || []), ...(def.sk ? [def.sk] : [])].map(k => [k, 1])), arts: {}, pack: [], av: 0 };
@@ -202,7 +215,7 @@
     }
     for (const ai of G.ais) spawnAiHero(ai, G.objs.find(o => o.t === 'town' && o.owner === ai.id));
     const def = HEROES[heroId], h = makeHero(def, m.P.x, m.P.y), ti = factionTiers(faction);
-    h.army = [{ t: ti[0], n: 20 }, { t: ti[1], n: 10 }, { t: ti[2], n: 5 }, null, null, null, null];
+    h.army = startArmy(def, faction);
     h.move = maxMove(h);
     G.heroes.push(h); setActive(0); learn(def.spells); rollTavern();
     if (map.scn && map.scn.bonus) for (const k in map.scn.bonus) G.res[k] = (G.res[k] || 0) + map.scn.bonus[k];
@@ -980,7 +993,7 @@
     if (G.heroes.length >= MAX_HEROES) return showModal(`<h2>⛓️ Prison</h2><p>${d.name} begs to join you, but you already lead ${MAX_HEROES} heroes. Come back when one of them has left.</p>`);
     if (G.heroes.some(x => x.id === d.id) || G.ais.some(a => a.heroes.some(x => x.pid === d.id))) { G.objs.splice(G.objs.indexOf(o), 1); reindex(G); renderAll(); return showModal('<h2>⛓️ Empty cell</h2><p>The captive was already freed by someone else.</p>'); }
     const nh = makeHero(d, o.x, o.y), ti = factionTiers(d.fac);
-    nh.army = [{ t: ti[0], n: 8 }, null, null, null, null, null, null]; nh.move = 0; learn(d.spells);
+    nh.army = startArmy(d, d.fac, 0.35); nh.move = 0; learn(d.spells);
     G.heroes.push(nh); G.objs.splice(G.objs.indexOf(o), 1); reindex(G); sfx('fanfare'); renderAll();
     await showModal(`<h2>⛓️ Hero freed!</h2><p><b>${nh.name}</b> (${clsLabel(d.cls)}) thanks you and joins your cause with a small band of ${C[ti[0]].n}s.</p>`);
   }
@@ -1731,7 +1744,7 @@
     const h = makeHero(HEROES[pick[0]], t.x, t.y);
     h.ai = ai.id; if (ai.heroes.some(x => x.name === h.name)) h.name += ' II';
     const ti = factionTiers(ai.fac), m = D.ehMul * (ai.heroes.length ? 0.6 : 1);
-    h.army = [{ t: ti[0], n: Math.max(2, Math.round(14 * m)) }, { t: ti[1], n: Math.max(1, Math.round(7 * m)) }, { t: ti[2], n: Math.max(1, Math.round(4 * m)) }, null, null, null, null];
+    h.army = startArmy(HEROES[pick[0]], ai.fac, 0.7 * m);
     const bonus = Math.max(0, Math.floor((D.ehMul - 0.7) * 3)); h.att += bonus; h.def += bonus;
     h.move = Math.round(D.ehMove * sizeMv());
     ai.heroes.push(h); return h;
@@ -2152,7 +2165,7 @@
     const ti = factionTiers(f), list = FACTIONS[f].heroes.map(([n]) => Object.assign({ key: n }, HEROES[n])); pick = pick || list[0].key;
     const cur = list.find(d => d.key === pick) || list[0];
     const tiles = list.map(d => `<button class="htile${d === cur ? ' on' : ''}" data-hid="${d.key}">${Art.heroPic(d.i, ownCol(0), 84, d.id)}<span>${d.name}</span><small>${clsLabel(d.cls)}</small></button>`).join('');
-    const army = [[ti[0], 20], [ti[1], 10], [ti[2], 5]];
+    const army = startArmy(cur, f).filter(Boolean).map(a => [a.t, a.n]);
     const panel = `<div class="hspan"><div class="hsbig">${Art.heroPic(cur.i, ownCol(0), 150, cur.id)}</div><h3>${cur.name}</h3><div class="hscls">${clsLabel(cur.cls)}${cur.sk ? ` · ${PERKS[cur.sk].i} ${PERKS[cur.sk].n}` : ''}</div>
       <div class="hsstats"><div><b>${cur.att}</b><span>Attack</span></div><div><b>${cur.def}</b><span>Defence</span></div><div><b>${cur.sp}</b><span>Spell power</span></div><div><b>${cur.kn}</b><span>Knowledge</span></div></div>
       <h4>Spells</h4><div class="hsspells">${[...START_SPELLS, ...cur.spells].map(k => `<span>${SPELLS[k].i} ${SPELLS[k].n}</span>`).join('')}</div>

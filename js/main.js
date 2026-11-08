@@ -576,6 +576,17 @@
       el.appendChild(b);
     });
     const sw = document.createElement('div'); sw.className = 'small'; sw.style.gridColumn = '1/-1'; sw.textContent = 'Click two slots to swap / merge.'; el.appendChild(sw);
+    if (selSlot >= 0 && h.army[selSlot]) { const a = h.army[selSlot], db = document.createElement('button'); db.className = 'danger disb'; db.style.gridColumn = '1/-1'; db.textContent = `🗑 Disband ${a.n} ${C[a.t].n}`; db.onclick = () => disbandSlot(h.army, selSlot, a.n, db); el.appendChild(db); }
+  }
+  // release creatures from the army for good (two clicks to confirm); a hero always keeps at least one creature
+  function disbandSlot(arr, i, n, btn, after) {
+    const s = arr[i]; if (!s) return;
+    if (!btn.dataset.sure) { btn.dataset.sure = '1'; const old = btn.textContent; btn.textContent = '⚠ Click again to disband'; setTimeout(() => { if (btn.isConnected) { delete btn.dataset.sure; btn.textContent = old; } }, 3000); return; }
+    n = Math.max(1, Math.min(s.n, n));
+    const left = arr.reduce((t, x) => t + (x ? x.n : 0), 0) - n;
+    if (arr === G.hero.army && left <= 0) { toast('A hero needs at least one creature.'); return; }
+    s.n -= n; if (s.n <= 0) arr[i] = null;
+    sfx('step'); toast(`${n} ${C[s.t].n} disbanded.`); selSlot = -1; if (after) after(); else renderAll();
   }
   function slotClick(i) {
     if (busy) return;
@@ -1178,13 +1189,14 @@
       const row = (a, rk) => a.map((s, i) => `<button class="slot${s ? '' : ' empty'}${sel && sel.r === rk && sel.i === i ? ' sel' : ''}" data-r="${rk}" data-i="${i}">${s ? `${Art.pic(s.t, 40)}<small>${s.n}</small>` : ''}</button>`).join('');
       $('mbox').innerHTML = `<h2>${title}</h2><div class="small">${note}</div>${extra ? extra.html : ''}
         <h4>${nameA}</h4><div class="armyrow">${row(A, 'a')}</div><h4>${nameB}</h4><div class="armyrow">${row(B, 'b')}</div>
-        ${sel ? (() => { const st = arr(sel.r)[sel.i]; return `<div class="small" style="margin-top:6px">Selected: <b>${C[st.t].n}</b> (${st.n}). Move <input type="number" id="xAmt" min="1" max="${st.n}" value="${Math.min(amt || st.n, st.n)}" style="width:72px"> <button id="xOne">1</button> <button id="xHalf">½</button> <button id="xAll">All</button> — then click an empty slot (or the same creature) to split, or any slot to swap/merge all.</div>`; })() : '<div class="small">Click a stack, choose how many to move, then click a slot: move / split / merge / swap.</div>'}
+        ${sel ? (() => { const st = arr(sel.r)[sel.i]; return `<div class="small" style="margin-top:6px">Selected: <b>${C[st.t].n}</b> (${st.n}). Move <input type="number" id="xAmt" min="1" max="${st.n}" value="${Math.min(amt || st.n, st.n)}" style="width:72px"> <button id="xOne">1</button> <button id="xHalf">½</button> <button id="xAll">All</button> — then click an empty slot (or the same creature) to split, or any slot to swap/merge all. <button class="danger" id="xDis">🗑 Disband</button></div>`; })() : '<div class="small">Click a stack, choose how many to move, then click a slot: move / split / merge / swap.</div>'}
         <div class="mb"><button class="primary" id="xClose">${back ? 'Back' : 'Close'}</button></div>`;
       $('xClose').onclick = () => { if (back) back(); else { $('modal').classList.add('hide'); renderAll(); } };
       if (extra) extra.bind();
       if (sel && $('xAmt')) {
         const inp = $('xAmt'), mx = arr(sel.r)[sel.i].n, setA = (v) => { amt = Math.max(1, Math.min(mx, v)); inp.value = amt; };
         inp.oninput = () => { amt = Math.max(1, Math.min(mx, parseInt(inp.value) || 1)); };
+        $('xDis').onclick = () => { const st = arr(sel.r)[sel.i], btn = $('xDis'); if (!btn.dataset.sure) { btn.dataset.sure = '1'; btn.textContent = `⚠ Disband ${Math.min(amt || st.n, st.n)}?`; setTimeout(() => { if (btn.isConnected) { delete btn.dataset.sure; btn.textContent = '🗑 Disband'; } }, 3000); return; } const n = Math.max(1, Math.min(st.n, amt || st.n)); if (A.concat(B).reduce((t, x) => t + (x ? x.n : 0), 0) - n <= 0) return toast('Keep at least one creature.'); st.n -= n; if (st.n <= 0) arr(sel.r)[sel.i] = null; toast(`${n} ${C[st.t].n} disbanded.`); sel = null; render(); };
         $('xOne').onclick = () => setA(1); $('xHalf').onclick = () => setA(Math.max(1, Math.floor(mx / 2))); $('xAll').onclick = () => setA(mx);
       }
       $('mbox').querySelectorAll('.slot').forEach(b => b.onclick = () => {

@@ -45,11 +45,11 @@ const Battle = (() => {
   const structAt = (c, r) => B.siege ? B.walls.get(key(c, r)) : undefined;
   const isAttacker = (s) => B.siege && s.side !== B.siege.dside;
   const bonus = (s) => s.side === 0 ? B.hero : B.eStats;
-  const attackOf = (s) => C[s.t].a + bonus(s).att + (s.bloodlust || 0);
-  const defenceOf = (s) => C[s.t].d + bonus(s).def + (s.stone || 0) + (s.defb ? 3 : 0);
+  const attackOf = (s) => Math.max(0, C[s.t].a + bonus(s).att + (s.bloodlust || 0) - (s.weak > 0 ? 3 : 0));
+  const defenceOf = (s) => Math.max(0, C[s.t].d + bonus(s).def + (s.stone || 0) + (s.defb ? 3 : 0) - (s.disr > 0 ? 3 : 0));
   const totalHp = (s) => (s.n - 1) * C[s.t].hp + s.hp;
   const adjEnemy = (s) => nbrs(s.c, s.r).some(([c, r]) => { const o = stackAt(c, r); return o && o.side !== s.side; });
-  const canShoot = (s) => C[s.t].shoot && s.ammo > 0 && !adjEnemy(s);
+  const canShoot = (s) => C[s.t].shoot && s.ammo > 0 && !(s.noshoot > 0) && !adjEnemy(s);
 
   // shooters: stronger point blank, weaker far away, half damage beyond 10 hexes ("broken arrow")
   function rangeMul(a, d) {
@@ -329,6 +329,8 @@ const Battle = (() => {
     for (const s of alive()) { s.ret = true; s.waited = false; }
     B.queue = alive().sort((a, b) => speedOf(b) - speedOf(a) || a.side - b.side);
     if (B.mach && B.mach.cart) for (const s of alive(0)) if (C[s.t].shoot && s.ammo < s.ammoMax) s.ammo++;
+    for (const s of alive()) { for (const f of ['weak', 'disr', 'noshoot', 'berserk']) if (s[f] > 0) s[f]--; if (s.hyp > 0 && --s.hyp === 0) { s.side = s.origSide; log(C[s.t].n + ' shakes off the mind grip.'); } }
+    B.queue = alive().sort((a, c) => speedOf(c) - speedOf(a) || a.side - c.side);
     B.waitQ = []; B.strikeUsed = false; B.mineUsed = false; B.balUsed = false; B.tentUsed = false;
     log(`— Round ${B.round} —`);
     if (B.siege) {
@@ -385,7 +387,7 @@ const Battle = (() => {
     if (!checkEnd()) nextTurn();
   }
   async function aiAct(s) {
-    const foes = alive(1 - s.side);
+    const foes = s.berserk > 0 ? alive().filter(e => e !== s).sort((a, c) => hexDist(a, s) - hexDist(c, s)).slice(0, 1) : alive(1 - s.side);
     if (!foes.length) return;
     const value = (e, dmg) => Math.min(dmg, totalHp(e)) / C[e.t].hp * C[e.t].v;
     const gate = B.siege && [...B.walls.values()].find(w => w.k === 'gate');
@@ -449,6 +451,7 @@ const Battle = (() => {
     if (B.spell === '__strike') { heroStrike(t); return; }
     if (B.spell === '__ballista') { fireBallista(t); return; }
     if (B.spell === '__tent') { firstAid(t); return; }
+    if (B.spell && SPELLS[B.spell] && SPELLS[B.spell].tgt === 'ground') { castGround(B.spell, h); return; }
     if (B.spell) { castSpell(B.spell, t); return; }
     const st = structAt(h.c, h.r);
     if (st && isAttacker(s)) {
@@ -491,7 +494,7 @@ const Battle = (() => {
   const spellOk = (sp) => sp.lv <= 2 + perk('wisdom');
   function castSpell(k, t) {
     const sp = SPELLS[k];
-    if (!t || (sp.tgt === 'enemy') !== (t.side === 1)) return toast('Invalid target.');
+    if (!t || (sp.tgt !== 'any' && (sp.tgt === 'enemy') !== (t.side === 1))) return toast('Invalid target.');
     if (!spellOk(sp)) return toast(`${sp.n} needs Insight (rank ${sp.lv - 2}).`);
     if (B.hero.mana < sp.cost) return toast('Not enough mana.');
     B.hero.mana -= sp.cost; B.castUsed = true; B.spell = null; sfx('spell');
@@ -533,11 +536,39 @@ const Battle = (() => {
       case 'bloodlust': allies().forEach(a => { a.bloodlust = 3 + 2 * Math.max(0, r - 1); mark(a, '😡'); }); log(`${sp.n} cast.`); break;
       case 'shield': allies().forEach(a => { a.shield = [0.3, 0.3, 0.45, 0.6][Math.min(3, r)]; mark(a, '🌀'); }); log(`${sp.n} cast.`); break;
       case 'heal': allies().forEach(a => { const g = healStack(a, sd(6 * P), a.n); mark(a, '+' + Math.round(g)); }); log(`${sp.n} cast.`); break;
+      case 'dispel': for (const f of ['slow', 'haste', 'bless', 'curse', 'stone', 'bloodlust', 'shield', 'stunned', 'weak', 'disr', 'noshoot', 'berserk']) delete t[f]; mark(t, '✔'); log(sp.n + ' cleanses ' + C[t.t].n + '.'); break;
+      case 'icebolt': spellHit(t, sd(20 * P + 10), 'Ice Lance pierces'); break;
+      case 'weakness': foes().forEach(e => { e.weak = 3; mark(e, '🥀'); }); log(sp.n + ' cast.'); break;
+      case 'disrupt': foes().forEach(e => { e.disr = 3; mark(e, '💥'); }); log(sp.n + ' cast.'); break;
+      case 'forget': foes().forEach(e => { e.noshoot = 3; mark(e, '🌫️'); }); log(sp.n + ' cast.'); break;
+      case 'destroyundead': for (const s2 of alive()) if (C[s2.t].fac === 'necropolis') spellHit(s2, sd(15 * P), 'Holy Light scorches'); break;
+      case 'deathripple': for (const s2 of alive()) if (C[s2.t].fac !== 'necropolis' && !abil(s2, 'mindless')) spellHit(s2, sd(8 * P + 10), 'The grave wave drains'); break;
+      case 'prayer': alive(0).forEach(a => { a.bloodlust = Math.max(a.bloodlust || 0, 2); a.stone = Math.max(a.stone || 0, 2); a.haste = Math.max(a.haste || 0, 2); mark(a, '🙏'); }); log(sp.n + ' lifts every banner.'); break;
+      case 'berserk': t.berserk = 2; mark(t, '😤'); log(C[t.t].n + ' goes into a frenzy!'); break;
+      case 'hypnotize': {
+        if (totalHp(t) > 40 * P * (1 + r)) { log('The mind of ' + C[t.t].n + ' is too strong.'); break; }
+        t.origSide = 1; t.hyp = 2; t.side = 0; mark(t, '🌀'); log(C[t.t].n + ' now fights for you!'); B.queue = B.queue.filter(x => x !== t); break;
+      }
       case 'resurrect': { const g = healStack(t, sd(40 * P), t.maxN); mark(t, '+' + Math.round(g)); log(`${sp.n} cast.`); break; }
     }
     B.reach = computeReach(B.cur);
     refreshButtons();
     if (!checkEnd()) { /* spell does not end the turn */ }
+  }
+  // summon spells: elemental spirits appear on a free hex of your side (one stack of each kind per battle)
+  const SUMMON = { summon_fire: 'conflux4', summon_water: 'conflux3', summon_air: 'conflux2', summon_earth: 'conflux5' };
+  function castGround(k, h) {
+    const sp = SPELLS[k], id = SUMMON[k];
+    if (!spellOk(sp)) return toast(sp.n + ' needs Insight (rank ' + (sp.lv - 2) + ').');
+    if (B.hero.mana < sp.cost) return toast('Not enough mana.');
+    if (stackAt(h.c, h.r) || B.obs.has(key(h.c, h.r)) || structAt(h.c, h.r) || h.c > BW / 2) return toast('Pick a free hex on your half of the field.');
+    if (B.stacks.some(s => !s.dead && s.summoned === k)) return toast('Those spirits are already here.');
+    B.hero.mana -= sp.cost; B.castUsed = true; B.spell = null; sfx('spell');
+    const n = Math.max(2, Math.round(B.hero.sp * (2 + spellRank(sp)))), p = hexPx(h.c, h.r);
+    B.stacks.push({ t: id, n, hp: C[id].hp, side: 0, c: h.c, r: h.r, slot: -1, ammo: 0, ammoMax: 0, px: p.x, py: p.y, ret: true, maxN: n, summoned: k, waited: true });
+    log(sp.n + ': ' + n + ' ' + C[id].n + ' answer the call.');
+    B.fx.push({ x: p.x, y: p.y - 20, txt: '✨ ' + n, col: '#9fe8ff', t0: performance.now() });
+    B.reach = computeReach(B.cur); refreshButtons();
   }
   // war machines (bought in the town smithy): the ballista shoots once a round, the first aid tent heals one stack a round, the ammo cart gives archers 50% more arrows
   function fireBallista(t) {
@@ -595,7 +626,7 @@ const Battle = (() => {
       b.innerHTML = `${sp.i} ${sp.n} · ${SCHOOL_ICON[sp.school]}${rk ? ' ' + RANK_NAMES[rk] : ''} · L${sp.lv} (${sp.cost})`;
       b.title = `${sp.desc}${ok ? '' : `\nNeeds Insight rank ${sp.lv - 2}`}`;
       b.disabled = B.hero.mana < sp.cost || !ok;
-      b.onclick = () => { B.spell = k; list.classList.add('hide'); toast(sp.n + ': pick a ' + (sp.tgt === 'enemy' ? 'enemy' : 'friendly') + ' stack'); };
+      b.onclick = () => { B.spell = k; list.classList.add('hide'); toast(sp.n + ': ' + (sp.tgt === 'ground' ? 'pick a free hex on your side' : sp.tgt === 'any' ? 'pick a stack' : 'pick a ' + (sp.tgt === 'enemy' ? 'enemy' : 'friendly') + ' stack')); };
       list.appendChild(b);
     }
     list.classList.toggle('hide');
@@ -649,7 +680,8 @@ const Battle = (() => {
   function bgName() { const t = (B.opts || {}).terrain; return { water: 'ship', sand: 'desert', desert: 'desert', snow: 'snow', swamp: 'swamp', lava: 'lava' }[t] || 'grass'; }
   // phones: the battlefield is a landscape board, so ask the player to turn the phone (and lock landscape where the browser allows it)
   function rotateHint(on) {
-    const el = document.getElementById('rotate'); if (!el) return;
+    if (typeof matchMedia === 'undefined') return;
+    const el = document.getElementById('rotate'); if (!el || !el.classList) return;
     const phone = window.innerWidth < 900 && (matchMedia('(pointer: coarse)').matches || window.innerWidth < 760);
     const upd = () => { const portrait = innerHeight > innerWidth; el.classList.toggle('hide', !(on && phone && portrait && !el.dataset.skip)); };
     if (on) { delete el.dataset.skip; try { if (phone && screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); } catch (e) { /* ignore */ } }
@@ -657,7 +689,7 @@ const Battle = (() => {
     rotateHint.upd = on ? upd : null; upd();
     const skip = document.getElementById('rotateSkip'); if (skip) skip.onclick = () => { el.dataset.skip = '1'; upd(); };
   }
-  window.addEventListener('resize', () => { if (rotateHint.upd) rotateHint.upd(); }); window.addEventListener('orientationchange', () => setTimeout(() => { if (rotateHint.upd) rotateHint.upd(); }, 200));
+  if (typeof window.addEventListener === 'function') { window.addEventListener('resize', () => { if (rotateHint.upd) rotateHint.upd(); }); window.addEventListener('orientationchange', () => setTimeout(() => { if (rotateHint.upd) rotateHint.upd(); }, 200)); }
   function buildBoard() {
     const bgi = typeof Assets !== 'undefined' ? Assets.get('battle/bg_' + bgName(), 'battle/bg_grass') : null;
     if (bgi) { const c = document.createElement('canvas'); c.width = 960; c.height = 640; const g = c.getContext('2d'), k = Math.max(960 / bgi.width, 640 / bgi.height), w = bgi.width * k, h = bgi.height * k; g.drawImage(bgi, (960 - w) / 2, (640 - h) / 2, w, h); B._bg = true; return c; }
@@ -773,7 +805,7 @@ const Battle = (() => {
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = '#140a04'; ctx.strokeText(lab, bx + w / 2, by + h / 2 + 1);
         ctx.fillStyle = '#fff'; ctx.fillText(lab, bx + w / 2, by + h / 2 + 1); ctx.textBaseline = 'alphabetic';
       }
-      let tags = ''; if (s.haste) tags += '💨'; if (s.bless) tags += '✨'; if (s.stone) tags += '🪨'; if (s.defb) tags += '🛡'; if (s.slow) tags += '🐌'; if (s.curse) tags += '☠️'; if (s.bloodlust) tags += '😡'; if (s.shield) tags += '🌀'; if (s.stunned > 0) tags += '🙈';
+      let tags = ''; if (s.weak > 0) tags += '🥀'; if (s.disr > 0) tags += '💥'; if (s.noshoot > 0) tags += '🌫️'; if (s.berserk > 0) tags += '😤'; if (s.hyp > 0) tags += '🌀'; if (s.haste) tags += '💨'; if (s.bless) tags += '✨'; if (s.stone) tags += '🪨'; if (s.defb) tags += '🛡'; if (s.slow) tags += '🐌'; if (s.curse) tags += '☠️'; if (s.bloodlust) tags += '😡'; if (s.shield) tags += '🌀'; if (s.stunned > 0) tags += '🙈';
       if (tags) { ctx.font = '12px ' + FONT; ctx.fillText(tags, p.x, p.y - HR * 0.78); }
     }
     drawProjectiles(now);

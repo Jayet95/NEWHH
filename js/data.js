@@ -290,7 +290,7 @@ const EMERGENCY_MINES = 2;                      // a defending player may always
 const FORT_INCOME = 400;
 const MILITIA = 6;
 const GUILD_COST = [null, { gold: 2000, wood: 5, ore: 5 }, { gold: 3000, mercury: 4, sulfur: 4 }, { gold: 4000, mercury: 6, sulfur: 6, crystal: 6, gems: 6 }];
-const GUILD_SPELLS = [null, ['lightning', 'haste', 'slow', 'heal', 'bloodlust'], ['fireball', 'curse', 'blind', 'frostring', 'shield'], ['chain', 'meteor', 'implosion', 'resurrect', 'armageddon']];
+const GUILD_SPELLS = [null, ['lightning', 'haste', 'slow', 'heal', 'bloodlust', 'dispel', 'icebolt'], ['fireball', 'curse', 'blind', 'frostring', 'shield', 'weakness', 'disrupt', 'forget', 'destroyundead'], ['chain', 'meteor', 'implosion', 'resurrect', 'armageddon', 'deathripple', 'prayer', 'berserk', 'hypnotize', 'summon_fire', 'summon_water', 'summon_air', 'summon_earth']];
 const START_SPELLS = ['arrow', 'bless', 'stone'];
 
 // school: air / earth / fire / water (its skill ranks the spell: Basic, Advanced, Expert); lv: spell level (needs Wisdom: level <= 2 + Wisdom rank)
@@ -314,6 +314,21 @@ const SPELLS = {
   bless:     { n: 'Bless',          i: '✨', cost: 5,  lv: 1, school: 'water', tgt: 'ally',  desc: 'Always max damage; Expert: all allies' },
   heal:      { n: 'Cure',           i: '💚', cost: 6,  lv: 1, school: 'water', tgt: 'ally',  desc: 'Restore 6 x Spell Power hit points (no revival); Expert: all allies' },
   frostring: { n: 'Frost Ring',     i: '❄️', cost: 12, lv: 3, school: 'water', tgt: 'enemy', desc: 'Area (radius 1): 10 x Spell Power + 15 and -2 Speed (Advanced+)' },
+
+  dispel:    { n: 'Clear Mind',    i: '🧼', cost: 5,  lv: 1, school: 'water', tgt: 'any',   desc: 'Strips every spell effect from the target stack (yours or theirs)' },
+  icebolt:   { n: 'Ice Lance',     i: '🧊', cost: 8,  lv: 2, school: 'water', tgt: 'enemy', desc: 'Damage 20 x Spell Power + 10' },
+  weakness:  { n: 'Sapping Touch', i: '🥀', cost: 8,  lv: 2, school: 'earth', tgt: 'enemy', desc: '-3 Attack for 3 rounds; Expert: all enemies' },
+  disrupt:   { n: 'Rend Armor',    i: '💥', cost: 8,  lv: 2, school: 'earth', tgt: 'enemy', desc: '-3 Defense for 3 rounds; Expert: all enemies' },
+  forget:    { n: 'Dull Aim',      i: '🌫️', cost: 9,  lv: 2, school: 'water', tgt: 'enemy', desc: 'Target archers cannot shoot for 3 rounds; Expert: all enemies' },
+  destroyundead: { n: 'Holy Light', i: '🌟', cost: 15, lv: 3, school: 'fire',  tgt: 'any',   desc: 'Burns every undead stack on the field: 15 x Spell Power' },
+  deathripple: { n: 'Grave Wave',  i: '💀', cost: 18, lv: 4, school: 'earth', tgt: 'any',   desc: 'Hurts every living stack on the field (undead are spared): 8 x Spell Power + 10' },
+  prayer:    { n: 'Rally',         i: '🙏', cost: 16, lv: 4, school: 'water', tgt: 'any',   desc: 'All your stacks: +2 Attack, +2 Defense, +2 Speed' },
+  berserk:   { n: 'Frenzy',        i: '😤', cost: 20, lv: 4, school: 'fire',  tgt: 'enemy', desc: 'The target stack attacks the nearest stack of ANY side for 2 rounds' },
+  hypnotize: { n: 'Mind Grip',     i: '🌀', cost: 24, lv: 5, school: 'earth', tgt: 'enemy', desc: 'Take over a weak enemy stack (total hit points up to 40 x Spell Power) for 2 rounds' },
+  summon_fire:  { n: 'Call Flame Spirits', i: '🔥', cost: 25, lv: 5, school: 'fire',  tgt: 'ground', desc: 'Summon Fire Spirits on a free hex (once per battle)' },
+  summon_water: { n: 'Call Tide Spirits',  i: '💧', cost: 25, lv: 5, school: 'water', tgt: 'ground', desc: 'Summon Water Spirits on a free hex (once per battle)' },
+  summon_air:   { n: 'Call Gale Spirits',  i: '🌬️', cost: 25, lv: 5, school: 'air',   tgt: 'ground', desc: 'Summon Air Spirits on a free hex (once per battle)' },
+  summon_earth: { n: 'Call Stone Spirits', i: '⛰️', cost: 25, lv: 5, school: 'earth', tgt: 'ground', desc: 'Summon Earth Spirits on a free hex (once per battle)' },
   resurrect: { n: 'Resurrection',   i: '🕊️', cost: 18, lv: 4, school: 'water', tgt: 'ally',  desc: 'Restore 40 x Spell Power hit points, reviving fallen creatures' },
 };
 const PORTAL_COST = 12;

@@ -330,6 +330,37 @@ function reindex(G) {
 }
 function objAt(G, x, y) { return G.omap.get(y * G.W + x); }
 
+// every tile a hero can still reach with 'budget' movement points: Map(y * W + x -> cost). Same terrain costs as findPath; objects block except resource piles and chests.
+function reachMap(G, sx, sy, budget, sail, caps) {
+  const W = G.W, H = G.H, dist = new Map([[sy * W + sx, 0]]), open = [[0, sx, sy]];
+  const cost = (nx, ny) => {
+    const t = G.tiles[ny][nx], c = TCOST[t];
+    let v;
+    if (sail) v = t === T.WATER ? 100 - 10 * ((caps && caps.nav) || 0) : 0;
+    else if (t === T.WATER) v = caps && caps.water ? WATERWALK_COST[caps.water] : 0;
+    else if (t === T.FOREST) v = caps && caps.forest ? FOREST_COST[caps.forest] : 0;
+    else if (t === T.MOUNT) v = caps && caps.mount ? MOUNT_COST[caps.mount] : 0;
+    else v = c || 0;
+    if (v && !sail && t !== T.ROAD && t !== T.WATER && G.biome) { const b = G.biome[ny] && G.biome[ny][nx]; if (b) v = Math.round(v * BIOME_COST[b] / 10) * 10; }
+    return v;
+  };
+  while (open.length) {
+    let bi = 0; for (let i = 1; i < open.length; i++) if (open[i][0] < open[bi][0]) bi = i;
+    const [d, cx, cy] = open.splice(bi, 1)[0];
+    if (d > dist.get(cy * W + cx)) continue;
+    for (const [nx, ny] of hexNb(cx, cy)) {
+      if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+      const c = cost(nx, ny); if (!c) continue;
+      const o = G.omap && G.omap.get(ny * W + nx); if (o && o.t !== 'pile' && o.t !== 'chest') continue;
+      const nd = d + c; if (nd > budget) continue;
+      const k = ny * W + nx; if (dist.has(k) && dist.get(k) <= nd) continue;
+      dist.set(k, nd); open.push([nd, nx, ny]);
+    }
+  }
+  dist.delete(sy * W + sx);
+  return dist;
+}
+
 // perk-based terrain costs per rank (index = rank): forests, mountains, walking on water
 const FOREST_COST = [0, 200, 150, 100], MOUNT_COST = [0, 300, 250, 200], WATERWALK_COST = [0, 160, 130, 100];
 // sail: the hero travels by boat (water tiles; a land tile only as the final step to disembark)

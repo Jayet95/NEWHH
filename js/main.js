@@ -370,6 +370,7 @@
     }
   }
   const monNeed = new Set(), fpFar = {};
+  let reachKey = '', reachSet = new Map();
   function draw() {
     if (!G) return;
     cx.setTransform(1, 0, 0, 1, 0, 0); cx.fillStyle = '#000'; cx.fillRect(0, 0, cmap.width, cmap.height); cx.setTransform(Z, 0, 0, Z, 0, 0);
@@ -384,6 +385,19 @@
       if (ow !== null && ow !== undefined && G.tiles[y][x] !== T.WATER) { Art.hexPath(cx, px, py, HR + 0.5); cx.fillStyle = ownFill(ow, 0.2); cx.fill(); }
       const hn = hexNb(x, y);
       for (let e = 0; e < 3; e++) { const nx = hn[e][0], ny = hn[e][1]; if (nx >= 0 && ny >= 0 && nx < G.W && ny < G.H && G.zone[ny][nx] !== z) { const p1 = Art.hexPt(px, py, HR, e), p2 = Art.hexPt(px, py, HR, e + 1); cx.beginPath(); cx.moveTo(p1[0], p1[1]); cx.lineTo(p2[0], p2[1]); cx.stroke(); } }
+    }
+    // tiles the selected hero can still walk to today (soft gold glow with a thin edge)
+    if (Settings.showReach && !busy && G.hero && G.hero.move > 0 && !G.over) {
+      const hh = G.hero, rk = [hh.x, hh.y, hh.move, hh.boat != null ? 1 : 0, G.day, G.objs.length].join();
+      if (reachKey !== rk) { reachKey = rk; reachSet = reachMap(G, hh.x, hh.y, hh.move, hh.boat != null, capsOf(hh)); }
+      cx.save(); cx.lineWidth = 1.3;
+      for (const [k] of reachSet) {
+        const tx = k % G.W, ty = (k / G.W) | 0; if (tx < x0 - 1 || tx > x0 + vx || ty < y0 - 1 || ty > y0 + vy) continue;
+        const px = hcx(tx, ty) - cam.x, py = hcy(ty) - cam.y;
+        cx.beginPath(); for (let i = 0; i < 6; i++) { const p = Art.hexPt(px, py, HR - 2, i); i ? cx.lineTo(p[0], p[1]) : cx.moveTo(p[0], p[1]); } cx.closePath();
+        cx.fillStyle = 'rgba(255, 233, 150, .16)'; cx.fill(); cx.strokeStyle = 'rgba(255, 224, 120, .55)'; cx.stroke();
+      }
+      cx.restore();
     }
     if (G.path) {
       let left = G.hero.move;
@@ -1795,6 +1809,7 @@
     if (o.t === 'pile') { ai.gold += o.kind === 'gold' ? o.amt : o.amt * RES_VALUE[o.kind]; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return false; }
     if (o.t === 'chest') { ai.gold += o.gold; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return false; }
     if (!last || o.owner === ai.id || isAlly(ai.id, o.owner)) return false;
+    if (o.owner === 0 && o.t !== 'town' && o.t !== 'fort') { centerOn(o.x, o.y); renderAll(); toast(`${h.name} of the ${FACTIONS[ai.fac].name} attacks your ${o.t === 'mine' ? o.kind + ' mine' : o.t}!`); await sleep(700); }
     const win = (def, bonus = 1) => { const d = def.map(a => a && ({ ...a })); return quickBattle(h.army, d, bonus); };
     const lose = () => { aiKill(ai, h); return true; };
     switch (o.t) {
@@ -2339,6 +2354,7 @@
       ${row('Interface size', seg('uiScale', [[1, 'Normal'], [1.15, 'Large'], [1.3, 'Huge']]))}
       ${row('Left-handed layout', seg('leftHand', [[false, 'Off'], [true, 'On']]), 'Mirrors the phone buttons')}
       ${row('Vibration', seg('haptics', [[true, 'On'], [false, 'Off']]), 'Phones only')}
+      ${row('Show walkable tiles', seg('showReach', [[true, 'On'], [false, 'Off']]), 'Lights up every tile your hero can reach today')}
       ${row('Warn before deadly fights', seg('confirmDanger', [[true, 'On'], [false, 'Off']]), 'Asks before attacking something far stronger than you')}
       ${row('Confirm before ending a turn', seg('confirmEnd', [[true, 'On'], [false, 'Off']]), 'Warns about idle heroes and unspent recruits')}
       ${row('Hints', seg('hints', [[true, 'On'], [false, 'Off']]), '<a href="#" id="stReset">Show all hints again</a>')}

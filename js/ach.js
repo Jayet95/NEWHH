@@ -29,7 +29,7 @@ const Ach = (() => {
     ['archmage', 'Realm', 'Archmage', 'Build the third Mage Guild level.', 'maxGuild', 3, 'book', 265],
     ['dragon_tamer', 'Dragons', 'Dragon Tamer', 'Conquer a Dragon Lair.', 'lairs', 1, 'flame', 8],
     ['dragon_master', 'Dragons', 'Dragon Master', 'Recruit 10 dragons from a lair.', 'lairDragons', 10, 'flames', 20],
-    ['azure_rider', 'Dragons', 'Azure Rider', 'Command an Azure Dragon.', 'azure', 1, 'drop', 200],
+    ['azure_rider', 'Dragons', 'Sapphire Rider', 'Command a Sapphire Wyrm.', 'azure', 1, 'drop', 200],
     ['collector', 'Heroes', 'Collector', 'Find 10 artifacts.', 'arts', 10, 'gem', 300],
     ['armed', 'Heroes', 'Armed to the Teeth', 'Equip 8 artifacts on one hero.', 'maxEquip', 8, 'armor', 215],
     ['veteran_hero', 'Heroes', 'Seasoned Hero', 'Reach hero level 10.', 'maxLevel', 10, 'star', 45],

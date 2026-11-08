@@ -2058,8 +2058,8 @@
     <p><b>Battle:</b> click a green hex to move, click an enemy to attack (archers shoot — +25% at close range, weaker the farther the target, and <b>half damage beyond 10 hexes: the broken arrow 💔</b>; flyers ignore obstacles). Your hero stands beside the field: cast one spell per round and make one Hero Strike per round. Castle assaults are <b>sieges</b>: break the gate or walls (your catapult helps), beware arrow towers and the moat; flyers can cross the walls. Level-ups let you pick one of two perks.</p>`;
   function refreshTitle() { $('tCont').disabled = !localStorage.getItem(SAVE); $('tLoad').disabled = !['h3js_save_v7', 'h3js_slot_1', 'h3js_slot_2', 'h3js_slot_3'].some(k => localStorage.getItem(k)); }
   function showDifficultySelect() {
-    const cards = Object.entries(DIFFICULTY).map(([k, d]) => `<div class="card" data-d="${k}"><div class="big">${d.icon}</div><b>${d.name}</b><div class="small">${d.desc}</div>
-      <div class="small">Start: ${RES_ICON.gold}${d.gold} · guards ×${d.neutral} · income ×${d.income}<br>Rivals march from day ${d.ehDay} · armies ×${d.ehMul} · rival income ×${d.aiInc}</div></div>`).join('');
+    const cards = Object.entries(DIFFICULTY).map(([k, d]) => `<div class="card dif" data-d="${k}"><div class="big">${d.icon}</div><b>${d.name}</b><div class="small">${d.desc}</div>
+      <div class="difstats"><div><span>Start gold</span><b>${d.gold.toLocaleString()}</b></div><div><span>Guards</span><b>×${d.neutral}</b></div><div><span>Your income</span><b>×${d.income}</b></div><div><span>Rivals march</span><b>day ${d.ehDay}</b></div><div><span>Rival armies</span><b>×${d.ehMul}</b></div><div><span>Rival income</span><b>×${d.aiInc}</b></div></div></div>`).join('');
     $('mbox').innerHTML = `<h2>Choose difficulty</h2><div class="grid two">${cards}</div><div class="mb"><button id="sBack">Back</button></div>`;
     $('sBack').onclick = () => $('modal').classList.add('hide');
     $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => showMapSelect(c.dataset.d));
@@ -2096,32 +2096,28 @@
   const FLAGS = ['blue', 'red', 'green', 'orange', 'purple', 'teal', 'pink', 'tan'];
   const flagImg = (i, px = 36) => { const u = Assets.url('flags/' + FLAGS[i]); return u ? `<img class="flagimg" src="${u}" alt="" draggable="false" style="height:${px}px">` : `<span class="zdot" style="background:${PALETTE[i][1]};width:${px * 0.5}px;height:${px * 0.5}px"></span>`; };
   const prevCache = {};
+  // map previews are real maps: one is generated for each type and painted with the game's own terrain and building pictures
   function mapPreview(kind0, biome) {
-    const kind = kind0, ck = kind0 + (biome || '');
+    const ck = kind0 + (biome || '');
     if (prevCache[ck] && prevCache[ck].full) return prevCache[ck].url;
-    const W = 300, H = 150, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
-    const T = (n) => Assets.get('terrain/' + n), full = !!(T('grass') && T('water'));
-    const fill = (img, col) => { g.fillStyle = img ? g.createPattern(img, 'repeat') : col; g.fillRect(0, 0, W, H); };
-    const blob = (img, col, cx, cy, rx, ry, rot = 0) => { g.save(); g.beginPath(); g.ellipse(cx, cy, rx, ry, rot, 0, 7); g.clip(); g.fillStyle = img ? g.createPattern(img, 'repeat') : col; g.fillRect(0, 0, W, H); g.restore(); g.beginPath(); g.ellipse(cx, cy, rx, ry, rot, 0, 7); g.lineWidth = 3; g.strokeStyle = 'rgba(235,225,190,.55)'; g.stroke(); };
-    const stamp = (name, x, y, h) => { const im = Assets.get(name); if (im) { const w = im.width * h / im.height; g.drawImage(im, x - w / 2, y - h, w, h); } };
-    let seed = kind.length * 7 + 3; const R = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
-    const trees = (n, x0, y0, x1, y1) => { for (let i = 0; i < n; i++) stamp('terrain/forest_overlay', x0 + R() * (x1 - x0), y0 + R() * (y1 - y0), 26 + R() * 8); };
-    const mounts = (n, x0, y0, x1, y1) => { const a = []; for (let i = 0; i < n; i++) a.push([x0 + R() * (x1 - x0), y0 + R() * (y1 - y0)]); a.sort((p, q) => p[1] - q[1]).forEach(([x, y]) => stamp('terrain/mountain_overlay', x, y, 38 + R() * 12)); };
-    if (kind === 'isles') {
-      fill(T('water'), '#2f6fb0');
-      blob(T('grass'), '#5b8a3a', 80, 90, 62, 36, -0.2); blob(T('grass'), '#5b8a3a', 215, 55, 52, 30, 0.3); blob(T('sand'), '#d8c07a', 235, 118, 34, 18); blob(T('grass'), '#5b8a3a', 150, 128, 28, 14);
-      trees(5, 45, 70, 110, 100); trees(4, 190, 40, 245, 70); stamp('objects/town_castle', 82, 92, 40); stamp('objects/boat', 150, 40, 26); stamp('objects/chest', 235, 118, 20);
-    } else if (kind === 'highland') {
-      fill(T('grass'), '#5b8a3a'); mounts(8, 15, 40, 285, 75); trees(14, 15, 70, 285, 140); blob(T('water'), '#2f6fb0', 255, 125, 55, 24); stamp('objects/town_castle', 60, 128, 40); stamp('objects/mine_ore', 175, 120, 26);
-    } else if (kind === 'steppe') {
-      fill(T('grass'), '#6f9a3a'); blob(T('sand'), '#d8c07a', 210, 100, 56, 22, 0.2); trees(4, 20, 30, 140, 70); stamp('objects/town_castle', 70, 118, 40); stamp('objects/dwelling_stronghold1', 190, 70, 30); stamp('objects/mine_gold', 250, 40, 24);
-      for (let i = 0; i < 4; i++) stamp('poses/left/idle/orc', 30 + R() * 250, 70 + R() * 70, 30);
-    } else {
-      fill(T('grass'), '#5b8a3a'); blob(T('water'), '#2f6fb0', 40, 130, 90, 36, -0.2); blob(T('sand'), '#d8c07a', 150, 135, 40, 12); mounts(4, 170, 30, 285, 60); trees(9, 100, 45, 270, 115); stamp('objects/town_castle', 95, 118, 40); stamp('objects/mine_wood', 205, 90, 24); stamp('objects/chest', 255, 120, 20);
-    }
-    const sh = g.createLinearGradient(0, H * 0.55, 0, H); sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,.45)'); g.fillStyle = sh; g.fillRect(0, 0, W, H);
-    const tint = { desert: '224,160,64', snow: '225,236,255', swamp: '70,90,40', lava: '200,70,20' }[biome]; if (tint) { g.fillStyle = `rgba(${tint},.34)`; g.fillRect(0, 0, W, H); }
-    const url = c.toDataURL('image/jpeg', 0.82); prevCache[ck] = { url, full }; return url;
+    const full = !!(Assets.get('terrain/grass') && Assets.get('terrain/water'));
+    let url = '';
+    try {
+      const mp = genMap(20260 + kind0.length * 31 + (biome ? biome.length * 7 : 0), ['necropolis'], 'normal', { preset: kind0, size: 'small', biome: biome || 'mixed' });
+      const PW = (mp.W + 0.5) * 32, PH = mp.H * RH + HR * 0.5, big = document.createElement('canvas'); big.width = Math.ceil(PW); big.height = Math.ceil(PH);
+      const bc = big.getContext('2d'), GF = { W: mp.W, H: mp.H, tiles: mp.tiles, biome: mp.biome, river: mp.river, zone: mp.zone, objs: mp.objs };
+      for (let y = 0; y < mp.H; y++) for (let x = 0; x < mp.W; x++) Art.tile(bc, mp.tiles[y][x], x, y, GF);
+      for (let y = 0; y < mp.H; y++) for (let x = 0; x < mp.W; x++) Art.tileOverlay(bc, mp.tiles[y][x], x, y, GF);
+      for (const o of mp.objs.slice().sort((p, q) => p.y - q.y)) {
+        if (!['town', 'mine', 'fort', 'lair', 'tower', 'shrine', 'chest'].includes(o.t)) continue;
+        const spr = Art.obj(o, o.fac); if (!spr) continue; const px = (o.x + 0.5 + (o.y & 1) * 0.5) * 32, py = o.y * RH + HR, sz = o.t === 'town' ? 58 : 36;
+        bc.drawImage(spr, px - sz / 2, py - sz * 0.62, sz, sz);
+      }
+      const W2 = 360, H2 = Math.round(W2 * PH / PW), c = document.createElement('canvas'); c.width = W2; c.height = H2; const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(big, 0, 0, W2, H2);
+      const sh = g.createLinearGradient(0, H2 * 0.6, 0, H2); sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,.4)'); g.fillStyle = sh; g.fillRect(0, 0, W2, H2);
+      url = c.toDataURL('image/jpeg', 0.84);
+    } catch (e) { url = ''; }
+    prevCache[ck] = { url, full }; return url;
   }
   const facBanner = (k) => { const h = Art.facHue(k); return h === null ? '#6b4f24' : `hsl(${h},48%,30%)`; };
   const goalLine = (g) => g.type === 'gold' ? `Hold <b>${g.n.toLocaleString()}</b> gold before day ${g.days}` : g.type === 'towns' ? `Own <b>${g.n}</b> towns before day ${g.days}` : g.type === 'survive' ? `Hold a town until <b>day ${g.days}</b>` : 'Defeat every rival realm';

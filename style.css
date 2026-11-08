@@ -441,4 +441,15 @@ body.skin .seg button { border-radius: 0; }
 .scnpan .mprev { margin-bottom: 8px; } .scnb { margin: 6px 0 0; font-size: 14px; line-height: 1.4; text-align: left; }
 .scngoal { text-align: left; background: #0f0a05; border: 1px solid var(--gold-d); border-radius: 8px; padding: 8px 10px; font-size: 14px; }
 .col .main2 { padding: 11px 46px; font-size: 18px; }
-@media (min-width: 761px) { #date { white-space: normal; line-height: 1.25; max-width: 360px; min-width: 0; } }
+
+/* date block */
+#date { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; white-space: normal; max-width: none; color: var(--txt); }
+.dtIco { font-size: 26px; filter: drop-shadow(0 1px 3px #000); }
+.dtMain { display: flex; flex-direction: column; line-height: 1.05; }
+.dtMain small { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--mut); }
+.dtMain b { font-size: 22px; color: var(--gold); text-shadow: 0 1px 0 #000, 0 0 10px rgba(230, 191, 85, .35); font-weight: 700; }
+.dtTurn { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--mut); text-align: center; line-height: 1.1; padding: 2px 8px; border-left: 1px solid #5a4423; border-right: 1px solid #5a4423; }
+.dtTurn b { font-size: 15px; color: var(--txt); letter-spacing: 0; }
+.dtDiff, .dtGoal { font-size: 12px; border: 1px solid #5a4423; background: rgba(0, 0, 0, .35); border-radius: 12px; padding: 2px 9px; white-space: nowrap; }
+.dtGoal { color: #f1d98a; border-color: var(--gold-d); max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 760px) { .dtIco { font-size: 18px; } .dtMain b { font-size: 15px; } .dtMain small { font-size: 9px; } .dtTurn { display: none; } .dtDiff, .dtGoal { font-size: 10px; padding: 1px 6px; } }

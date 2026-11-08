@@ -1089,7 +1089,7 @@
       }
     }
     const before0 = armyCount(h), th0 = threatOfDef(guard), slain0 = guard.filter(Boolean).reduce((p, a) => p + a.n, 0);
-    const res = await Battle.run({ hero: { att: eff(h, 'att'), def: eff(h, 'def'), sp: eff(h, 'sp'), mana: h.mana, spells: G.spells, perks: perksOf(h), name: h.name, icon: h.icon, pid: h.pid, morale: heroMorale(h), luck: heroLuck(h) },
+    const res = await Battle.run({ hero: { att: eff(h, 'att'), def: eff(h, 'def'), sp: eff(h, 'sp'), mana: h.mana, spells: G.spells, perks: perksOf(h), name: h.name, icon: h.icon, pid: h.pid, mach: h.mach || {}, morale: heroMorale(h), luck: heroLuck(h) },
       army: h.army, enemy: guard.filter(Boolean).map(a => ({ ...a })), eStats, eHero, title, siege, terrain: battleTerrain(h), canRetreat: true });
     h.mana = res.mana; h.buff = null;
     if (res.win) {
@@ -1398,6 +1398,7 @@
     return null;
   }
 
+  const MACHINES = [['ballista', 'Ballista', 2500], ['tent', 'First aid tent', 800], ['cart', 'Ammo cart', 1000]];
   function openTown(t) {
     t = t || (curTown && curTown.owner === 0 ? curTown : defaultTown());
     if (!t) return toast('You do not own a town.');
@@ -1447,11 +1448,14 @@
       <div class="trow big"><div class="ic">${TownArt.pic('tavern', 1, t.fac, 64)}</div><div><b>Tavern</b><br><span class="small">Heroes ${G.heroes.length}/${MAX_HEROES}. Hire more heroes and exchange troops between heroes in town.</span></div>
         <div class="acts"><button data-tavern="1">Hire heroes</button>${heroesAt(t.x, t.y).length > 1 ? '<button data-xhero="1">Exchange troops</button>' : ''}</div></div>
       `;
+    const smithy = `<div class="trow big"><div class="ic"><span class="mico">⚒️</span></div><div><b>Smithy</b><br><span class="small">${here ? `War machines for ${th.name}: the <b>ballista</b> shoots every round, the <b>first aid tent</b> heals a stack every round and the <b>ammo cart</b> gives your archers 50% more arrows and refills one arrow a round.` : 'A hero must be in town to buy war machines.'}</span></div>
+        <div class="acts">${here ? MACHINES.map(([k, nm, cost]) => (th.mach || {})[k] ? `<span class="small">✔ ${nm}</span>` : `<button data-mach="${k}" title="${nm}">${nm} ${RES_ICON.gold}${cost}</button>`).join('') : ''}</div></div>
+      `;
     const garrRow = `      <div class="trow big"><div class="ic">${TownArt.pic('garrison', 1, t.fac, 64)}</div><div><b>Garrison</b><br><span class="small">${armyList(t.garrison, false) || 'No troops stationed.'} The garrison defends the town when no hero is inside${here ? '' : ' (bring a hero to move troops)'}.</span></div>
         <div class="acts"><button data-garr="1">Manage garrison</button></div></div>
 `;
     const tabBar = `<div class="ttabs"><button class="ttab${townTab === 'war' ? ' on' : ''}" data-ttab="war">⚔️ Warriors</button><button class="ttab${townTab === 'bld' ? ' on' : ''}" data-ttab="bld">🏗️ Buildings</button></div>`;
-    html += tabBar + (townTab === 'war' ? war + garrRow + outpostHtml(t) + caravanHtml(t, mt) : garrRow + bld) + `<div class="small" style="margin-top:8px">${RES.map(k => RES_ICON[k] + ' ' + G.res[k]).join('  ')}</div>
+    html += tabBar + (townTab === 'war' ? war + garrRow + outpostHtml(t) + caravanHtml(t, mt) : garrRow + bld + smithy) + `<div class="small" style="margin-top:8px">${RES.map(k => RES_ICON[k] + ' ' + G.res[k]).join('  ')}</div>
       <div class="mb"><button class="primary" id="tClose">Leave town</button></div>`;
     $('mbox').innerHTML = html; $('modal').classList.remove('hide');
     if (!townLoop) { townLoop = true; requestAnimationFrame(drawTown); }
@@ -1541,6 +1545,7 @@
       toast(`A boat is launched at (${spot.x}, ${spot.y}). Walk a hero onto it to sail.`); again();
     });
     q('[data-trade]', b => b.onclick = () => openMarket(MARKET_RATE + ((G.wk && G.wk.rateBonus) || 0), 'Merchant Row', true));
+    q('[data-mach]', b => b.onclick = () => { const k = b.dataset.mach, mm = MACHINES.find(x => x[0] === k); if (!th || G.res.gold < mm[2]) return toast('Not enough gold.'); G.res.gold -= mm[2]; (th.mach = th.mach || {})[k] = 1; sfx('build'); toast(`${mm[1]} bought for ${th.name}.`); again(); });
     q('[data-tavern]', b => b.onclick = openTavern);
     q('[data-xhero]', b => b.onclick = () => {
       const hs = heroesAt(t.x, t.y), a = hs[0], c2 = hs[1];

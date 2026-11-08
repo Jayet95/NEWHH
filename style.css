@@ -636,3 +636,13 @@ body.th-dungeon .skyD, body.th-dungeon .skyN { animation: ghostPulse2 4s ease-in
 @keyframes ghostPulse2 { 50% { filter: drop-shadow(0 0 12px rgba(176, 90, 255, .75)); } }
 
 body.th-inferno, body.th-necropolis, body.th-dungeon, body.th-fortress { --fibre: none; }
+
+/* turn-your-phone prompt shown in battle */
+#rotate { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: rgba(6, 4, 2, .94); text-align: center; padding: 24px; }
+#rotate.hide { display: none !important; }
+.rotbox { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 320px; color: var(--txt); }
+.rotbox b { font-family: var(--f-head); font-size: 24px; color: var(--gold); letter-spacing: 1px; text-transform: uppercase; }
+.rotbox span { font-family: var(--f-flav); font-size: 17px; opacity: .9; }
+.rotico { width: 96px; height: 96px; color: var(--gold); animation: rotPhone 2.2s ease-in-out infinite; transform-origin: 50% 50%; }
+@keyframes rotPhone { 0%, 20% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+.rotbox button { margin-top: 10px; font-size: 13px; opacity: .8; }

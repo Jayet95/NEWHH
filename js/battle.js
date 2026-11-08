@@ -328,7 +328,8 @@ const Battle = (() => {
     if (B.round > 60) { log('Stalemate — the attackers withdraw.'); finish(false, false); return; }
     for (const s of alive()) { s.ret = true; s.waited = false; }
     B.queue = alive().sort((a, b) => speedOf(b) - speedOf(a) || a.side - b.side);
-    B.waitQ = []; B.strikeUsed = false; B.mineUsed = false;
+    if (B.mach && B.mach.cart) for (const s of alive(0)) if (C[s.t].shoot && s.ammo < s.ammoMax) s.ammo++;
+    B.waitQ = []; B.strikeUsed = false; B.mineUsed = false; B.balUsed = false; B.tentUsed = false;
     log(`— Round ${B.round} —`);
     if (B.siege) {
       for (let i = 0; i < 2; i++) {
@@ -446,6 +447,8 @@ const Battle = (() => {
     const s = B.cur, t = stackAt(h.c, h.r);
     if (B.spell === '__mine') { layMine(h); return; }
     if (B.spell === '__strike') { heroStrike(t); return; }
+    if (B.spell === '__ballista') { fireBallista(t); return; }
+    if (B.spell === '__tent') { firstAid(t); return; }
     if (B.spell) { castSpell(B.spell, t); return; }
     const st = structAt(h.c, h.r);
     if (st && isAttacker(s)) {
@@ -472,7 +475,8 @@ const Battle = (() => {
     if (!B || B.over || !B.input || B.busy || !B.cur || B.cur.side !== 0 || !h || typeof Art === 'undefined' || !Art.cursor) return '';
     const s = B.cur, t = stackAt(h.c, h.r);
     if (B.spell === '__mine') return Art.cursor('boot');
-    if (B.spell === '__strike') return t && t.side === 1 ? Art.cursor('sword') : Art.cursor('no');
+    if (B.spell === '__strike' || B.spell === '__ballista') return t && t.side === 1 ? Art.cursor(B.spell === '__ballista' ? 'arrow' : 'sword') : Art.cursor('no');
+    if (B.spell === '__tent') return t && t.side === 0 ? Art.cursor('wand') : Art.cursor('no');
     if (B.spell) return t && (SPELLS[B.spell].tgt === 'enemy') === (t.side === 1) ? Art.cursor('wand') : Art.cursor('no');
     const st = structAt(h.c, h.r);
     if (st && isAttacker(s)) return C[s.t].shoot && s.ammo > 0 ? Art.cursor('arrow') : spotNear(s, h.c, h.r, B.reach) ? Art.cursor('sword') : Art.cursor('no');
@@ -535,6 +539,24 @@ const Battle = (() => {
     refreshButtons();
     if (!checkEnd()) { /* spell does not end the turn */ }
   }
+  // war machines (bought in the town smithy): the ballista shoots once a round, the first aid tent heals one stack a round, the ammo cart gives archers 50% more arrows
+  function fireBallista(t) {
+    if (!t || t.side !== 1) return toast('Pick an enemy stack.');
+    if (B.balUsed) return toast('The ballista already fired this round.');
+    B.balUsed = true; B.spell = null;
+    const dmg = Math.floor((10 + 3 * B.hero.att) * (1 + 0.2 * perk('ballistics')));
+    B.shot = { ax: HERO_POS[0].x + 14, ay: HERO_POS[0].y + 30, b: { c: t.c, r: t.r }, t0: performance.now(), col: '#d9c07a' };
+    hit(t, dmg, 'The ballista fires');
+    refreshButtons();
+  }
+  function firstAid(t) {
+    if (!t || t.side !== 0) return toast('Pick one of your own stacks.');
+    if (B.tentUsed) return toast('The first aid tent already worked this round.');
+    const g = healStack(t, 40 + 12 * B.hero.sp, t.maxN);
+    if (g <= 0) return toast('That stack is unhurt.');
+    B.tentUsed = true; B.spell = null; { const p = hexPx(t.c, t.r); B.fx.push({ x: p.x, y: p.y - 20, txt: '+' + Math.round(g), col: '#7dff9a', t0: performance.now() }); } log('The first aid tent patches up ' + C[t.t].n + '.');
+    refreshButtons();
+  }
   function heroStrike(t) {
     if (!t || t.side !== 1) return toast('Pick an enemy stack.');
     if (B.strikeUsed) return toast('The hero already struck this round.');
@@ -553,6 +575,9 @@ const Battle = (() => {
     $('bDef').disabled = !mine;
     $('bSpell').disabled = !mine || B.castUsed || !B.hero.spells.length || B.hero.mana < 5;
     $('bHero').disabled = !mine || B.strikeUsed;
+    const mc = (B.hero && B.hero.mach) || {};
+    $('bBal').classList.toggle('hide', !mc.ballista); $('bBal').disabled = !mine || B.balUsed;
+    $('bTent').classList.toggle('hide', !mc.tent); $('bTent').disabled = !mine || B.tentUsed;
     const canMine = !!B.siege && B.siege.dside === 0 && B.mineReserve > 0;
     $('bMine').classList.toggle('hide', !canMine); $('bMine').disabled = !mine || B.mineUsed; $('bMine').textContent = `💣 Lay mine (${B.mineReserve || 0})`;
     $('bFlee').disabled = !B.canRetreat;
@@ -589,6 +614,8 @@ const Battle = (() => {
     $('bWait').onclick = () => B && B.cur && !B.cur.waited && playerAct(async () => { B.cur.waited = true; B.waitQ.push(B.cur); log(`${C[B.cur.t].n} waits.`); });
     $('bDef').onclick = () => B && playerAct(async () => { B.cur.defb = true; log(`${C[B.cur.t].n} defends.`); });
     $('bSpell').onclick = () => B && B.input && openSpells();
+    $('bBal').onclick = () => { if (B && B.input && !B.balUsed) { B.spell = '__ballista'; toast('Ballista: pick an enemy stack'); } };
+    $('bTent').onclick = () => { if (B && B.input && !B.tentUsed) { B.spell = '__tent'; toast('First aid: pick one of your stacks'); } };
     $('bHero').onclick = () => { if (B && B.input && !B.strikeUsed) { B.spell = '__strike'; toast('Hero Strike: pick an enemy stack'); } };
     $('bMine').onclick = () => { if (B && B.input && B.siege && B.mineReserve > 0 && !B.mineUsed) { B.spell = '__mine'; toast('Lay a mine: pick free ground in front of the walls'); } };
     $('bAuto').onclick = () => {
@@ -620,6 +647,17 @@ const Battle = (() => {
   }
   // painted battlefield backdrop chosen by where the fight happens (terrain) or who defends (inferno = lava, undead/dungeon = swamp)
   function bgName() { const t = (B.opts || {}).terrain; return { water: 'ship', sand: 'desert', desert: 'desert', snow: 'snow', swamp: 'swamp', lava: 'lava' }[t] || 'grass'; }
+  // phones: the battlefield is a landscape board, so ask the player to turn the phone (and lock landscape where the browser allows it)
+  function rotateHint(on) {
+    const el = document.getElementById('rotate'); if (!el) return;
+    const phone = window.innerWidth < 900 && (matchMedia('(pointer: coarse)').matches || window.innerWidth < 760);
+    const upd = () => { const portrait = innerHeight > innerWidth; el.classList.toggle('hide', !(on && phone && portrait && !el.dataset.skip)); };
+    if (on) { delete el.dataset.skip; try { if (phone && screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); } catch (e) { /* ignore */ } }
+    else { try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) { /* ignore */ } }
+    rotateHint.upd = on ? upd : null; upd();
+    const skip = document.getElementById('rotateSkip'); if (skip) skip.onclick = () => { el.dataset.skip = '1'; upd(); };
+  }
+  window.addEventListener('resize', () => { if (rotateHint.upd) rotateHint.upd(); }); window.addEventListener('orientationchange', () => setTimeout(() => { if (rotateHint.upd) rotateHint.upd(); }, 200));
   function buildBoard() {
     const bgi = typeof Assets !== 'undefined' ? Assets.get('battle/bg_' + bgName(), 'battle/bg_grass') : null;
     if (bgi) { const c = document.createElement('canvas'); c.width = 960; c.height = 640; const g = c.getContext('2d'), k = Math.max(960 / bgi.width, 640 / bgi.height), w = bgi.width * k, h = bgi.height * k; g.drawImage(bgi, (960 - w) / 2, (640 - h) / 2, w, h); B._bg = true; return c; }
@@ -731,6 +769,7 @@ const Battle = (() => {
         const g = ctx.createLinearGradient(0, by, 0, by + h); g.addColorStop(0, s.side === 0 ? '#3b6fc4' : '#c4473f'); g.addColorStop(1, s.side === 0 ? '#16305e' : '#5e1a16');
         ctx.beginPath(); ctx.roundRect ? ctx.roundRect(bx, by, w, h, 6) : ctx.rect(bx, by, w, h);
         ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#f3d27a'; ctx.stroke(); ctx.lineWidth = 1; ctx.strokeStyle = '#140a04'; ctx.stroke();
+        if (C[s.t].shoot) { const lowA = s.ammo <= 3; ctx.font = 'bold 11px Cinzel, Georgia, serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; const at = '➶ ' + s.ammo; ctx.lineWidth = 3; ctx.strokeStyle = '#140a04'; ctx.strokeText(at, bx + 2, by + h + 8); ctx.fillStyle = s.ammo === 0 ? '#ff6a5a' : lowA ? '#ffd24a' : '#e8e0c0'; ctx.fillText(at, bx + 2, by + h + 8); ctx.font = 'bold 15px Georgia, serif'; }
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = '#140a04'; ctx.strokeText(lab, bx + w / 2, by + h / 2 + 1);
         ctx.fillStyle = '#fff'; ctx.fillText(lab, bx + w / 2, by + h / 2 + 1); ctx.textBaseline = 'alphabetic';
       }
@@ -759,7 +798,7 @@ const Battle = (() => {
     }
     // spell / strike targeting hint
     if (B.spell && B.spell !== '__mine') {
-      const ally = B.spell !== '__strike' && SPELLS[B.spell].tgt === 'ally';
+      const ally = B.spell === '__tent' || (B.spell !== '__strike' && B.spell !== '__ballista' && SPELLS[B.spell].tgt === 'ally');
       for (const s of alive(ally ? 0 : 1)) { const p = hexPx(s.c, s.r); hexPath(p.x, p.y, HR - 3); ctx.strokeStyle = ally ? 'rgba(120,255,170,.95)' : 'rgba(255,200,80,.95)'; ctx.lineWidth = 3; ctx.stroke(); }
     }
     drawQueue();
@@ -900,7 +939,7 @@ const Battle = (() => {
         : win ? `<h2>🏆 Victory!</h2><p>Your forces lost <b>${lost}</b> creatures.</p><p>Experience gained: <b>${res.xp}</b></p>`
           : '<h2>💀 Defeat</h2><p>Your army has been destroyed. The hero retreats to town.</p>';
       if (win) await window.showModal(html, ['Continue']);
-      document.body.classList.remove('inbattle');
+      document.body.classList.remove('inbattle'); rotateHint(false);
       B.resolve(res);
       B = null;
     }, 400);
@@ -921,7 +960,7 @@ const Battle = (() => {
     cv = $('bat'); ctx = cv.getContext('2d'); bind(); if (typeof Sfx !== 'undefined') Sfx.mood('battle');
     return new Promise(resolve => {
       const hero = { att: opts.hero.att, def: opts.hero.def, sp: opts.hero.sp, mana: opts.hero.mana, spells: opts.hero.spells || [],
-        perks: opts.hero.perks || {}, name: opts.hero.name || 'Hero', icon: opts.hero.icon || '🛡️', pid: opts.hero.pid, morale: opts.hero.morale || 0, luck: opts.hero.luck || 0 };
+        perks: opts.hero.perks || {}, mach: opts.hero.mach || {}, name: opts.hero.name || 'Hero', icon: opts.hero.icon || '🛡️', pid: opts.hero.pid, morale: opts.hero.morale || 0, luck: opts.hero.luck || 0 };
       B = { eHero: opts.eHero || null, heroFlash: null, strikeUsed: false, siege: null, walls: new Map(), moat: new Set(), cw: 0, stacks: [], obs: new Map(), queue: [], waitQ: [], cur: null, round: 0, reach: new Map(), busy: false, input: false, auto: false, over: false,
         spell: null, castUsed: false, hover: null, fx: [], shot: null, xp: 0, hero, eStats: opts.eStats || { att: 0, def: 0 },
         opts, armyIn: opts.army.map(a => a && { ...a }), canRetreat: opts.canRetreat !== false, resolve };
@@ -930,7 +969,7 @@ const Battle = (() => {
         items.forEach((it, k) => {
           const r = Math.round((k + 0.5) * BH / items.length - 0.5), c = side === 0 ? 0 : BW - 1;
           const p = hexPx(c, r);
-          B.stacks.push({ t: it.a.t, n: it.a.n, hp: C[it.a.t].hp, side, c, r, slot: it.slot, ammo: C[it.a.t].shoot || 0, px: p.x, py: p.y, ret: true, maxN: it.a.n });
+          B.stacks.push({ t: it.a.t, n: it.a.n, hp: C[it.a.t].hp, side, c, r, slot: it.slot, ammo: Math.ceil((C[it.a.t].shoot || 0) * (side === 0 && opts.hero.mach && opts.hero.mach.cart ? 1.5 : 1)), ammoMax: Math.ceil((C[it.a.t].shoot || 0) * (side === 0 && opts.hero.mach && opts.hero.mach.cart ? 1.5 : 1)), px: p.x, py: p.y, ret: true, maxN: it.a.n });
         });
       };
       mk(0, opts.army); mk(1, opts.enemy);
@@ -944,7 +983,7 @@ const Battle = (() => {
       }
       placeMines();
       $('blog').innerHTML = ''; $('btitle').textContent = opts.title || 'Battle';
-      document.body.classList.add('inbattle');
+      document.body.classList.add('inbattle'); rotateHint(true);
       log(opts.siege ? (opts.siege.dside === 1 ? '🏰 Siege! Break the gate, cross the drawbridge, beware the towers.' : '🏰 The castle is under siege — hold the walls!') : 'Battle begins!');
       refreshButtons();
       requestAnimationFrame(draw);

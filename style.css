@@ -849,3 +849,6 @@ h2 .gi { width: 1.1em; height: 1.1em; }
   body.inbattle #spells:not(.hide) { position: fixed !important; left: var(--sal); top: var(--sat); right: calc(150px + var(--sar)); bottom: var(--sab); z-index: 60; display: grid !important; grid-template-columns: repeat(3, 1fr); gap: 6px; align-content: start; padding: 8px; background: var(--grain), linear-gradient(rgba(30, 20, 12, .97), rgba(12, 8, 4, .98)); border: 2px solid var(--edge); border-radius: 10px; overflow-y: auto; max-height: none !important; }
   body.inbattle #spells button { text-align: left !important; white-space: normal !important; font-size: 11px !important; line-height: 1.15; min-height: 40px !important; padding: 4px 6px !important; display: flex; align-items: center; gap: 4px; }
 }
+#army .slot { touch-action: none; -webkit-user-select: none; user-select: none; }
+#army .slot.lifted { opacity: .35; } #army .slot.drop { outline: 2px dashed var(--gold); background: rgba(230, 191, 85, .18); }
+#army .slot .pic, #army .slot img { pointer-events: none; }

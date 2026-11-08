@@ -598,11 +598,37 @@
       const b = document.createElement('button');
       b.className = 'slot' + (a ? '' : ' empty') + (i === selSlot ? ' sel' : '');
       if (a) { const c = C[a.t]; b.innerHTML = `${Art.pic(a.t, 44)}<small>${a.n}${c.lv > 1 ? ' ' + '★'.repeat(c.lv - 1) : ''}</small>`; b.title = `${c.n} — ${Art.rarity(a.t).n}\nAtt ${c.a} Def ${c.d} Dmg ${c.lo}-${c.hi} HP ${c.hp} Spd ${c.s}${c.shoot ? '\nArcher' : ''}${c.fly ? '\nFlying' : ''}`; }
-      b.onclick = () => slotClick(i);
+      b.dataset.i = i; b.draggable = false;
+      b.onclick = () => { if (armyDragged) return; slotClick(i); };
+      armyDrag(b, i);
       el.appendChild(b);
     });
-    const sw = document.createElement('div'); sw.className = 'small'; sw.style.gridColumn = '1/-1'; sw.textContent = 'Click two slots to swap / merge.'; el.appendChild(sw);
+    const sw = document.createElement('div'); sw.className = 'small'; sw.style.gridColumn = '1/-1'; sw.textContent = 'Drag a stack onto another slot — or tap two slots — to move, merge or swap.'; el.appendChild(sw);
+    if (selSlot >= 0 && h.army[selSlot] && h.army[selSlot].n > 1 && h.army.some(x => !x)) { const a = h.army[selSlot], sp = document.createElement('button'); sp.style.gridColumn = '1/-1'; sp.className = 'splitb'; sp.textContent = `✂ Split ${Math.floor(a.n / 2)} into a new stack`; sp.onclick = () => { const e = h.army.findIndex(x => !x), k = Math.floor(a.n / 2); h.army[e] = { t: a.t, n: k }; a.n -= k; selSlot = -1; sfx('click'); renderAll(); }; el.appendChild(sp); }
     if (selSlot >= 0 && h.army[selSlot]) { const a = h.army[selSlot], db = document.createElement('button'); db.className = 'danger disb'; db.style.gridColumn = '1/-1'; db.textContent = `🗑 Disband ${a.n} ${C[a.t].n}`; db.onclick = () => disbandSlot(h.army, selSlot, a.n, db); el.appendChild(db); }
+  }
+  // drag a stack with finger or mouse onto another slot: empty = move, same creature = merge, other = swap
+  let armyDragged = false;
+  function armyDrag(b, i) {
+    let d = null, ghost = null;
+    const slotAt = (x, y) => { const el = document.elementFromPoint(x, y), s = el && el.closest ? el.closest('#army .slot') : null; return s && s.dataset.i !== undefined ? s : null; };
+    const clear = () => document.querySelectorAll('#army .slot.drop').forEach(e => e.classList.remove('drop'));
+    b.onpointerdown = (e) => { if (!G.hero.army[i]) return; d = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId }; try { b.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } };
+    b.onpointermove = (e) => {
+      if (!d || d.id !== e.pointerId) return;
+      if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 9) { d.moved = true; ghost = document.createElement('div'); ghost.className = 'dragghost'; ghost.innerHTML = b.innerHTML; document.body.appendChild(ghost); b.classList.add('lifted'); }
+      if (d.moved) { ghost.style.left = e.clientX + 'px'; ghost.style.top = e.clientY + 'px'; clear(); const t = slotAt(e.clientX, e.clientY); if (t) t.classList.add('drop'); }
+    };
+    const finish = (e, cancel) => {
+      if (!d || d.id !== e.pointerId) return; const was = d; d = null; if (ghost) { ghost.remove(); ghost = null; } clear(); b.classList.remove('lifted');
+      if (!was.moved) return;
+      armyDragged = true; setTimeout(() => { armyDragged = false; }, 80);
+      const t = cancel ? null : slotAt(e.clientX, e.clientY); if (!t) return; const j = +t.dataset.i; if (j === i) return;
+      const a = G.hero.army, src = a[i]; if (!src) return;
+      if (a[j] && a[j].t === src.t) { a[j].n += src.n; a[i] = null; } else { a[i] = a[j]; a[j] = src; }
+      selSlot = -1; sfx('click'); renderAll();
+    };
+    b.onpointerup = (e) => finish(e, false); b.onpointercancel = (e) => finish(e, true);
   }
   // release creatures from the army for good (two clicks to confirm); a hero always keeps at least one creature
   function disbandSlot(arr, i, n, btn, after) {

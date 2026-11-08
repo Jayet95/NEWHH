@@ -739,8 +739,9 @@ const Battle = (() => {
         if (inside) { ctx.fillStyle = 'rgba(170,130,80,.30)'; ctx.fill(); }
         if (B.moat.has(k)) { ctx.fillStyle = 'rgba(40,120,200,.65)'; ctx.fill(); }
       }
-      if (input && B.reach.has(k) && !B.spell) { ctx.fillStyle = 'rgba(120,255,120,.22)'; ctx.fill(); }
-      ctx.strokeStyle = B._board ? 'rgba(0,0,0,.22)' : 'rgba(0,0,0,.35)'; ctx.lineWidth = 1; ctx.stroke();
+      const walk = input && B.reach.has(k) && !B.spell && B.reach.get(k).d > 0;
+      if (walk) { ctx.fillStyle = 'rgba(255, 236, 150, .30)'; ctx.fill(); }
+      ctx.strokeStyle = walk ? 'rgba(255, 224, 110, .95)' : B._board ? 'rgba(0,0,0,.22)' : 'rgba(0,0,0,.35)'; ctx.lineWidth = walk ? 2 : 1; ctx.stroke();
       if (B.obs.has(k)) { const oe = B.obs.get(k), oi = typeof Assets !== 'undefined' ? Assets.get(oe === '🌲' ? 'terrain/forest_overlay' : (oe === '🪨' || oe === '⛰️') ? 'terrain/mountain_overlay' : '') : null; if (oi) sprite(oi, p.x, p.y, oe === '🌲' ? 44 : 40); else { ctx.fillStyle = '#fff'; emoji(oe, p.x, p.y, 30); } }
       if (B.siege && B.moat.has(k) && (!B._board || B._bg)) { ctx.fillStyle = 'rgba(255,255,255,.5)'; emoji('≈', p.x, p.y, 20); }
       if (B.siege && B.mines && B.mines.has(k) && B.siege.dside === 0) { const mi = typeof Assets !== 'undefined' ? Assets.get('battle/mine_dormant') : null; if (mi) sprite(mi, p.x, p.y + 6, 34); else { ctx.fillStyle = '#fff'; emoji('💣', p.x, p.y + 2, 18); } }

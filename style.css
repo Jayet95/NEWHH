@@ -852,3 +852,18 @@ h2 .gi { width: 1.1em; height: 1.1em; }
 #army .slot { touch-action: none; -webkit-user-select: none; user-select: none; }
 #army .slot.lifted { opacity: .35; } #army .slot.drop { outline: 2px dashed var(--gold); background: rgba(230, 191, 85, .18); }
 #army .slot .pic, #army .slot img { pointer-events: none; }
+
+/* ---------- town buildings as picture cards ---------- */
+.bgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin-bottom: 6px; }
+.bcard { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 12px; background: var(--grain), linear-gradient(#2a1d12, #1a1209); border: 2px solid #4a381c; box-shadow: inset 0 0 0 1px #000, inset 0 0 0 3px rgba(140, 106, 51, .2), 0 3px 8px rgba(0, 0, 0, .45); }
+.bcard.built { border-color: var(--gold-d); }
+.bcard.lockedrow { filter: saturate(.45); opacity: .62; }
+.bpic { position: relative; height: 134px; border-radius: 9px; overflow: hidden; display: flex; align-items: flex-end; justify-content: center; border: 1px solid #000; box-shadow: inset 0 0 14px rgba(0, 0, 0, .5); background: linear-gradient(#6d93c4 0%, #a9c9de 52%, #5f7a3a 53%, #36481f 100%); }
+.bpic img.pic { width: auto !important; height: 126px !important; max-width: 94%; object-fit: contain; filter: drop-shadow(0 4px 4px rgba(0, 0, 0, .55)); }
+.bpic .mico { font-size: 60px; }
+.bcr { position: absolute; right: 4px; top: 4px; } .bcr .pic { width: 34px !important; height: 34px !important; border: 2px solid var(--gold); border-radius: 50%; box-shadow: 0 2px 5px #000; }
+.bcard > div:nth-child(2) { flex: 1; font-size: 13px; line-height: 1.35; } .bcard b { font-family: var(--f-head); color: var(--gold); font-size: 15px; }
+.bacts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; } .bacts button { flex: 1 1 auto; } .bacts .small { align-self: center; }
+@media (orientation: landscape) and (max-height: 540px) { .bgrid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; } .bpic { height: 84px; } .bpic img.pic { height: 78px !important; } .bcard { padding: 5px; gap: 4px; } .bcard > div:nth-child(2) { font-size: 11px; } .bcard b { font-size: 13px; } }
+@media (max-width: 420px) { .bgrid { grid-template-columns: 1fr 1fr; gap: 6px; } .bpic { height: 96px; } .bpic img.pic { height: 90px !important; } .bcard { padding: 5px; } .bcard > div:nth-child(2) { font-size: 11px; } }
+.bpic .bcr img.pic { width: 34px !important; height: 34px !important; max-width: none; object-fit: cover; filter: none; border-radius: 50%; }

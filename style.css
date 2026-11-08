@@ -349,7 +349,7 @@ body.skin button:not(.slot):not(.htile):not(.hbtn):not(.swatch):not(.seg button)
 body.skin button.primary:not(.slot):not(.seg button):not(#zoomctl button) { border-image-source: url(art/ui/btn_pressed.webp) !important; color: #2a1a06 !important; text-shadow: 0 1px 0 rgba(255, 240, 190, .5); font-weight: bold; }
 body.skin button:disabled { border-image-source: url(art/ui/btn_disabled.webp) !important; color: #9a9a9a; opacity: .75; }
 body.skin button:hover:not(:disabled):not(.slot):not(.seg button) { filter: brightness(1.18); }
-body.skin #top { border: 16px solid transparent; border-image: url(art/ui/topbar.webp) 38 fill / 16px stretch; background: none; box-shadow: none; }
+body.skin #top { border: 16px solid transparent; border-image: none; background: none; box-shadow: none; position: relative; }
 body.skin #mres { border: 12px solid transparent; border-image: url(art/ui/frame_toolbar.webp) 26 fill / 12px stretch; background: none; box-shadow: none; }
 body.skin #mbox { border: 22px solid transparent; border-image: url(art/ui/frame_scroll.webp) 90 / 22px stretch; background-clip: padding-box; box-shadow: 0 10px 40px rgba(0, 0, 0, .8); }
 body.skin #zoomctl button { border: 0; background: url(art/ui/frame_command.webp) center / 100% 100% no-repeat; box-shadow: none; color: #f3e7c6; font-size: 20px; text-shadow: 0 1px 2px #000; }
@@ -459,8 +459,6 @@ body.th-light { --gold: #ffd766; --gold-d: #c9a23a; --edge: #7f9cc6; --edge-l: #
 html:has(body.th-light), body.th-light { background: radial-gradient(ellipse at 50% -10%, #5d7fb0 0%, #1d2c46 75%) fixed; }
 body.th-dark { --gold: #ff8a45; --gold-d: #a84a1c; --edge: #6e2323; --edge-l: #a63535; --panel: #130d0d; --panel2: #1d1313; --txt: #eadada; --mut: #a88e8e; --shadow: 0 4px 16px rgba(0, 0, 0, .8); }
 html:has(body.th-dark), body.th-dark { background: radial-gradient(ellipse at 50% -10%, #3a1212 0%, #050303 72%) fixed; }
-body.skin.th-light #top { border-image-source: url(art/ui/topbar_light.webp); }
-body.skin.th-dark #top { border-image-source: url(art/ui/topbar_dark.webp); }
 body.th-light .dtMain b, body.th-light #hero h3, body.th-light #batui h3 { text-shadow: 0 1px 0 rgba(0, 0, 0, .55); }
 body.th-light #top { color: #fff; }
 body.th-dark .dtIco { filter: drop-shadow(0 0 6px #ff5a1a); }
@@ -471,3 +469,17 @@ body.aiturn #top::after { content: "Rivals are moving…"; position: absolute; l
 
 /* minimap frame */
 #mini { image-rendering: auto; border: 3px solid var(--edge-l); border-radius: 10px; box-shadow: var(--shadow), inset 0 0 0 1px #000, 0 0 0 2px #140e07; touch-action: none; cursor: crosshair; }
+
+/* ---------- day and night: the top bar crossfades between a bright day frame and a dark night frame, the sun gives way to the moon ---------- */
+.sky { display: none; }
+body.skin .sky { display: block; position: absolute; inset: -16px; border: 16px solid transparent; pointer-events: none; z-index: 0; transition: opacity 1.8s ease; }
+body.skin .skyD { border-image: url(art/ui/topbar_day.webp) 38 fill / 16px stretch; opacity: 1; }
+body.skin .skyN { border-image: url(art/ui/topbar_night.webp) 38 fill / 16px stretch; opacity: 0; }
+body.skin.night .skyD { opacity: 0; } body.skin.night .skyN { opacity: 1; }
+body.skin #top > :not(.sky) { position: relative; z-index: 1; }
+#orb { position: relative; width: 34px; height: 34px; flex: none; overflow: hidden; border-radius: 50%; background: radial-gradient(circle, rgba(0,0,0,.28), rgba(0,0,0,0) 70%); }
+#orb b { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 26px; filter: drop-shadow(0 1px 3px #000); transition: transform 1.6s cubic-bezier(.5, 0, .3, 1), opacity 1.6s; }
+#orb .sun { transform: rotate(0) translateY(0); opacity: 1; } #orb .moon { transform: rotate(60deg) translateY(30px); opacity: 0; }
+body.night #orb .sun { transform: rotate(-60deg) translateY(-30px); opacity: 0; } body.night #orb .moon { transform: rotate(0) translateY(0); opacity: 1; }
+#stage::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 2; background: radial-gradient(ellipse at 50% 45%, rgba(20, 30, 90, .1), rgba(8, 14, 60, .42)); opacity: 0; transition: opacity 2.4s ease; mix-blend-mode: multiply; }
+body.night:not(.inbattle) #stage::after { opacity: 1; }

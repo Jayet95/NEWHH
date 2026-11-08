@@ -535,8 +535,9 @@
     $('res').innerHTML = resHtml; $('mres').innerHTML = resHtml; syncMres();
     $('income').innerHTML = `📈 ${RES.filter(k => gn[k]).map(k => `+${fmtN(gn[k])}${RES_ICON[k]}`).join(' ') || 'no income'}<small>/day</small>`;
     const d = G.day - 1;
+    document.body.classList.toggle('night', G.day % 2 === 0);
     { const gt = goalText(), mo = Math.floor(d / 28) + 1, wk = Math.floor(d % 28 / 7) + 1, dw = d % 7 + 1;
-      $('date').innerHTML = `<span class="dtIco">${G.day % 2 ? '☀️' : '🌙'}</span><span class="dtMain"><small>Month ${mo} · Week ${wk}</small><b>Day ${dw}</b></span><span class="dtTurn" title="Turns played">Turn<br><b>${G.day}</b></span><span class="dtDiff">${DF().icon} ${DF().name}</span>${gt ? `<span class="dtGoal" title="Scenario objective">🎯 ${gt}</span>` : ''}`; }
+      $('date').innerHTML = `<span class="dtMain"><small>Month ${mo} · Week ${wk}</small><b>Day ${dw}</b></span><span class="dtTurn" title="Turns played">Turn<br><b>${G.day}</b></span><span class="dtDiff">${DF().icon} ${DF().name}</span>${gt ? `<span class="dtGoal" title="Scenario objective">🎯 ${gt}</span>` : ''}`; }
     const h = G.hero;
     const ab = artBonus(h), plus = (v) => v ? ` <span class="bonus">(${v > 0 ? '+' : ''}${v})</span>` : '';
     const perkTxt = Object.keys(PERKS).filter(k => perk(h, k) > 0).map(k => `<span title="${PERKS[k].d}">${PERKS[k].i}${PERKS[k].n} ${RANK_NAMES[perk(h, k)]}${ab.sk[k] ? '*' : ''}</span>`).join(' · ');

@@ -2,7 +2,7 @@
 // Player preferences (stored in the browser): animation speed, volumes, UI size, left-handed layout, haptics, hints.
 const Settings = (() => {
   const KEY = 'h3js_settings_v1';
-  const def = { animSpeed: 1, sfxVol: 0.8, musicVol: 0.35, uiScale: 1, leftHand: false, haptics: true, confirmEnd: true, confirmDanger: true, showReach: true, hints: true, hintsSeen: {} };
+  const def = { animSpeed: 1, sfxVol: 0.8, musicVol: 0.35, uiScale: 1, leftHand: false, haptics: true, confirmEnd: true, confirmDanger: true, showReach: false, hints: true, hintsSeen: {} };
   let s = Object.assign({}, def);
   try { Object.assign(s, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { /* ignore */ }
   const S = {

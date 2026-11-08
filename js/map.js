@@ -306,8 +306,6 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
   const biome = []; { const BR = rng(seed ^ 0x5bd1e995), one = { desert: 1, snow: 2, swamp: 3, lava: 4 }[mo.biome], kinds = one ? [one] : [1, 2, 3, 4], span = Math.max(W, H), cs = []; const warp = noise(BR, W, H, 5 * fs);
     const nC = mo.biome === 'none' ? 0 : Math.max(3, Math.round(3 + sc * 1.6)); for (let i = 0; i < nC * 4 && cs.length < nC; i++) { const c = { x: Math.floor(BR() * W), y: Math.floor(BR() * H), k: kinds[(cs.length + Math.floor(BR() * 2)) % kinds.length], r: span * (0.14 + BR() * 0.12) * (one ? 1.5 : 1) }; if (Math.hypot(c.x - P.x, c.y - P.y) > Math.max(12, span * 0.38)) cs.push(c); }
     for (let y = 0; y < H; y++) { biome[y] = []; for (let x = 0; x < W; x++) { let best = 0, bd = 1e9; for (const c of cs) { const d = Math.hypot(c.x - x, (c.y - y) * 1.15) + (warp[y][x] - 0.5) * 7; if (d < c.r && d < bd) { bd = d; best = c.k; } } biome[y][x] = best; } } }
-  { const fp = new Set(); for (const o of objs) if (o.t === 'town') for (const [fx, fy] of townFootprint(o)) if (fx >= 0 && fy >= 0 && fx < W && fy < H) { fp.add(fy * W + fx); if (tiles[fy][fx] !== T.ROAD) tiles[fy][fx] = T.GRASS; }
-    for (let i = objs.length - 1; i >= 0; i--) { const o = objs[i]; if (o.t !== 'town' && fp.has(o.y * W + o.x)) objs.splice(i, 1); } }
   return { W, H, tiles, biome, river, objs, P, E, aiStarts, zone, dock };
 }
 
@@ -316,17 +314,9 @@ function zoneOwner(G, z) {
   return o ? o.owner : null;
 }
 
-// a town stands on four tiles: its own plus the east, south-east and south-west neighbours (all of them lead into the town)
-function townFootprint(o) { return hexNb(o.x, o.y).slice(0, 3); }
 function reindex(G) {
   G.omap = new Map();
   for (const o of G.objs) G.omap.set(o.y * G.W + o.x, o);
-  for (const o of G.objs) if (o.t === 'town') for (const [fx, fy] of townFootprint(o)) {
-    if (fx < 0 || fy < 0 || fx >= G.W || fy >= G.H) continue;
-    const t = G.tiles[fy][fx], k = fy * G.W + fx;
-    if (t === T.WATER || t === T.MOUNT || G.omap.has(k)) continue;
-    G.omap.set(k, o);
-  }
 }
 function objAt(G, x, y) { return G.omap.get(y * G.W + x); }
 

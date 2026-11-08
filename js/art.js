@@ -204,10 +204,12 @@ const Art = (() => {
   };
   const spriteCache = {};
   const contain = (g, img, w, h) => { const k = Math.min(w / img.width, h / img.height); g.drawImage(img, w / 2 - img.width * k / 2, h - img.height * k, img.width * k, img.height * k); };
+  // map objects without their own picture borrow a close one from the pack (replace by adding art/objects/<type>.webp)
+  const OBJ_ALIAS = { obelisk: 'stone', prison: 'tower', questgate: 'fort', keytent: 'merchant', gate: 'mono' };
   function obj(o, fac) {
     if (typeof Assets !== 'undefined') {
       const f2 = fac || o.fac || '', kd = o.kind ? '_' + o.kind : '';
-      const names = [...(o.t === 'dwelling' ? ['dwelling_' + (o.cid || (o.fac + o.tier))] : []), o.t + kd + (o.t === 'town' || o.t === 'dwelling' ? '_' + f2 : ''), o.t + kd, o.t].map(n => 'objects/' + n);
+      const names = [...(o.t === 'dwelling' ? ['dwelling_' + (o.cid || (o.fac + o.tier))] : []), o.t + kd + (o.t === 'town' || o.t === 'dwelling' ? '_' + f2 : ''), o.t + kd, o.t, ...(OBJ_ALIAS[o.t] ? [OBJ_ALIAS[o.t]] : [])].map(n => 'objects/' + n);
       const ai = Assets.get(...names);
       if (ai) return spriteCache['A|' + names[0]] || (spriteCache['A|' + names[0]] = mk(128, 128, (g) => contain(g, ai, 128, 128)));
     }

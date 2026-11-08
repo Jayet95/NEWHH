@@ -618,7 +618,15 @@ const Battle = (() => {
     const im = typeof Assets !== 'undefined' ? Assets.get(name) : null; if (!im) return texCache[k] = null;
     const c = document.createElement('canvas'); c.width = c.height = 256; c.getContext('2d').drawImage(im, im.width * crop[0], im.height * crop[1], im.width * crop[2], im.height * crop[3], 0, 0, 256, 256); return texCache[k] = c;
   }
+  // painted battlefield backdrop chosen by where the fight happens (terrain) or who defends (inferno = lava, undead/dungeon = swamp)
+  function bgName() {
+    const o = B.opts || {}, fac = String(((o.enemy || []).find(Boolean) || {}).t || '').replace(/d.*$/, '');
+    if (fac === 'inferno') return 'lava'; if (fac === 'necropolis' || fac === 'dungeon') return 'swamp';
+    return { water: 'ship', sand: 'desert', mount: 'snow' }[o.terrain] || 'grass';
+  }
   function buildBoard() {
+    const bgi = typeof Assets !== 'undefined' ? Assets.get('battle/bg_' + bgName(), 'battle/bg_grass') : null;
+    if (bgi) { const c = document.createElement('canvas'); c.width = 960; c.height = 640; const g = c.getContext('2d'), k = Math.max(960 / bgi.width, 640 / bgi.height), w = bgi.width * k, h = bgi.height * k; g.drawImage(bgi, (960 - w) / 2, (640 - h) / 2, w, h); B._bg = true; return c; }
     const grass = flatTex('battle/grass', [0.3, 0.26, 0.4, 0.2]), dirt = flatTex('battle/dirt', [0.3, 0.26, 0.4, 0.2]), water = flatTex('terrain/water', [0, 0, 1, 1]);
     if (!grass) return null;
     const c = document.createElement('canvas'); c.width = 960; c.height = 640; const g = c.getContext('2d');
@@ -651,7 +659,7 @@ const Battle = (() => {
       const p = hexPx(c, r), k = key(c, r);
       hexPath(p.x, p.y, HR - 1);
       ctx.fillStyle = (c + r) % 2 ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.08)'; ctx.fill();
-      if (B.siege && !B._board) {
+      if (B.siege && (!B._board || B._bg)) {
         const inside = B.siege.dside === 1 ? c > B.cw : c < B.cw;
         if (inside) { ctx.fillStyle = 'rgba(170,130,80,.30)'; ctx.fill(); }
         if (B.moat.has(k)) { ctx.fillStyle = 'rgba(40,120,200,.65)'; ctx.fill(); }
@@ -659,7 +667,7 @@ const Battle = (() => {
       if (input && B.reach.has(k) && !B.spell) { ctx.fillStyle = 'rgba(120,255,120,.22)'; ctx.fill(); }
       ctx.strokeStyle = B._board ? 'rgba(0,0,0,.22)' : 'rgba(0,0,0,.35)'; ctx.lineWidth = 1; ctx.stroke();
       if (B.obs.has(k)) { const oe = B.obs.get(k), oi = typeof Assets !== 'undefined' ? Assets.get(oe === '🌲' ? 'terrain/forest_overlay' : (oe === '🪨' || oe === '⛰️') ? 'terrain/mountain_overlay' : '') : null; if (oi) sprite(oi, p.x, p.y, oe === '🌲' ? 44 : 40); else { ctx.fillStyle = '#fff'; emoji(oe, p.x, p.y, 30); } }
-      if (B.siege && B.moat.has(k) && !B._board) { ctx.fillStyle = 'rgba(255,255,255,.5)'; emoji('≈', p.x, p.y, 20); }
+      if (B.siege && B.moat.has(k) && (!B._board || B._bg)) { ctx.fillStyle = 'rgba(255,255,255,.5)'; emoji('≈', p.x, p.y, 20); }
       if (B.siege && B.mines && B.mines.has(k) && B.siege.dside === 0) { const mi = typeof Assets !== 'undefined' ? Assets.get('battle/mine_dormant') : null; if (mi) sprite(mi, p.x, p.y + 6, 34); else { ctx.fillStyle = '#fff'; emoji('💣', p.x, p.y + 2, 18); } }
       if (B.siege && c === B.cw && !structAt(c, r) && typeof Assets !== 'undefined') { const kk = SIEGE_LAYOUT[r], di = Assets.get(kk === 'gate' ? 'battle/gate_open' : kk === 'tower' ? 'battle/tower_damaged' : 'battle/wall_breached'); if (di) sprite(di, p.x, p.y, kk === 'tower' ? 52 : 70); }
       if (B.spell === '__mine' && freeMineHex(c, r)) { hexPath(p.x, p.y, HR - 4); ctx.strokeStyle = 'rgba(255,200,80,.8)'; ctx.lineWidth = 2; ctx.stroke(); }
@@ -920,7 +928,7 @@ const Battle = (() => {
         perks: opts.hero.perks || {}, name: opts.hero.name || 'Hero', icon: opts.hero.icon || '🛡️', pid: opts.hero.pid, morale: opts.hero.morale || 0, luck: opts.hero.luck || 0 };
       B = { eHero: opts.eHero || null, heroFlash: null, strikeUsed: false, siege: null, walls: new Map(), moat: new Set(), cw: 0, stacks: [], obs: new Map(), queue: [], waitQ: [], cur: null, round: 0, reach: new Map(), busy: false, input: false, auto: false, over: false,
         spell: null, castUsed: false, hover: null, fx: [], shot: null, xp: 0, hero, eStats: opts.eStats || { att: 0, def: 0 },
-        armyIn: opts.army.map(a => a && { ...a }), canRetreat: opts.canRetreat !== false, resolve };
+        opts, armyIn: opts.army.map(a => a && { ...a }), canRetreat: opts.canRetreat !== false, resolve };
       const mk = (side, list, col) => {
         const items = list.map((a, slot) => a && { a, slot }).filter(Boolean).slice(0, 7);
         items.forEach((it, k) => {

@@ -1046,6 +1046,8 @@
     sfx('coin'); if (typeof Celebrate !== 'undefined') Celebrate.loot();
     await showModal(`<h2>💰 Spoils of war</h2><p>${who} searches the battlefield and claims:</p><div style="line-height:1.8">${lines.join('<br>')}</div>${sp.arts.length ? '<p class="small">Captured artifacts were added to the hero (equipped if a slot was free, otherwise in the backpack).</p>' : ''}`, ['Collect']);
   }
+  // ground type under the fighting hero, used to pick the battle backdrop
+  const battleTerrain = (h) => { if (h.boat != null) return 'water'; const t = G.tiles && G.tiles[h.y] && G.tiles[h.y][h.x]; return t === T.SAND ? 'sand' : t === T.MOUNT ? 'mount' : t === T.WATER ? 'water' : 'grass'; };
   let fightFromAi = false, fightCancelled = false;
   async function fight(h, guard, eStats, title, siege, eHero) {
     fightCancelled = false;
@@ -1059,7 +1061,7 @@
     }
     const before0 = armyCount(h), th0 = threatOfDef(guard), slain0 = guard.filter(Boolean).reduce((p, a) => p + a.n, 0);
     const res = await Battle.run({ hero: { att: eff(h, 'att'), def: eff(h, 'def'), sp: eff(h, 'sp'), mana: h.mana, spells: G.spells, perks: perksOf(h), name: h.name, icon: h.icon, pid: h.pid, morale: heroMorale(h), luck: heroLuck(h) },
-      army: h.army, enemy: guard.filter(Boolean).map(a => ({ ...a })), eStats, eHero, title, siege, canRetreat: true });
+      army: h.army, enemy: guard.filter(Boolean).map(a => ({ ...a })), eStats, eHero, title, siege, terrain: battleTerrain(h), canRetreat: true });
     h.mana = res.mana; h.buff = null;
     if (res.win) {
       res.survivors.forEach((n, i) => { if (h.army[i]) { if (n > 0) h.army[i].n = n; else h.army[i] = null; } });

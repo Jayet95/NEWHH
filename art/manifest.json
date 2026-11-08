@@ -1,5 +1,11 @@
 {
  "files": [
+  "battle/bg_desert.webp",
+  "battle/bg_grass.webp",
+  "battle/bg_lava.webp",
+  "battle/bg_ship.webp",
+  "battle/bg_snow.webp",
+  "battle/bg_swamp.webp",
   "battle/dirt.webp",
   "battle/gate_closed.webp",
   "battle/gate_open.webp",

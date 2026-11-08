@@ -50,6 +50,23 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
       tiles[y][x] = t;
     }
   }
+  // rivers (drawn as streams, they do not block movement): from high ground downhill to water
+  const river = Array.from({ length: H }, () => new Array(W).fill(0));
+  { const RR = rng(seed ^ 0x2545f491), starts = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (tiles[y][x] === T.MOUNT) starts.push({ x, y });
+    const nR = Math.max(2, Math.round(2.5 * sc));
+    for (let k = 0; k < nR && starts.length; k++) {
+      let c = starts.splice(Math.floor(RR() * starts.length), 1)[0], steps = 0; const seen = new Set();
+      while (c && steps++ < 70) {
+        if (tiles[c.y][c.x] === T.WATER) break;
+        seen.add(c.y * W + c.x);
+        if (tiles[c.y][c.x] !== T.MOUNT) river[c.y][c.x] = 1;
+        const nb = hexNb(c.x, c.y).filter(([nx, ny]) => nx >= 0 && ny >= 0 && nx < W && ny < H && !seen.has(ny * W + nx));
+        if (!nb.length) break;
+        nb.sort((p, q) => (n1[p[1]][p[0]] + RR() * 0.12) - (n1[q[1]][q[0]] + RR() * 0.12));
+        const nx = nb[0]; c = { x: nx[0], y: nx[1] };
+      }
+    } }
   // the player's castle starts in a random corner (the map is laid out as before and mirrored); the bay lies along the nearest edge
   const flipX = R() < 0.5, flipY = R() < 0.5, fx = (x) => flipX ? W - 1 - x : x, fy = (y) => flipY ? H - 1 - y : y;
   const P = { x: fx(5), y: fy(H - 6) };
@@ -245,6 +262,15 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
     objs.push({ t: 'seer', need: k, amt: k === 'wood' || k === 'ore' ? 12 + Math.floor(R() * 10) : 5 + Math.floor(R() * 4), art: randomArt(R, Math.max(2, artTierFor(d, R))), x: c.x, y: c.y });
   }
 
+  // prisons: free a captive hero (a jailor stack guards each one)
+  { const heroKeys = Object.keys(HEROES); for (let i = 0, n = Math.max(1, Math.round(1.3 * sc)); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'prison', hero: heroKeys[Math.floor(R() * heroKeys.length)], x: c.x, y: c.y, guard: [guard(c, 0.9)] }); } }
+  // obelisks: visit them all to piece the map together and unearth a relic
+  { const nO = Math.max(4, Math.round(4 * Math.sqrt(sc))); for (let i = 0; i < nO; i++) { const c = pick(); if (!c) break; objs.push({ t: 'obelisk', seen: false, x: c.x, y: c.y }); } }
+  // quest guardians: a hero of enough level earns a reward
+  for (let i = 0, n = Math.max(1, Math.round(1.5 * sc)); i < n; i++) { const c = pick(); if (!c) break; const d = depthOf(c); objs.push({ t: 'questgate', need: 3 + Math.round(d * 5) + Math.floor(R() * 2), art: randomArt(R, Math.max(2, artTierFor(d, R))), gold: 2000 + Math.round(d * 4000), x: c.x, y: c.y }); }
+  // key masters and border gates: the tent of a colour hands out its key, the gate of the same colour guards a vault
+  { const cols = ['red', 'blue', 'green', 'gold'], nK = Math.min(4, Math.max(1, Math.round(1.2 * sc))); for (let i = 0; i < nK; i++) { const a = pick(), b = pick(); if (!a || !b) break; const d = depthOf(b); objs.push({ t: 'keytent', col: cols[i], x: a.x, y: a.y, guard: [guard(a, 0.7)] }, { t: 'gate', col: cols[i], gold: 3000 + Math.round(d * 5000), res: RES[1 + Math.floor(R() * (RES.length - 1))], art: randomArt(R, Math.max(3, artTierFor(d, R))), x: b.x, y: b.y }); } }
+
   const kindsBase = ['gold', 'gold', 'gold', 'wood', 'wood', 'ore', 'ore', 'mercury', 'sulfur', 'crystal', 'gems'];
   const nMines = Math.max(8, Math.round(11 * Math.pow(sc, 0.8)));
   const mineKinds = Array.from({ length: nMines }, (_, i) => kindsBase[i % kindsBase.length]);
@@ -280,7 +306,7 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
   const biome = []; { const BR = rng(seed ^ 0x5bd1e995), one = { desert: 1, snow: 2, swamp: 3, lava: 4 }[mo.biome], kinds = one ? [one] : [1, 2, 3, 4], span = Math.max(W, H), cs = []; const warp = noise(BR, W, H, 5 * fs);
     const nC = mo.biome === 'none' ? 0 : Math.max(3, Math.round(3 + sc * 1.6)); for (let i = 0; i < nC * 4 && cs.length < nC; i++) { const c = { x: Math.floor(BR() * W), y: Math.floor(BR() * H), k: kinds[(cs.length + Math.floor(BR() * 2)) % kinds.length], r: span * (0.14 + BR() * 0.12) * (one ? 1.5 : 1) }; if (Math.hypot(c.x - P.x, c.y - P.y) > Math.max(12, span * 0.38)) cs.push(c); }
     for (let y = 0; y < H; y++) { biome[y] = []; for (let x = 0; x < W; x++) { let best = 0, bd = 1e9; for (const c of cs) { const d = Math.hypot(c.x - x, (c.y - y) * 1.15) + (warp[y][x] - 0.5) * 7; if (d < c.r && d < bd) { bd = d; best = c.k; } } biome[y][x] = best; } } }
-  return { W, H, tiles, biome, objs, P, E, aiStarts, zone, dock };
+  return { W, H, tiles, biome, river, objs, P, E, aiStarts, zone, dock };
 }
 
 function zoneOwner(G, z) {

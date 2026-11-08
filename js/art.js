@@ -394,6 +394,16 @@ const Art = (() => {
   function tileOverlay(c, t, x, y, G) {
     if (typeof Assets === 'undefined') return;
     const cxp = (x + .5 + (y & 1) * .5) * 32, cyp = y * HR * 1.5 + HR;
+    if (G && G.river && G.river[y] && G.river[y][x] && t !== T.WATER && t !== T.MOUNT) {      // a stream: water-coloured strokes to every neighbour that is also river or sea
+      const nb = hexNb(x, y); let any = false;
+      c.save(); c.lineCap = 'round';
+      for (let i = 0; i < 6; i++) { const p = nb[i]; if (p[0] < 0 || p[1] < 0 || p[0] >= G.W || p[1] >= G.H) continue; const isR = (G.river[p[1]] && G.river[p[1]][p[0]]) || G.tiles[p[1]][p[0]] === T.WATER; if (!isR) continue; any = true;
+        const nx = (p[0] + .5 + (p[1] & 1) * .5) * 32, ny = p[1] * HR * 1.5 + HR, mx = (cxp + nx) / 2, my = (cyp + ny) / 2;
+        c.beginPath(); c.moveTo(cxp, cyp); c.lineTo(mx, my); c.lineWidth = 9; c.strokeStyle = 'rgba(30,70,120,.55)'; c.stroke();
+        c.lineWidth = 6.5; c.strokeStyle = '#4f93d6'; c.stroke(); c.lineWidth = 2.2; c.strokeStyle = 'rgba(210,235,255,.75)'; c.stroke(); }
+      c.beginPath(); c.arc(cxp, cyp, any ? 4.6 : 5.5, 0, 7); c.fillStyle = '#4f93d6'; c.fill(); c.lineWidth = 1.4; c.strokeStyle = 'rgba(30,70,120,.7)'; c.stroke();
+      c.restore();
+    }
     if (t === T.ROAD) {                                   // road pieces: a half-road from the centre to every connected neighbour plus a hub
       const st = Assets.get('roads/dirt_straight'); if (!st || !G) return;
       const nb = hexNb(x, y), rw = 15, L = 19, ih = st.height, iw = st.width;

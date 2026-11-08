@@ -183,7 +183,7 @@
     const aiFacs = shuffle(Object.keys(FACTIONS).filter(f => f !== faction)).slice(0, nAI);
     const m = genMap(seed, aiFacs, diff, { preset, size, biome: map.biome });
     setFaction(faction); applyTheme(faction);
-    G = { seed, preset, size, W: m.W, H: m.H, scn: map.scn ? { id: map.scn.id, name: map.scn.name, goal: map.scn.goal } : null, tiles: m.tiles, biome: m.biome, zone: m.zone, objs: m.objs, dock: m.dock, boats: [], nextBoat: 1, day: 1, over: false, path: null, faction, diff,
+    G = { seed, preset, size, W: m.W, H: m.H, scn: map.scn ? { id: map.scn.id, name: map.scn.name, goal: map.scn.goal } : null, tiles: m.tiles, biome: m.biome, river: m.river, zone: m.zone, objs: m.objs, dock: m.dock, boats: [], nextBoat: 1, day: 1, over: false, path: null, faction, diff,
       res: { gold: D.gold, wood: r(20), ore: r(20), mercury: r(5), sulfur: r(5), crystal: r(5), gems: r(5) }, spells: [...START_SPELLS],
       wk: {}, heroes: [], sel: 0, hero: null, tavern: [], noTown: 0,
       col: (() => { const pc = Math.max(0, Math.min(7, map.color || 0)), free = PALETTE.map((p, i) => i).filter(i => i !== pc); return [PALETTE[pc][1], ...aiFacs.map((f, i) => PALETTE[free[i % free.length]][1])]; })(),
@@ -357,6 +357,11 @@
       case 'bank': return { crypt: '⚰️', utopia: '🐲', stockpile: '🏚️' }[o.kind];
       case 'mono': return '🌌';
       case 'seer': return '🧙';
+      case 'prison': return '⛓️';
+      case 'obelisk': return o.seen ? '🔹' : '🔺';
+      case 'questgate': return '🛡️';
+      case 'keytent': return '⛺';
+      case 'gate': return '🚪';
       case 'mine': return MINE_ICON[o.kind];
       case 'pile': return RES_ICON[o.kind];
       case 'chest': return '🧰';
@@ -653,6 +658,11 @@
       case 'tower': return '<b>Observation Tower</b><br>Reveals a large area.';
       case 'bank': return `<b>${{ crypt: 'Crypt', utopia: 'Dragon Hoard', stockpile: 'Giant Stockpile' }[o.kind]}</b><br>Guarded treasure: ${armyList(o.guard, true)}`;
       case 'mono': return '<b>Monolith</b><br>Teleports to its twin.';
+      case 'prison': return `<b>⛓️ Prison</b><br>A captive hero (${HEROES[o.hero].name}) waits behind the jailors.`;
+      case 'obelisk': return `<b>🔺 Obelisk</b><br>${o.seen ? 'Already visited.' : 'Visit every obelisk to unearth a relic.'} (${G.objs.filter(x => x.t === 'obelisk' && x.seen).length}/${G.objs.filter(x => x.t === 'obelisk').length})`;
+      case 'questgate': return `<b>🛡️ Quest Guardian</b><br>Rewards a hero of level ${o.need} or higher.`;
+      case 'keytent': return `<b>⛺ Key Master (${o.col})</b><br>Hands out the ${o.col} key.`;
+      case 'gate': return `<b>🚪 Border Gate (${o.col})</b><br>${(G.keys || {})[o.col] ? 'You hold the key — open the vault.' : `Needs the ${o.col} key from a Key Master.`}`;
       case 'seer': return `<b>Seer's Hut</b><br>Wants ${o.amt} ${o.need} for an artifact.`;
       case 'spring': return `<b>${SPRING[o.kind].n}</b><br>${SPRING[o.kind].d}<br><span class="small">Once per week per hero.</span>`;
       case 'wreck': return `<b>Shipwreck</b><br>Salvage: ${RES_ICON.gold}${o.gold} + ${RES_ICON[o.res]}${g}`;
@@ -914,6 +924,47 @@
     h.x = other.x; h.y = other.y; h.boat = null; G.path = null; h.move = Math.max(0, h.move - 100); sfx('level'); centerOn(h.x, h.y); renderAll();
     return toast(`${h.name} steps through the monolith and emerges far away!`);
   }
+  // ---------- prisons, obelisks, quest guardians, key masters and border gates ----------
+  async function visitPrison(o, h) {
+    if (o.guard && o.guard.length) { if (!(await fight(h, o.guard, { att: 0, def: 0 }, 'Prison jailors'))) return; o.guard = []; }
+    const d = HEROES[o.hero];
+    if (G.heroes.length >= MAX_HEROES) return showModal(`<h2>⛓️ Prison</h2><p>${d.name} begs to join you, but you already lead ${MAX_HEROES} heroes. Come back when one of them has left.</p>`);
+    if (G.heroes.some(x => x.id === d.id) || G.ais.some(a => a.heroes.some(x => x.pid === d.id))) { G.objs.splice(G.objs.indexOf(o), 1); reindex(G); renderAll(); return showModal('<h2>⛓️ Empty cell</h2><p>The captive was already freed by someone else.</p>'); }
+    const nh = makeHero(d, o.x, o.y), ti = factionTiers(d.fac);
+    nh.army = [{ t: ti[0], n: 8 }, null, null, null, null, null, null]; nh.move = 0; learn(d.spells);
+    G.heroes.push(nh); G.objs.splice(G.objs.indexOf(o), 1); reindex(G); sfx('fanfare'); renderAll();
+    await showModal(`<h2>⛓️ Hero freed!</h2><p><b>${nh.name}</b> (${clsLabel(d.cls)}) thanks you and joins your cause with a small band of ${C[ti[0]].n}s.</p>`);
+  }
+  async function visitObelisk(o, h) {
+    if (o.seen) return toast('You have already seen this obelisk.');
+    o.seen = true; sfx('level');
+    const all = G.objs.filter(x => x.t === 'obelisk'), got = all.filter(x => x.seen).length;
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const X = o.x + dx, Y = o.y + dy; if (X >= 0 && Y >= 0 && X < G.W && Y < G.H && G.expl) G.expl[Y * G.W + X] = 1; }
+    fogDirty = true; renderAll();
+    if (got < all.length) return showModal(`<h2>🔺 Obelisk</h2><p>A piece of an old map is etched into the stone. (${got}/${all.length})</p>`);
+    const rel = randomArt(Math.random, 5), a = ART[rel], gotIt = giveArt(h, rel);
+    G.res.gold += 5000; renderAll();
+    await showModal(`<h2>🔺 The map is whole!</h2><p>All ${all.length} obelisks are found. The map leads you to a buried relic: ${a.i} <b>${a.n}</b> (${artStats(a)}) and ${RES_ICON.gold}5000 gold.${gotIt === 'full' ? ' (Your backpack is full — the relic is lost.)' : ''}</p>`);
+  }
+  async function visitQuestGate(o, h) {
+    const a = ART[o.art];
+    if (h.lvl < o.need) return showModal(`<h2>🛡️ Quest Guardian</h2><p>"Only a hero of <b>level ${o.need}</b> may claim what I guard." ${h.name} is level ${h.lvl}.</p>`);
+    const got = giveArt(h, o.art); G.res.gold += o.gold; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); sfx('build'); renderAll();
+    await showModal(`<h2>🛡️ Quest complete</h2><p>The guardian bows to ${h.name} and hands over ${RES_ICON.gold}${o.gold} gold and ${a.i} <b>${a.n}</b>.${got === 'full' ? ' (Your backpack is full — the artifact is lost.)' : ''}</p>`);
+  }
+  async function visitKeyTent(o, h) {
+    G.keys = G.keys || {};
+    if (G.keys[o.col]) return toast('You already hold the ' + o.col + ' key.');
+    if (o.guard && o.guard.length) { if (!(await fight(h, o.guard, { att: 0, def: 0 }, 'Key Master guards'))) return; o.guard = []; }
+    G.keys[o.col] = true; sfx('build'); renderAll();
+    await showModal(`<h2>⛺ Key Master</h2><p>You receive the <b>${o.col} key</b>. Somewhere on the map a border gate of the same colour guards a vault.</p>`);
+  }
+  async function visitGate(o, h) {
+    if (!(G.keys || {})[o.col]) return showModal(`<h2>🚪 Border Gate</h2><p>The gate is sealed. It needs the <b>${o.col} key</b> from a Key Master's tent.</p>`);
+    const a = ART[o.art], got = giveArt(h, o.art), n = 6 + Math.floor(Math.random() * 6);
+    G.res.gold += o.gold; G.res[o.res] += n; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); sfx('build'); renderAll();
+    await showModal(`<h2>🚪 Vault opened</h2><p>The ${o.col} key turns. Inside: ${RES_ICON.gold}${o.gold} gold, ${RES_ICON[o.res]}${n} ${o.res} and ${a.i} <b>${a.n}</b>.${got === 'full' ? ' (Backpack full — the artifact is lost.)' : ''}</p>`);
+  }
   async function visitSeer(o, h) {
     const a = ART[o.art], have = G.res[o.need] >= o.amt;
     const i = await showModal(`<h2>🏚️ Seer's Hut</h2><p>"Bring me <b>${o.amt} ${RES_ICON[o.need]} ${o.need}</b> and I will give you ${a.i} <b>${a.n}</b> (${artStats(a)})."</p><p class="small">You have ${G.res[o.need]}.</p>`, have ? ['Accept the deal', 'Not now'] : ['Not now']);
@@ -963,6 +1014,11 @@
     if (o.t === 'bank') return visitBank(o, h);
     if (o.t === 'mono') return visitMono(o, h);
     if (o.t === 'seer') return visitSeer(o, h);
+    if (o.t === 'prison') return visitPrison(o, h);
+    if (o.t === 'obelisk') return visitObelisk(o, h);
+    if (o.t === 'questgate') return visitQuestGate(o, h);
+    if (o.t === 'keytent') return visitKeyTent(o, h);
+    if (o.t === 'gate') return visitGate(o, h);
     if (o.t === 'merchant') return openMarket(MERCHANT_RATE + ((G.wk && G.wk.rateBonus) || 0), 'Wandering Merchant', false);
     if (o.t === 'town') {
       if (o.owner === 0) { for (const x of heroesAt(o.x, o.y)) x.mana = maxMana(x); return openTown(o); }

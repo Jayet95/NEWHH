@@ -672,3 +672,85 @@ body.th-inferno, body.th-necropolis, body.th-dungeon, body.th-fortress { --fibre
   body.skin.inbattle #batui button.primary { background: linear-gradient(var(--gold), color-mix(in srgb, var(--gold) 45%, #000)) !important; color: #2a1604 !important; }
   body.skin.inbattle #batui button:disabled { opacity: .45; }
 }
+
+/* ---------- phone landscape: compact title menu (crest and name on the left, buttons on the right) ---------- */
+@media (orientation: landscape) and (max-height: 540px) {
+  .titlebox { display: grid !important; grid-template-columns: 210px 1fr; grid-template-areas: "crest col" "name col" "sub col"; align-items: center; gap: 2px 20px; width: min(96vw, 720px) !important; max-height: 96vh; padding: 12px 20px 10px !important; margin: 0 !important; overflow: hidden; }
+  .titlebox .crest { grid-area: crest; width: 74px !important; height: 74px !important; margin: -26px auto 0 !important; }
+  .titlebox h1 { grid-area: name; font-size: 24px !important; margin: 0; white-space: nowrap; }
+  .titlebox .sub { grid-area: sub; margin: 4px 0 0 !important; font-size: 13px !important; }
+  .titlebox #loadmsg { display: none; }
+  .titlebox .col { grid-area: col; display: grid !important; grid-template-columns: 1fr 1fr; gap: 6px !important; width: 100%; }
+  .col #tNew { grid-column: 1 / -1; min-height: 46px !important; padding: 6px 10px !important; font-size: 18px !important; }
+  .col .main2 { min-height: 40px !important; padding: 4px 6px !important; font-size: 14px !important; }
+  .col .sec2 { grid-column: 1 / -1; display: grid !important; grid-template-columns: repeat(4, 1fr); gap: 5px !important; margin: 2px 0 0 !important; padding-top: 6px !important; }
+  .col .sec2 button { min-height: 36px !important; font-size: 10.5px !important; padding: 3px 2px !important; }
+}
+
+/* ---------- phone landscape: dialogs use the whole (short) screen ---------- */
+@media (orientation: landscape) and (max-height: 540px) {
+  #modal { padding: 0 !important; align-items: center; justify-content: center; }
+  body:has(#mbox .setup) #mres { display: none !important; }
+  #mres { transform: scale(.82); transform-origin: 50% 0; margin-bottom: -10px; }
+  #mbox, body.skin #mbox { max-height: calc(100vh - 8px) !important; max-height: calc(100dvh - 8px) !important; max-width: 98vw !important; width: 98vw !important; padding: 4px 10px !important; border-width: 10px !important; border-image-width: 10px !important; }
+  #mbox:has(> .setup), #mbox:has(.townwide) { width: 98vw !important; max-width: 98vw !important; }
+  #mbox h2, #mbox h2 .small { margin: 0 0 4px !important; padding-bottom: 8px !important; font-size: 15px !important; }
+  #mbox h2 .small { display: inline; font-size: 11px !important; }
+  #mbox .mb, body.skin #mbox .mb { margin-top: 4px !important; padding-top: 2px !important; bottom: -4px !important; gap: 6px; }
+  #mbox .mb button { padding: 6px 12px !important; min-height: 34px !important; font-size: 13px !important; }
+  .scngrid { grid-template-columns: repeat(3, 1fr) !important; gap: 6px !important; }
+  .card.scn { padding: 4px !important; } .card.scn b { font-size: 12px; } .card.scn .small { font-size: 10px; }
+  .setup .mprev { aspect-ratio: 3 / 1 !important; margin-bottom: 3px !important; }
+  .hsbody { grid-template-columns: 1fr 230px !important; gap: 8px !important; }
+  .hspan { position: static !important; order: 0 !important; padding: 6px !important; }
+  .hsgrid { grid-template-columns: repeat(5, 1fr) !important; gap: 5px !important; }
+  .htile { padding: 3px 2px !important; } .htile .pic { width: 46px; height: 46px; } .htile span { font-size: 11px; } .htile small { display: none; }
+  .hsbig .pic { width: 70px !important; height: 70px !important; }
+  .hspan h3 { font-size: 15px; margin: 2px 0 0; } .hscls { margin-bottom: 3px; font-size: 11px; }
+  .hsstats { margin: 3px 0 !important; } .hsstats b { font-size: 14px; }
+  .hspan h4 { margin: 4px 0 2px !important; font-size: 10px; }
+  .hsarmy .pic { width: 38px !important; height: 38px !important; } .hsarmy div { width: 70px; font-size: 9px; }
+  .hsgo { margin-top: 5px !important; padding: 7px !important; font-size: 13px !important; }
+  .facgrid { grid-template-columns: repeat(3, 1fr) !important; gap: 6px !important; }
+  .facpic { height: 78px !important; } .ribbon { font-size: 14px !important; padding: 12px 6px 3px !important; }
+  .card.fac .blurb { font-size: 10px !important; padding: 3px 6px 0 !important; min-height: 0 !important; }
+  .card.fac .crow { gap: 2px !important; margin-top: 3px !important; } .card.fac .crow .pic { width: 26px !important; height: 26px !important; }
+  .setup .grid.two { grid-template-columns: repeat(4, 1fr) !important; gap: 5px !important; }
+  .setup .card { padding: 4px !important; }
+  #mbox p { margin: 4px 0; }
+  #mbox .setup .small { font-size: 10px; }
+  .trow.big { grid-template-columns: 52px 1fr auto !important; padding: 4px 2px !important; gap: 8px !important; }
+  .trow.big .ic .pic { width: 46px !important; height: 46px !important; }
+  #tcv { max-height: 90px; }
+  .ttab { padding: 5px 4px !important; font-size: 12px !important; }
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  body.skin #mbox button:not(.slot):not(.htile):not(.hbtn):not(.swatch):not(.ttab):not(.flagbtn):not(.danger):not(.primary) { border: 1px solid #0d0803 !important; border-image: none !important; border-radius: 6px !important; background: var(--grain), linear-gradient(#3b2d1c, #19110a) !important; box-shadow: inset 0 0 0 1px var(--edge), inset 0 0 0 2px #0d0803 !important; min-height: 32px !important; padding: 4px 10px !important; font-size: 12px !important; }
+  body.skin #mbox button.primary:not(.slot) { background: linear-gradient(var(--gold), color-mix(in srgb, var(--gold) 45%, #000)) !important; color: #2a1604 !important; }
+  body.skin #mbox button:disabled { opacity: .45; }
+  #mbox .mb button { flex: 0 0 auto !important; }
+}
+.hsgo2 { display: none; }
+@media (orientation: landscape) and (max-height: 540px) { .hsgo2 { display: inline-flex !important; } .hspan .hsgo { display: none !important; } }
+@media (orientation: landscape) and (max-height: 540px) {
+  body.skin #mbox button.primary:not(.slot) { border: 1px solid #0d0803 !important; border-image: none !important; border-radius: 6px !important; box-shadow: inset 0 0 0 1px #ffe08a, inset 0 0 0 2px #3a2506 !important; min-height: 32px !important; padding: 4px 12px !important; font-size: 13px !important; text-shadow: 0 1px 0 rgba(255, 235, 170, .6) !important; }
+}
+/* phone landscape: slim top bar so the map keeps the height */
+@media (orientation: landscape) and (max-height: 540px) {
+  body.skin:not(.inbattle) #top { border-width: 7px !important; padding: 0 6px !important; min-height: 0; }
+  body.skin .sky { inset: -7px !important; border-width: 7px !important; border-image-width: 7px !important; }
+  body:not(.inbattle) #res .chip { font-size: 11px !important; padding: 0 5px !important; }
+  body:not(.inbattle) #date { gap: 5px; }
+  body:not(.inbattle) .dtMain small { font-size: 8px; } body:not(.inbattle) .dtMain b { font-size: 14px; }
+  body:not(.inbattle) .dtTurn, body:not(.inbattle) .dtDiff { display: none; }
+  body:not(.inbattle) .dtGoal { font-size: 10px; padding: 1px 6px; max-width: 150px; }
+  #orb { width: 24px; height: 24px; } #orb b { font-size: 18px; }
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  #tcv { max-height: 56px !important; aspect-ratio: auto !important; height: 56px !important; object-fit: cover; }
+  #mbox canvas#tcv + .small { display: none; }
+  .ttabs { margin: 3px 0 !important; } .ttab { padding: 4px !important; font-size: 12px !important; }
+  .trow.big b { font-size: 14px !important; } .trow .small { font-size: 11px !important; }
+  .trow.big .acts input { width: 56px !important; font-size: 14px !important; padding: 3px !important; } .trow.big .acts button { padding: 5px 10px !important; font-size: 12px !important; }
+}
+@media (orientation: landscape) and (max-height: 540px) { .trow .acts, .trow.big .acts { grid-column: auto !important; justify-content: flex-end !important; max-width: none !important; flex-wrap: nowrap !important; } }

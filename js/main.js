@@ -390,12 +390,12 @@
     if (Settings.showReach && !busy && G.hero && G.hero.move > 0 && !G.over) {
       const hh = G.hero, rk = [hh.x, hh.y, hh.move, hh.boat != null ? 1 : 0, G.day, G.objs.length].join();
       if (reachKey !== rk) { reachKey = rk; reachSet = reachMap(G, hh.x, hh.y, hh.move, hh.boat != null, capsOf(hh)); }
-      cx.save(); cx.lineWidth = 1.3;
+      cx.save(); cx.lineWidth = 2;
       for (const [k] of reachSet) {
         const tx = k % G.W, ty = (k / G.W) | 0; if (tx < x0 - 1 || tx > x0 + vx || ty < y0 - 1 || ty > y0 + vy) continue;
         const px = hcx(tx, ty) - cam.x, py = hcy(ty) - cam.y;
         cx.beginPath(); for (let i = 0; i < 6; i++) { const p = Art.hexPt(px, py, HR - 2, i); i ? cx.lineTo(p[0], p[1]) : cx.moveTo(p[0], p[1]); } cx.closePath();
-        cx.fillStyle = 'rgba(255, 233, 150, .16)'; cx.fill(); cx.strokeStyle = 'rgba(255, 224, 120, .55)'; cx.stroke();
+        cx.fillStyle = 'rgba(255, 233, 150, .22)'; cx.fill(); cx.strokeStyle = 'rgba(255, 214, 90, .9)'; cx.stroke();
       }
       cx.restore();
     }
@@ -2118,11 +2118,11 @@
       <h4>Starting army</h4><div class="hsarmy">${army.map(([id, n]) => `<div>${Art.pic(id, 60)}<small>${n} ${C[id].n}</small></div>`).join('')}</div>
       <button class="primary hsgo" id="hsGo">Play as ${cur.name}</button></div>`;
     $('mbox').innerHTML = `<div class="setup"><span data-bg="hero_select"></span><h2>${FACTIONS[f].icon} ${FACTIONS[f].name} — choose your hero</h2><div class="hsbody"><div class="hsgrid">${tiles}</div>${panel}</div>
-      <div class="small">Your rival will command a different castle. Fight them across zones, forts and sieges.</div><div class="mb"><button id="sBack">Back</button></div></div>`;
+      <div class="small">Your rival will command a different castle. Fight them across zones, forts and sieges.</div><div class="mb"><button id="sBack">Back</button><button class="primary hsgo2" id="hsGo2">Play as ${cur.name}</button></div></div>`;
     $('sBack').onclick = () => showFactionSelect(diff, map);
     const go = (id) => { $('modal').classList.add('hide'); $('title').classList.add('hide'); newGame(f, id, diff, map); };
     $('mbox').querySelectorAll('.htile').forEach(b => { b.onclick = () => showHeroSelect(f, diff, map, b.dataset.hid); b.ondblclick = () => go(b.dataset.hid); });
-    $('hsGo').onclick = () => go(cur.key);
+    $('hsGo').onclick = () => go(cur.key); $('hsGo2').onclick = () => go(cur.key);
   }
   $('tNew').onclick = showDifficultySelect;
   $('tScn').onclick = () => showScenarios();

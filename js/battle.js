@@ -379,7 +379,7 @@ const Battle = (() => {
     if (abil(s, 'regen') && s.hp < C[s.t].hp) { s.hp = C[s.t].hp; log(`${C[s.t].n} regenerates.`); }
     B.cur = s; s.defb = false; B.spell = null;
     // narrow screens scroll the board sideways: keep the acting stack in view
-    try { const st = document.getElementById('stage'), c = document.getElementById('bat'); if (st && c && st.scrollWidth > st.clientWidth + 4) st.scrollTo({ left: Math.max(0, (s.px / 960) * c.clientWidth - st.clientWidth / 2), behavior: 'smooth' }); } catch (e) { /* ignore */ }
+    try { const st = document.getElementById('stage'), c = document.getElementById('bat'); if (st && c && (st.scrollWidth > st.clientWidth + 4 || st.scrollHeight > st.clientHeight + 4)) st.scrollTo({ left: Math.max(0, (s.px / 960) * c.clientWidth - st.clientWidth / 2), top: Math.max(0, (s.py / 640) * c.clientHeight - st.clientHeight / 2), behavior: 'smooth' }); } catch (e) { /* ignore */ }
     B.reach = computeReach(s);
     const ai = s.side === 1 || B.auto;
     B.input = !ai;
@@ -653,6 +653,7 @@ const Battle = (() => {
     $('bWait').onclick = () => B && B.cur && !B.cur.waited && playerAct(async () => { B.cur.waited = true; B.waitQ.push(B.cur); log(`${C[B.cur.t].n} waits.`); });
     $('bDef').onclick = () => B && playerAct(async () => { B.cur.defb = true; log(`${C[B.cur.t].n} defends.`); });
     $('bSpell').onclick = () => B && B.input && openSpells();
+    if ($('bZoom')) $('bZoom').onclick = () => { document.body.classList.toggle('bzfit'); const st = $('stage'), c = $('bat'); if (B && B.cur && st && c) setTimeout(() => st.scrollTo({ left: Math.max(0, (B.cur.px / 960) * c.clientWidth - st.clientWidth / 2), top: Math.max(0, (B.cur.py / 640) * c.clientHeight - st.clientHeight / 2) }), 60); };
     $('bBal').onclick = () => { if (B && B.input && !B.balUsed) { B.spell = '__ballista'; toast('Ballista: pick an enemy stack'); } };
     $('bTent').onclick = () => { if (B && B.input && !B.tentUsed) { B.spell = '__tent'; toast('First aid: pick one of your stacks'); } };
     $('bHero').onclick = () => { if (B && B.input && !B.strikeUsed) { B.spell = '__strike'; toast('Hero Strike: pick an enemy stack'); } };

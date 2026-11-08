@@ -434,7 +434,8 @@
         }
       }
       const spr = o.t === 'monster' ? null : Art.obj(o, o.fac);
-      if (spr) { const sz = o.t === 'town' ? 50 : o.t === 'fort' || o.t === 'lair' ? 46 : o.t === 'dwelling' ? 44 : o.t === 'pile' ? 30 : 38; cx.drawImage(spr, px - sz / 2, py - sz / 2 - (o.t === 'town' ? 5 : 2), sz, sz); }
+      if (spr && o.t === 'town') { const sz = 100; cx.drawImage(spr, px + 16 - sz / 2, py + 12 - sz * 0.62, sz, sz); }
+      else if (spr) { const sz = o.t === 'town' ? 50 : o.t === 'fort' || o.t === 'lair' ? 46 : o.t === 'dwelling' ? 44 : o.t === 'pile' ? 30 : 38; cx.drawImage(spr, px - sz / 2, py - sz / 2 - (o.t === 'town' ? 5 : 2), sz, sz); }
       else if (o.t !== 'monster') { cx.font = `26px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(objIcon(o), px, py + 1); }
       if (o.t === 'fort') {
         drawFlag(px + 13, py - 8, ownCol(o.owner), relOf(o.owner), 1.1);
@@ -442,11 +443,11 @@
         if (o.owner === 0 && gn) { cx.font = 'bold 11px sans-serif'; cx.fillStyle = '#000b'; cx.fillRect(px - 14, py + 10, 28, 13); cx.fillStyle = '#fff'; cx.fillText(gn, px, py + 17); }
       }
       if (o.t === 'mine' || o.t === 'dwelling' || o.t === 'lair') drawFlag(px + 11, py - 4, ownCol(o.owner), relOf(o.owner), 0.85);
-      if (o.t === 'town') drawFlag(px + 15, py - 10, ownCol(o.owner), relOf(o.owner), 1.25);
+      if (o.t === 'town') drawFlag(px + 40, py - 22, ownCol(o.owner), relOf(o.owner), 1.4);
       { const df = defenderOf(o); if (df && (o.t !== 'monster' || vis[o.y * G.W + o.x] || !fogOn())) { const th = threatOfDef(df); if (th) { const bx = px - 14, by = py + 12; cx.beginPath(); cx.arc(bx, by, 5.5, 0, 7); cx.fillStyle = th.col; cx.fill(); cx.lineWidth = 1.6; cx.strokeStyle = '#140a04'; cx.stroke(); if (th.label === 'Deadly') { cx.strokeStyle = '#fff'; cx.lineWidth = 1.4; cx.beginPath(); cx.moveTo(bx - 2.4, by - 2.4); cx.lineTo(bx + 2.4, by + 2.4); cx.moveTo(bx + 2.4, by - 2.4); cx.lineTo(bx - 2.4, by + 2.4); cx.stroke(); } } } }
       if (o.t === 'town' || o.t === 'fort') {
         cx.font = 'bold 11px sans-serif'; cx.lineWidth = 3; cx.strokeStyle = '#000'; cx.fillStyle = o.owner === 0 ? '#bcd8ff' : allyOfPlayer(o.owner) ? '#c8f0c8' : o.owner ? '#ffb3a8' : '#f3e7bd';
-        cx.strokeText(o.name, px, py - 27); cx.fillText(o.name, px, py - 27);
+        { const ny = o.t === 'town' ? py - 58 : py - 27, nx = o.t === 'town' ? px + 16 : px; cx.strokeText(o.name, nx, ny); cx.fillText(o.name, nx, ny); }
       }
     }
     for (const b of G.boats) {
@@ -750,7 +751,8 @@
   cmap.addEventListener('click', (ev) => {
     if (suppress) return;
     if (!G || busy || G.over) return;
-    const t = tileFromEvent(ev); if (!t) return;
+    let t = tileFromEvent(ev); if (!t) return;
+    { const to = objAt(G, t.x, t.y); if (to && to.t === 'town' && (to.x !== t.x || to.y !== t.y)) t = { x: to.x, y: to.y }; }   // any of the town's four tiles leads to its gate
     const here = heroesAt(t.x, t.y);
     if (here.length) {
       if (!here.includes(G.hero)) { setActive(G.heroes.indexOf(here[0])); G.path = null; renderAll(); return; }

@@ -28,7 +28,11 @@ const Battle = (() => {
   }
 
   const alive = (side) => B.stacks.filter(s => !s.dead && (side === undefined || s.side === side));
-  const stackAt = (c, r) => B.stacks.find(s => !s.dead && s.c === c && s.r === r);
+  // double-width creatures: head hex (c, r) plus a tail hex one column behind (to the left for your side, to the right for the enemy)
+  const isWide = (s) => !!(C[s.t].wide && B && !B.siege);
+  const tailAt = (s, c = s.c, r = s.r) => { if (!isWide(s)) return null; const tc = c + (s.side === 0 ? -1 : 1); return inB(tc, r) ? [tc, r] : null; };
+  const occHexes = (s, c = s.c, r = s.r) => { const t = tailAt(s, c, r); return t ? [[c, r], t] : [[c, r]]; };
+  const stackAt = (c, r) => B.stacks.find(s => { if (s.dead) return false; if (s.c === c && s.r === r) return true; const t = tailAt(s); return !!t && t[0] === c && t[1] === r; });
   const COARSE = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false;
   const sfx = (n) => { if (typeof Sfx !== 'undefined') Sfx.play(n); };
   const perk = (id) => (B.hero && B.hero.perks && B.hero.perks[id]) || 0;
@@ -38,7 +42,7 @@ const Battle = (() => {
     return false;
   };
   const hates = (a, d) => (C[a.t].ab || []).some(x => x.startsWith('hate:') && x.slice(5) === C[d.t].line);
-  const adjStacks = (s) => nbrs(s.c, s.r).map(([c, r]) => stackAt(c, r)).filter(Boolean);
+  const adjStacks = (s) => [...new Set(occHexes(s).flatMap(([c0, r0]) => nbrs(c0, r0).map(([c, r]) => stackAt(c, r)).filter(o => o && o !== s)))];
   const HERO_POS = [{ x: 38, y: 310 }, { x: 922, y: 310 }];
   const STRUCT = { wall: { hp: 120, n: 'Wall', i: '🧱' }, gate: { hp: 160, n: 'Gate', i: '🚪' }, tower: { hp: 200, n: 'Arrow Tower', i: '🗼' } };
   const blockedGround = (c, r) => B.obs.has(key(c, r)) || (B.siege && (B.walls.has(key(c, r)) || B.moat.has(key(c, r))));
@@ -48,7 +52,7 @@ const Battle = (() => {
   const attackOf = (s) => Math.max(0, C[s.t].a + bonus(s).att + (s.bloodlust || 0) - (s.weak > 0 ? 3 : 0));
   const defenceOf = (s) => Math.max(0, C[s.t].d + bonus(s).def + (s.stone || 0) + (s.defb ? 3 : 0) - (s.disr > 0 ? 3 : 0));
   const totalHp = (s) => (s.n - 1) * C[s.t].hp + s.hp;
-  const adjEnemy = (s) => nbrs(s.c, s.r).some(([c, r]) => { const o = stackAt(c, r); return o && o.side !== s.side; });
+  const adjEnemy = (s) => occHexes(s).some(([c0, r0]) => nbrs(c0, r0).some(([c, r]) => { const o = stackAt(c, r); return o && o.side !== s.side; }));
   const canShoot = (s) => C[s.t].shoot && s.ammo > 0 && !(s.noshoot > 0) && !adjEnemy(s);
 
   // shooters: stronger point blank, weaker far away, half damage beyond 10 hexes ("broken arrow")
@@ -121,7 +125,8 @@ const Battle = (() => {
 
   function computeReach(s) {
     const res = new Map(), spd = speedOf(s);
-    const free = (c, r) => !blockedGround(c, r) && !stackAt(c, r);
+    const own = (c, r) => { const o = stackAt(c, r); return !o || o === s; };
+    const free = (c, r) => { if (blockedGround(c, r) || !own(c, r)) return false; const t = tailAt(s, c, r); if (isWide(s) && !t) return false; return !t || (!blockedGround(t[0], t[1]) && own(t[0], t[1])); };
     res.set(key(s.c, s.r), { c: s.c, r: s.r, d: 0, prev: null });
     if (C[s.t].fly) {
       for (let r = 0; r < BH; r++) for (let c = 0; c < BW; c++) {
@@ -142,8 +147,11 @@ const Battle = (() => {
     return res;
   }
   function meleeSpot(s, e, reach) {
-    let best = null;
-    for (const [c, r] of nbrs(e.c, e.r)) { const h = reach.get(key(c, r)); if (h && (!best || h.d < best.d)) best = h; }
+    let best = null; const eh = occHexes(e);
+    for (const h of reach.values()) {
+      if (best && h.d >= best.d) continue;
+      if (occHexes(s, h.c, h.r).some(([c, r]) => eh.some(([ec, er]) => hexDist({ c, r }, { c: ec, r: er }) === 1))) best = h;
+    }
     return best;
   }
   function pathTo(reach, hex) {
@@ -785,8 +793,9 @@ const Battle = (() => {
       const pst = fighting ? 'fighting' : defending ? 'defending' : 'idle', pb = String(s.t).replace(/_\d$/, ''), pu = /_\d$/.test(String(s.t)) ? '_up' : '', pd = s.side === 0 ? 'right' : 'left';
       const pose = typeof Assets !== 'undefined' ? Assets.get('poses/' + pd + '/' + pst + '/' + pb + pu, 'poses/' + pd + '/idle/' + pb + pu, 'poses/' + pd + '/idle/' + pb) : null;
       if (pose) {
-        const kk = Math.min(66 / pose.height, 72 / pose.width), pw = pose.width * kk, ph = pose.height * kk, fy = p.y + 22;
-        ctx.beginPath(); ctx.ellipse(p.x, fy, 21, 7.5, 0, 0, 7); ctx.fillStyle = flash ? 'rgba(255,110,90,.6)' : 'rgba(0,0,0,.38)'; ctx.fill();
+        const wd = isWide(s), kk = Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.3 : 1), pw = pose.width * kk, ph = pose.height * kk, fy = p.y + 22;
+        if (wd) p.x += (s.side === 0 ? -1 : 1) * HW * 0.5;
+        ctx.beginPath(); ctx.ellipse(p.x, fy, wd ? 36 : 21, wd ? 9 : 7.5, 0, 0, 7); ctx.fillStyle = flash ? 'rgba(255,110,90,.6)' : 'rgba(0,0,0,.38)'; ctx.fill();
         ctx.lineWidth = s === B.cur ? 3 : 2; ctx.strokeStyle = s === B.cur ? '#ffd24a' : (s.side === 0 ? '#4a8bff' : '#e0504a'); ctx.stroke();
         ctx.save(); ctx.translate(p.x, fy); ctx.rotate(off.rot * 0.4); if (flash) ctx.globalAlpha = 0.88; ctx.drawImage(pose, -pw / 2, -ph, pw, ph); ctx.restore();
       } else {
@@ -999,7 +1008,7 @@ const Battle = (() => {
       const mk = (side, list, col) => {
         const items = list.map((a, slot) => a && { a, slot }).filter(Boolean).slice(0, 7);
         items.forEach((it, k) => {
-          const r = Math.round((k + 0.5) * BH / items.length - 0.5), c = side === 0 ? 0 : BW - 1;
+          const r = Math.round((k + 0.5) * BH / items.length - 0.5), wd = !opts.siege && C[it.a.t].wide, c = side === 0 ? (wd ? 1 : 0) : (wd ? BW - 2 : BW - 1);
           const p = hexPx(c, r);
           B.stacks.push({ t: it.a.t, n: it.a.n, hp: C[it.a.t].hp, side, c, r, slot: it.slot, ammo: Math.ceil((C[it.a.t].shoot || 0) * (side === 0 && opts.hero.mach && opts.hero.mach.cart ? 1.5 : 1)), ammoMax: Math.ceil((C[it.a.t].shoot || 0) * (side === 0 && opts.hero.mach && opts.hero.mach.cart ? 1.5 : 1)), px: p.x, py: p.y, ret: true, maxN: it.a.n });
         });

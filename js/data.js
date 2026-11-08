@@ -462,3 +462,7 @@ const SCENARIOS = [
   { id: 'embers', icon: '🌋', name: 'Siege of Embers', blurb: 'Ash and lava. Three realms close in; simply outlast them — hold a town on day 45.', diff: 'hard', goal: { type: 'survive', days: 45 }, map: { preset: 'highland', size: 'medium', seed: 'embers', ais: 3, teams: ['bloc', 'bloc', 'bloc'], biome: 'lava' } },
   { id: 'warlords', icon: '👑', name: 'War of the Warlords', blurb: 'A huge realm, three rivals, every one for themselves. Only one crown will remain.', diff: 'expert', goal: { type: 'conquer' }, map: { preset: 'plains', size: 'huge', seed: 'warlords', ais: 3, biome: 'mixed' } },
 ];
+
+// big creatures take two hexes on the battlefield (not in sieges)
+const WIDE_IDS = ['castle6', 'rampart6', 'rampart7', 'inferno3', 'necropolis7', 'dungeon6', 'dungeon7', 'stronghold2', 'stronghold7', 'fortress6', 'fortress7', 'conflux7'];
+(() => { for (const id of WIDE_IDS) for (let L = 1; L <= MAX_LV; L++) { const o = C[lineType(id, L)]; if (o) o.wide = 1; } for (const k of ['dragon', 'wolf', 'kraken', 'shark', 'azured', 'crystald', 'rustd']) if (C[k]) C[k].wide = 1; })();

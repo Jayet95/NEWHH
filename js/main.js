@@ -641,7 +641,7 @@
       case 'stone': return '<b>Learning Stone</b><br>Grants experience once per hero.';
       case 'shrine': return `<b>Shrine of ${SPELLS[o.spell].n}</b><br>Teaches a spell once per hero.`;
       case 'tower': return '<b>Observation Tower</b><br>Reveals a large area.';
-      case 'bank': return `<b>${{ crypt: 'Crypt', utopia: 'Wyrm Hoard', stockpile: 'Rockhurler Stockpile' }[o.kind]}</b><br>Guarded treasure: ${armyList(o.guard, true)}`;
+      case 'bank': return `<b>${{ crypt: 'Crypt', utopia: 'Dragon Hoard', stockpile: 'Giant Stockpile' }[o.kind]}</b><br>Guarded treasure: ${armyList(o.guard, true)}`;
       case 'mono': return '<b>Monolith</b><br>Teleports to its twin.';
       case 'seer': return `<b>Seer's Hut</b><br>Wants ${o.amt} ${o.need} for an artifact.`;
       case 'spring': return `<b>${SPRING[o.kind].n}</b><br>${SPRING[o.kind].d}<br><span class="small">Once per week per hero.</span>`;
@@ -889,7 +889,7 @@
     return showModal('<h2>🔭 Observation Tower</h2><p>From the top you survey the land: a large area of the map is revealed.</p>');
   }
   async function visitBank(o, h) {
-    const NAMES = { crypt: '⚰️ Crypt', utopia: '🐲 Wyrm Hoard', stockpile: '🏚️ Rockhurler Stockpile' };
+    const NAMES = { crypt: '⚰️ Crypt', utopia: '🐲 Dragon Hoard', stockpile: '🏚️ Giant Stockpile' };
     if (!(await fight(h, o.guard, { att: 0, def: 0 }, NAMES[o.kind].slice(3)))) return;
     let txt = `${RES_ICON.gold}${o.gold}`; G.res.gold += o.gold;
     if (o.kind === 'stockpile') { for (const k of ['wood', 'ore', 'mercury', 'sulfur', 'crystal', 'gems']) G.res[k] += 4; txt += ' and 4 of every other resource'; }
@@ -1089,7 +1089,7 @@
       const nec = perk(h, 'necromancy');
       if (nec && res.xp > 0) {
         const raised = Math.floor(res.xp * 0.1 * nec / 6);
-        if (raised > 0 && addToArmy(h, 'necropolis1', raised)) toast(`💀 ${h.name} raises ${raised} bonewalkers from the fallen (Grave Craft ${RANK_NAMES[nec]}).`);
+        if (raised > 0 && addToArmy(h, 'necropolis1', raised)) toast(`💀 ${h.name} raises ${raised} skeletons from the fallen (Grave Craft ${RANK_NAMES[nec]}).`);
       }
       await gainXp(h, res.xp);
       const foe = eHero && (eHero.real || (eHero.arts || eHero.pack ? eHero : null));
@@ -2144,7 +2144,7 @@
     ['Zones', 'The map is divided into zones, each ruled from a town or fort. Mines pay you only while you hold their zone.'],
     ['Threat tags', 'The coloured dot next to a guard compares its strength with your selected hero\'s army: Trivial, Easy, Even, Hard, Deadly. It is an estimate, not a promise.'],
     ['Outposts', 'Dwellings and the Dragon Lair you have conquered deliver their weekly recruits to every castle — buy them in the Warriors tab.'],
-    ['Dragon Lair', 'Guarded by a dragon horde. Conquer it to buy the Glimmerdrake, Corrosion, Prism and Sapphire Wyrms, found in no castle.'],
+    ['Dragon Lair', 'Guarded by a dragon horde. Conquer it to buy the Tiny, Acid, Gem and Blue Dragons, found in no castle.'],
     ['Caravans', 'Troops sent from one castle garrison to another travel for several days, depending on distance.'],
     ['Rarity colours', 'The frame of a creature portrait shows its rarity: Common (bronze), Uncommon (green), Rare (blue), Epic (purple), Legendary (gold), Mythic (red), Ancient (silver), Divine (prismatic). Stars show the upgrade level.'],
     ['Surrender & ransom', 'A hopelessly outmatched rival hero may offer gold to be let go. If you are the outmatched one, you can pay a ransom and retreat to your nearest castle with your army intact.'],

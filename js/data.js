@@ -335,7 +335,7 @@ const PERKS = {
   earthmagic: { n: 'Earth Magic', i: '⛰️', d: 'Earth spells (Stone Skin, Slow, Curse, Meteor Shower, Implosion) are stronger; Expert makes them mass' },
   firemagic:  { n: 'Fire Magic',  i: '🔥', d: 'Fire spells (Bloodlust, Blind, Fireball, Armageddon) are stronger; Expert makes them mass / wider' },
   watermagic: { n: 'Water Magic', i: '💧', d: 'Water spells (Bless, Cure, Frost Ring, Resurrection) are stronger; Expert makes them mass' },
-  necromancy: { n: 'Necromancy', i: '🦴', d: 'Raise bonewalkers after battle: 10 / 20 / 30% of the enemy hit points slain' },
+  necromancy: { n: 'Necromancy', i: '🦴', d: 'Raise skeletons after battle: 10 / 20 / 30% of the enemy hit points slain' },
   navigation: { n: 'Navigation', i: '⚓', d: 'Sailing costs 10 / 20 / 30% less movement' },
   scouting:   { n: 'Scouting',   i: '🔭', d: 'See 1 / 2 / 3 tiles farther through the fog of war' },
   mysticism:  { n: 'Mysticism',  i: '🌀', d: 'Regain 2 / 4 / 6 extra mana per day' },

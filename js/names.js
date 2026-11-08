@@ -4,17 +4,17 @@
 (() => {
   // [base name, upgraded name] for the 7 tiers of each castle, in FD order
   const CREATURES = {
-    castle: [['Levyman', 'Pikeward'], ['Longbowman', 'Deadeye'], ['Skyrender', 'Crowned Skyrender'], ['Sworn Blade', 'Oathblade'], ['Cantor', 'High Cantor'], ['Lancer', 'Warlance'], ['Dawnwing', 'Sunwing Herald']],
-    rampart: [['Plainsrider', 'Plainsrider Warden'], ['Stonekin', 'Ironkin'], ['Glade Archer', 'Glade Warden'], ['Cloudmare', 'Moonmare'], ['Rootguard', 'Barkguard'], ['Whitehorn', 'Warhorn'], ['Emerald Wyrm', 'Aurum Wyrm']],
-    tower: [['Tinker Imp', 'Master Tinker'], ['Stonewing', 'Glasswing'], ['Granite Automaton', 'Iron Automaton'], ['Adept', 'Magister'], ['Lampbound', 'Lampmaster'], ['Coilmaiden', 'Coilqueen'], ['Cloudgiant', 'Skytitan']],
-    inferno: [['Cinder Imp', 'Ember Imp'], ['Flamecaster', 'Pyromancer'], ['Ashhound', 'Threefang'], ['Fiend', 'Horned Fiend'], ['Abyss Warden', 'Abyss Overlord'], ['Scorch Djinn', 'Flame Sultan'], ['Infernal', 'Infernal Tyrant']],
-    necropolis: [['Bonewalker', 'Bonesworn'], ['Shambler', 'Rotten Shambler'], ['Lurking Shade', 'Dread Shade'], ['Bloodthrall', 'Bloodlord'], ['Grave Mage', 'Gravelord'], ['Blackguard', 'Deathguard'], ['Skeletal Wyrm', 'Spectral Wyrm']],
-    dungeon: [['Cave Dweller', 'Deep Dweller'], ['Screecher', 'Shrieking Hag'], ['Gazer', 'Dread Gazer'], ['Serpent Maiden', 'Serpent Queen'], ['Maze Brute', 'Maze Lord'], ['Stingbeast', 'Dire Stingbeast'], ['Crimson Wyrm', 'Night Wyrm']],
-    stronghold: [['Skulker', 'Cutthroat'], ['Fangrider', 'Fang Raider'], ['Blackhide', 'Blackhide Chief'], ['Brute', 'Brute Shaman'], ['Great Condor', 'Storm Condor'], ['Rockhurler', 'Rockhurler King'], ['Doomhorn', 'Ancient Doomhorn']],
-    fortress: [['Hyenakin', 'Hyena Raider'], ['Scaleman', 'Scale Warrior'], ['Stinger Fly', 'Spitfire Fly'], ['Stonemaw', 'Greater Stonemaw'], ['Bronze Bull', 'Mighty Bronze Bull'], ['Fangwing', 'Fangwing Monarch'], ['Manyjaw', 'Chaos Manyjaw']],
-    conflux: [['Mote', 'Wisp'], ['Gale Spirit', 'Storm Spirit'], ['Tide Spirit', 'Frost Spirit'], ['Flame Spirit', 'Spark Spirit'], ['Stone Spirit', 'Magma Spirit'], ['Mind Spirit', 'Arcane Spirit'], ['Sunfeather', 'Sunfeather Reborn']],
+    castle: [['Spearman', 'Shield Spearman'], ['Archer', 'Sharp Archer'], ['Winged Lion', 'Royal Winged Lion'], ['Swordsman', 'Holy Swordsman'], ['Priest', 'High Priest'], ['Horse Knight', 'Royal Horse Knight'], ['Sun Angel', 'Great Sun Angel']],
+    rampart: [['Plains Rider', 'Plains Captain'], ['Stone Dwarf', 'Iron Dwarf'], ['Forest Elf', 'Great Elf'], ['Winged Horse', 'Silver Winged Horse'], ['Tree Guard', 'Tree Soldier'], ['White Unicorn', 'War Unicorn'], ['Green Dragon', 'Gold Dragon']],
+    tower: [['Tinker', 'Master Tinker'], ['Stone Bat', 'Black Stone Bat'], ['Stone Golem', 'Iron Golem'], ['Mage', 'Great Mage'], ['Lamp Spirit', 'Lamp Master'], ['Snake Woman', 'Snake Queen'], ['Giant', 'Storm Giant']],
+    inferno: [['Imp', 'Fire Imp'], ['Fire Thrower', 'Fire Master'], ['Hell Hound', 'Big Hell Hound'], ['Demon', 'Horned Demon'], ['Pit Demon', 'Pit Lord'], ['Fire Djinn', 'Fire Sultan'], ['Devil', 'Arch Devil']],
+    necropolis: [['Skeleton', 'Skeleton Warrior'], ['Zombie', 'Rotten Zombie'], ['Ghost', 'Dark Ghost'], ['Vampire', 'Vampire Lord'], ['Skull Mage', 'Great Skull Mage'], ['Black Knight', 'Death Knight'], ['Bone Dragon', 'Ghost Dragon']],
+    dungeon: [['Cave Man', 'Cave Chief'], ['Harpy', 'Old Harpy'], ['Floating Eye', 'Evil Eye'], ['Stone Witch', 'Stone Queen'], ['Bull Man', 'Bull King'], ['Scorpion Lion', 'Big Scorpion Lion'], ['Red Dragon', 'Black Dragon']],
+    stronghold: [['Goblin', 'Big Goblin'], ['Wolf Rider', 'Wolf Raider'], ['Orc', 'Orc Chief'], ['Ogre', 'Ogre Mage'], ['Giant Bird', 'Thunder Bird'], ['One-Eye Giant', 'One-Eye King'], ['Giant Beast', 'Ancient Beast']],
+    fortress: [['Hyena Man', 'Hyena Raider'], ['Lizard Man', 'Lizard Warrior'], ['Giant Fly', 'Dragon Fly'], ['Stone Lizard', 'Great Stone Lizard'], ['Iron Bull', 'Mighty Iron Bull'], ['Sting Dragon', 'Sting Dragon King'], ['Swamp Hydra', 'Chaos Hydra']],
+    conflux: [['Light Sprite', 'Bright Sprite'], ['Air Spirit', 'Storm Spirit'], ['Water Spirit', 'Ice Spirit'], ['Fire Spirit', 'Energy Spirit'], ['Earth Spirit', 'Lava Spirit'], ['Mind Spirit', 'Magic Spirit'], ['Fire Bird', 'Phoenix']],
   };
-  const NEUTRAL = { goblin: 'Skulker', wolf: 'Fangrider', orc: 'Blackhide', ogre: 'Brute', troll: 'Rockjaw', golem: 'Granite Automaton', naga: 'Coilmaiden', dragon: 'Emerald Wyrm', shark: 'Razorfin', kraken: 'Maelstrom Beast', faerie: 'Glimmerdrake', rustd: 'Corrosion Wyrm', crystald: 'Prism Wyrm', azured: 'Sapphire Wyrm' };
+  const NEUTRAL = { goblin: 'Goblin', wolf: 'Wolf Rider', orc: 'Orc', ogre: 'Ogre', troll: 'Troll', golem: 'Stone Golem', naga: 'Snake Woman', dragon: 'Green Dragon', shark: 'Shark', kraken: 'Giant Squid', faerie: 'Tiny Dragon', rustd: 'Acid Dragon', crystald: 'Gem Dragon', azured: 'Blue Dragon' };
   const HERO = {
     // castle
     'Orrin': 'Aldren', 'Valeska': 'Maribel', 'Edric': 'Corwin', 'Sylvia': 'Elowen', 'Lord Haart': 'Lord Brannoch', 'Sorsha': 'Theodora', 'Christian': 'Gareth', 'Tyris': 'Rowena',

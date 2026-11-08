@@ -19,3 +19,8 @@ Install Android Studio, then: `npm run build && npx cap sync android && npx cap 
 - Store listing: icon 512px (`icons/icon-512.png`), feature graphic 1024x500, 2+ phone screenshots, short and full description.
 - Privacy policy URL (the game collects no data; say so), Data safety form, content rating questionnaire, target audience.
 - Raise `versionCode` in `android/app/build.gradle` for every upload.
+
+## Screens and Android 15/16 (edge-to-edge)
+- The app targets SDK 36, where Android draws the app under the status bar, cutout and gesture bar. The game keeps clear of them through `--sat/--sab/--sal/--sar` (CSS safe-area insets; Capacitor's SystemBars plugin supplies them, `insetsHandling: css`).
+- Layouts are checked at 344x882 (folded phone), 360x780, 412x915, 915x412 (landscape with cutout insets), 673x841 (unfolded), 800x1280 and 1280x800 tablets.
+- Battles prefer landscape: in portrait a "turn your phone sideways" prompt appears (it also asks Android to lock landscape where allowed).

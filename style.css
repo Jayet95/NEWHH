@@ -293,7 +293,10 @@ body.inbattle { padding-bottom: 0; }
 /* troop slots: the picture must never start the browser's own image drag */
 .slot img, .dragghost img, .pic { -webkit-user-drag: none; user-select: none; }
 .slot img { pointer-events: none; }
-@media (orientation: landscape) and (max-height: 540px) { #tcv { height: 96px !important; object-fit: cover; } }
+@media (orientation: landscape) and (max-height: 540px) { #tcv { height: 96px !important; object-fit: cover; object-position: 50% 48%; } }
+/* the card a clicked plot in the castle picture points at */
+.slotflash { animation: slotflash 1.5s ease; }
+@keyframes slotflash { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 214, 110, 0); } 25%, 75% { box-shadow: 0 0 0 3px #ffd766, 0 0 22px rgba(255, 214, 110, .7); } }
 
 /* ---------- menu, settings, slots ---------- */
 .menugrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

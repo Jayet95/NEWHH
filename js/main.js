@@ -1474,21 +1474,40 @@
   const tierType = (t, tier) => lineType(tiersOf(t)[tier - 1], (t.up && t.up[tier]) || 1);
   const starStr = (lv, max = MAX_LV) => '★'.repeat(lv) + '☆'.repeat(max - lv);
   function startTownAnim(kind, slot) { townAnim = { kind, slot, t0: performance.now() }; sfx(kind === 'upgrade' ? 'level' : 'build'); }
+  // what each of the 16 plots in the castle picture shows: 0-6 the dwellings, 7-15 the town buildings
   function slotInfo(t, i) {
-    if (i < 7) return { built: !!t.b[i + 1], lv: t.up[i + 1] || 1, max: MAX_LV, icon: C[tierType(t, i + 1)].i, id: tierType(t, i + 1) };
-    if (i === 7) return { built: t.b.hall > 0, lv: t.b.hall, max: 5, icon: '🏛️', id: 'hall' };
-    if (i === 8) return { built: t.b.guild > 0, lv: t.b.guild, max: 3, icon: '🔮' };
-    if (i === 9) return { built: !!t.b.market, lv: t.b.market ? 1 : 0, max: 1, icon: '⚖️' };
-    return { built: !!t.b.ship, lv: t.b.ship ? 1 : 0, max: 1, icon: '⚓' };
+    if (i < 7) { const tier = i + 1, id = tierType(t, tier); return { built: !!t.b[tier], lv: t.up[tier] || 1, max: MAX_LV, id, name: C[id].n, av: t.avail[tier] || 0, locked: !t.b[tier] && t.b.hall < TIER_HALL[tier] }; }
+    switch (i) {
+      case 7: return { built: t.b.hall > 0, lv: t.b.hall, max: 5, name: t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Town Hall' };
+      case 8: return { built: t.b.guild > 0, lv: t.b.guild, max: 3, name: 'Arcane Lodge' };
+      case 9: return { built: !!t.b.market, lv: t.b.market ? 1 : 0, max: 1, name: 'Merchant Row' };
+      case 10: return { built: !!t.b.ship, lv: t.b.ship ? 1 : 0, max: 1, name: 'Shipyard', na: !(G.dock && t === myTowns()[0]) };
+      case 11: return { built: true, lv: 1, max: 1, name: 'Tavern' };
+      case 12: return { built: true, lv: 1, max: 1, name: 'Smithy' };
+      case 13: return { built: true, lv: 1, max: 1, name: 'Garrison' };
+      case 14: return { built: true, lv: t.fort || 0, max: 3, name: FORT_LEVELS[t.fort || 0].n };
+      default: return { built: true, lv: t.minel || 0, max: 3, name: MINE_LEVELS[t.minel || 0].n };
+    }
   }
+  let townHover = -1;
+  const TW = 1040, TH = 470;   // the panorama is painted in these units and backed at screen density
   function drawTown() {
     const cv = $('tcv');
     if (!cv || $('modal').classList.contains('hide')) { townLoop = false; return; }
     const t = curTown; if (!t) return;
-    const now = performance.now();
+    const now = performance.now(), dpr = DPR();
     if (townAnim && now - townAnim.t0 > 1600) townAnim = null;
-    TownArt.scene(cv.getContext('2d'), t, now, townAnim, slotInfo, cv.width, cv.height);
+    if (cv.width !== Math.round(TW * dpr)) { cv.width = Math.round(TW * dpr); cv.height = Math.round(TH * dpr); }
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    TownArt.scene(g, t, now, townAnim, slotInfo, TW, TH, townHover);
     requestAnimationFrame(drawTown);
+  }
+  // clicking a plot in the picture opens the matching warriors / buildings card below and flashes it
+  function townSlotClick(t, i) {
+    townTab = (i < 7 && slotInfo(t, i).built) ? 'war' : 'bld';
+    openTown(t);
+    const el = $('mbox').querySelector('[data-slot="' + i + '"]');
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('slotflash'); setTimeout(() => el.classList.remove('slotflash'), 1600); }
   }
 
   function openMarket(rate, title, back) {
@@ -1611,7 +1630,7 @@
     curTown = t; (G.flags = G.flags || {}).town = true; Assets.need(['ui/town_' + t.fac]); if (typeof Sfx !== 'undefined' && Sfx.ambience) Sfx.ambience(t.fac); // quiet per-castle ambience while the town screen is open
     const th = townHero(t), here = !!th, mt = myTowns(), coastal = !!G.dock && t === mt[0];
     const tabs = mt.length > 1 ? `<div class="hlist">${mt.map((x, i) => `<button class="hbtn${x === t ? ' on' : ''}" data-tab="${i}" title="${x.name}">${FACTIONS[x.fac].icon}</button>`).join('')}</div>` : '';
-    let html = `${tabs}<h2>🏰 ${t.name} <span class="small">${FACTIONS[t.fac].name} · ${t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Settlement'}</span></h2><span class="townwide"></span><canvas id="tcv" width="1040" height="290" style="width:100%;height:auto;aspect-ratio:1040/290;border-radius:8px;border:2px solid #8c6a33;display:block"></canvas>
+    let html = `${tabs}<h2>🏰 ${t.name} <span class="small">${FACTIONS[t.fac].name} · ${t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Settlement'}</span></h2><span class="townwide"></span><canvas id="tcv" width="1040" height="470" style="width:100%;height:auto;aspect-ratio:1040/470;border-radius:8px;border:2px solid #8c6a33;display:block;touch-action:manipulation"></canvas>
       <div class="small">${here ? `${th.name} is in town — recruits join the hero's army.` : 'No hero in this town — recruits join the town garrison (a hero can pick them up later).'} Higher Town Hall levels unlock new dwellings and creature upgrades.</div>`;
     let war = '', dwc = '', wc = '';
     tiersOf(t).forEach((id, i) => {
@@ -1624,9 +1643,9 @@
         for (const s of th.army) if (s && C[s.t].line === id && C[s.t].lv < lv) { cost += (c.cost.gold - C[s.t].cost.gold) * s.n; count += s.n; }
         if (count) upArmy = { cost, count };
       }
-      dwc += `<div class="bcard${built ? ' built' : ''}${!built && locked ? ' lockedrow' : ''}"><div class="bpic">${TownArt.pic('dwell', lv, t.fac, 112, lineType(id, lv))}<span class="bcr">${Art.pic(lineType(id, lv), 34)}</span></div><div><b>${c.n} dwelling</b> <span class="stars">${built ? starStr(lv) : ''}</span><br><span class="small">${built ? `Recruits <b>${av}</b> now · +${c.gr}/week · ${fmtCost(c.cost)} each` : locked ? `Needs the ${HALL_LEVELS[needHall].n}` : `Not built yet — ${fmtCost(DWELL_COST[tier])}`}</span></div>
+      dwc += `<div class="bcard${built ? ' built' : ''}${!built && locked ? ' lockedrow' : ''}" data-slot="${i}"><div class="bpic">${TownArt.pic('dwell', lv, t.fac, 112, lineType(id, lv))}<span class="bcr">${Art.pic(lineType(id, lv), 34)}</span></div><div><b>${c.n} dwelling</b> <span class="stars">${built ? starStr(lv) : ''}</span><br><span class="small">${built ? `Recruits <b>${av}</b> now · +${c.gr}/week · ${fmtCost(c.cost)} each` : locked ? `Needs the ${HALL_LEVELS[needHall].n}` : `Not built yet — ${fmtCost(DWELL_COST[tier])}`}</span></div>
         <div class="bacts">${built ? (upC ? (upLocked ? `<span class="lockpill">Lv${nextLv} · Hall ${UP_HALL[nextLv]}</span>` : `<button data-up="${tier}" title="${Art.fmtCostTxt(upC)}">⬆ Lv${nextLv} ${fmtCost(upC)}</button>`) : '<span class="small">MAX</span>') : (locked ? `<span class="lockpill">🔒 Hall ${needHall}</span>` : `<button class="primary" data-build="${tier}">Build ${fmtCost(DWELL_COST[tier])}</button>`)}</div></div>`;
-      wc += `<div class="bcard wcard${built ? ' built' : ''}${!built && locked ? ' lockedrow' : ''}"><div class="bpic wpic">${Art.pic(lineType(id, lv), 112)}<span class="bcr">${TownArt.pic('dwell', lv, t.fac, 44, lineType(id, lv))}</span>${built ? `<span class="wav" title="Ready to recruit">${av}</span>` : ''}</div>
+      wc += `<div class="bcard wcard${built ? ' built' : ''}${!built && locked ? ' lockedrow' : ''}" data-slot="${i}"><div class="bpic wpic">${Art.pic(lineType(id, lv), 112)}<span class="bcr">${TownArt.pic('dwell', lv, t.fac, 44, lineType(id, lv))}</span>${built ? `<span class="wav" title="Ready to recruit">${av}</span>` : ''}</div>
         <div><b>${c.n}</b> <span class="stars">${built ? starStr(lv) : ''}</span><div class="wstats"><span>⚔ ${c.a}</span><span>🛡 ${c.d}</span><span>HP ${c.hp}</span><span>👢 ${c.s}</span><span>${c.lo}-${c.hi} dmg</span>${c.shoot ? '<span>🏹 archer</span>' : ''}${c.fly ? '<span>flying</span>' : ''}</div>
         <span class="small">${built ? `${fmtCost(c.cost)} each · +${c.gr}/week` : locked ? `🔒 Needs the ${HALL_LEVELS[needHall].n}` : `Dwelling not built — ${fmtCost(DWELL_COST[tier])}`}</span></div>
         <div class="bacts">${built ? `<input type="number" min="1" max="${av}" value="${av}" id="n${tier}"><button class="primary" data-buy="${tier}">Recruit</button>${upC ? (upLocked ? `<span class="lockpill" title="Requires Town Hall level ${UP_HALL[nextLv]}">Lv${nextLv} · Hall ${UP_HALL[nextLv]}</span>` : `<button data-up="${tier}" title="${Art.fmtCostTxt(upC)}">⬆ Lv${nextLv} ${fmtCost(upC)}</button>`) : ''}${upArmy ? `<button data-uparmy="${tier}">🪖 Upgrade ${upArmy.count} troops ${RES_ICON.gold}${upArmy.cost}</button>` : ''}` : (locked ? `<span class="lockpill">🔒 Hall ${needHall}</span>` : `<button class="primary" data-build="${tier}">Build</button>`)}</div></div>`;
@@ -1641,35 +1660,39 @@
     });
     const hl = t.b.hall, hNext = hl < 5 ? HALL_LEVELS[hl + 1] : null;
     const gl = t.b.guild, gNext = gl < 3 ? GUILD_COST[gl + 1] : null;
-    const bld = `<div class="trow big"><div class="ic">${TownArt.pic('hall', Math.max(1, hl), t.fac, 64)}</div><div><b>${hl ? HALL_LEVELS[hl].n : 'Town Hall'}</b> <span class="stars">${starStr(hl, 5)}</span><br>
+    const bld = `<div class="trow big" data-slot="7"><div class="ic">${TownArt.pic('hall', Math.max(1, hl), t.fac, 64)}</div><div><b>${hl ? HALL_LEVELS[hl].n : 'Town Hall'}</b> <span class="stars">${starStr(hl, 5)}</span><br>
         <span class="small">${hl ? `+${HALL_LEVELS[hl].inc} 🪙/day.` : 'No income yet.'}${hNext ? ` Next: ${hNext.n} (+${hNext.inc} 🪙/day) — unlocks ${hl + 1 >= 1 && TIER_HALL.indexOf(hl + 1) > 0 ? 'tier ' + TIER_HALL.indexOf(hl + 1) + ' dwelling' : ''}${UP_HALL[hl + 2] ? ' and Lv' + (hl + 2) + ' upgrades' : ''}.` : ''}</span></div>
         <div class="acts">${hNext ? `<button data-hall="1" title="${Art.fmtCostTxt(hNext.cost)}">${hl ? 'Upgrade' : 'Build'} ${fmtCost(hNext.cost)}</button>` : '<span class="small">MAX</span>'}</div></div>
-      <div class="trow big"><div class="ic">${TownArt.pic('guild', Math.max(1, gl), t.fac, 64)}</div><div><b>Arcane Lodge</b> <span class="stars">${starStr(gl, 3)}</span><br>
+      <div class="trow big" data-slot="8"><div class="ic">${TownArt.pic('guild', Math.max(1, gl), t.fac, 64)}</div><div><b>Arcane Lodge</b> <span class="stars">${starStr(gl, 3)}</span><br>
         <span class="small">Spellbook: ${G.spells.map(k => SPELLS[k].i + ' ' + SPELLS[k].n).join(', ')}${gl < 3 ? `<br>Next level teaches: ${GUILD_SPELLS[gl + 1].map(k => SPELLS[k].i + ' ' + SPELLS[k].n).join(', ')}` : ''}</span></div>
         <div class="acts">${gNext ? `<button data-guild="1" title="${Art.fmtCostTxt(gNext)}">${gl ? 'Upgrade' : 'Build'} ${fmtCost(gNext)}</button>` : '<span class="small">MAX</span>'}</div></div>
-      <div class="trow big"><div class="ic">${TownArt.pic('market', 1, t.fac, 64)}</div><div><b>Merchant Row</b><br><span class="small">${t.b.market ? `Buy missing resources at ${Math.round(MARKET_RATE * 100)}% rate.` : `Trade resources — ${fmtCost(MARKET_COST)}`}</span></div>
+      <div class="trow big" data-slot="9"><div class="ic">${TownArt.pic('market', 1, t.fac, 64)}</div><div><b>Merchant Row</b><br><span class="small">${t.b.market ? `Buy missing resources at ${Math.round(MARKET_RATE * 100)}% rate.` : `Trade resources — ${fmtCost(MARKET_COST)}`}</span></div>
         <div class="acts">${t.b.market ? '<button data-trade="1">Trade</button>' : '<button data-build="market">Build</button>'}</div></div>
-      <div class="trow big"><div class="ic">${TownArt.pic('ship', 1, t.fac, 64)}</div><div><b>Shipyard</b><br><span class="small">${t.b.ship ? `Boats ${G.boats.length}/${MAX_BOATS}. A new boat appears at the port by the bay (${fmtCost(BOAT_COST)} each). Walk a hero onto a boat to sail; collect treasures at sea.` : coastal ? `Build boats to sail the sea and collect its treasures — ${fmtCost(SHIPYARD_COST)}` : 'There is no coast near this town.'}</span></div>
+      <div class="trow big" data-slot="10"><div class="ic">${TownArt.pic('ship', 1, t.fac, 64)}</div><div><b>Shipyard</b><br><span class="small">${t.b.ship ? `Boats ${G.boats.length}/${MAX_BOATS}. A new boat appears at the port by the bay (${fmtCost(BOAT_COST)} each). Walk a hero onto a boat to sail; collect treasures at sea.` : coastal ? `Build boats to sail the sea and collect its treasures — ${fmtCost(SHIPYARD_COST)}` : 'There is no coast near this town.'}</span></div>
         <div class="acts">${!coastal ? '' : t.b.ship ? `<button data-boat="1" ${G.boats.length >= MAX_BOATS ? 'disabled' : ''}>⛵ Build boat</button>` : '<button data-build="ship">Build</button>'}</div></div>
-      <div class="trow big"><div class="ic">${TownArt.pic('fort', t.fort || 0, t.fac, 64)}</div><div><b>${FORT_LEVELS[t.fort || 0].n}</b> <span class="stars">${starStr(t.fort || 0, 3)}</span><br>
+      <div class="trow big" data-slot="14"><div class="ic">${TownArt.pic('fort', t.fort || 0, t.fac, 64)}</div><div><b>${FORT_LEVELS[t.fort || 0].n}</b> <span class="stars">${starStr(t.fort || 0, 3)}</span><br>
         <span class="small">Walls, gate and arrow towers are ×${FORT_LEVELS[t.fort || 0].hp} as strong in a siege${(t.fort || 0) < 3 ? ` — next: ${FORT_LEVELS[(t.fort || 0) + 1].n} (×${FORT_LEVELS[(t.fort || 0) + 1].hp} walls, ×${FORT_LEVELS[(t.fort || 0) + 1].tower} tower fire)` : ''}.</span></div>
         <div class="acts">${(t.fort || 0) < 3 ? `<button data-fortify="1" title="${Art.fmtCostTxt(FORT_LEVELS[(t.fort || 0) + 1].cost)}">⬆ ${fmtCost(FORT_LEVELS[(t.fort || 0) + 1].cost)}</button>` : '<span class="small">MAX</span>'}</div></div>
-      <div class="trow big"><div class="ic">${TownArt.pic('mines', t.minel || 0, t.fac, 64)}</div><div><b>${MINE_LEVELS[t.minel || 0].n}</b> <span class="stars">${starStr(t.minel || 0, 3)}</span><br>
+      <div class="trow big" data-slot="15"><div class="ic">${TownArt.pic('mines', t.minel || 0, t.fac, 64)}</div><div><b>${MINE_LEVELS[t.minel || 0].n}</b> <span class="stars">${starStr(t.minel || 0, 3)}</span><br>
         <span class="small">Hidden mines (${MINE_LEVELS[t.minel || 0].stock}) in front of the walls hurt and halt attackers. A defending hero can lay ${EMERGENCY_MINES} extra mines even without a minefield${(t.minel || 0) < 3 ? ` — next: ${MINE_LEVELS[(t.minel || 0) + 1].n} (${MINE_LEVELS[(t.minel || 0) + 1].stock} mines)` : ''}.</span></div>
         <div class="acts">${(t.minel || 0) < 3 ? `<button data-minefield="1" title="${Art.fmtCostTxt(MINE_LEVELS[(t.minel || 0) + 1].cost)}">⬆ ${fmtCost(MINE_LEVELS[(t.minel || 0) + 1].cost)}</button>` : '<span class="small">MAX</span>'}</div></div>
-      <div class="trow big"><div class="ic">${TownArt.pic('tavern', 1, t.fac, 64)}</div><div><b>Tavern</b><br><span class="small">Heroes ${G.heroes.length}/${MAX_HEROES}. Hire more heroes and exchange troops between heroes in town.</span></div>
+      <div class="trow big" data-slot="11"><div class="ic">${TownArt.pic('tavern', 1, t.fac, 64)}</div><div><b>Tavern</b><br><span class="small">Heroes ${G.heroes.length}/${MAX_HEROES}. Hire more heroes and exchange troops between heroes in town.</span></div>
         <div class="acts"><button data-tavern="1">Hire heroes</button>${heroesAt(t.x, t.y).length > 1 ? '<button data-xhero="1">Exchange troops</button>' : ''}</div></div>
       `;
-    const smithy = `<div class="trow big"><div class="ic"><span class="mico">⚒️</span></div><div><b>Smithy</b><br><span class="small">${here ? `War machines for ${th.name}: the <b>ballista</b> shoots every round, the <b>first aid tent</b> heals a stack every round and the <b>ammo cart</b> gives your archers 50% more arrows and refills one arrow a round.` : 'A hero must be in town to buy war machines.'}</span></div>
+    const smithy = `<div class="trow big" data-slot="12"><div class="ic">${TownArt.pic('smithy', 1, t.fac, 64)}</div><div><b>Smithy</b><br><span class="small">${here ? `War machines for ${th.name}: the <b>ballista</b> shoots every round, the <b>first aid tent</b> heals a stack every round and the <b>ammo cart</b> gives your archers 50% more arrows and refills one arrow a round.` : 'A hero must be in town to buy war machines.'}</span></div>
         <div class="acts">${here ? MACHINES.map(([k, nm, cost]) => (th.mach || {})[k] ? `<span class="small">✔ ${nm}</span>` : `<button data-mach="${k}" title="${nm}">${nm} ${RES_ICON.gold}${cost}</button>`).join('') : ''}</div></div>
       `;
-    const garrRow = `      <div class="trow big"><div class="ic">${TownArt.pic('garrison', 1, t.fac, 64)}</div><div><b>Garrison</b><br><span class="small">${armyList(t.garrison, false) || 'No troops stationed.'} The garrison defends the town when no hero is inside${here ? '' : ' (bring a hero to move troops)'}.</span></div>
+    const garrRow = `      <div class="trow big" data-slot="13"><div class="ic">${TownArt.pic('garrison', 1, t.fac, 64)}</div><div><b>Garrison</b><br><span class="small">${armyList(t.garrison, false) || 'No troops stationed.'} The garrison defends the town when no hero is inside${here ? '' : ' (bring a hero to move troops)'}.</span></div>
         <div class="acts"><button data-garr="1">Manage garrison</button></div></div>
 `;
     const tabBar = `<div class="ttabs"><button class="ttab${townTab === 'war' ? ' on' : ''}" data-ttab="war">⚔️ Warriors</button><button class="ttab${townTab === 'bld' ? ' on' : ''}" data-ttab="bld">🏗️ Buildings</button></div>`;
     html += tabBar + (townTab === 'war' ? `<div class="bgrid wgrid">${wc}</div><div class="bgrid">${cardify(garrRow)}</div>` + outpostHtml(t) + caravanHtml(t, mt) : `<h4>Creature dwellings</h4><div class="bgrid">${dwc}</div><h4>Town buildings</h4><div class="bgrid">${cardify(garrRow + bld + smithy)}</div>`) + `<div class="small" style="margin-top:8px">${RES.map(k => RES_ICON[k] + ' ' + G.res[k]).join('  ')}</div>
       <div class="mb"><button class="primary" id="tClose">Leave town</button></div>`;
-    $('mbox').innerHTML = html; $('modal').classList.remove('hide');
+    $('mbox').innerHTML = html; $('modal').classList.remove('hide'); townHover = -1;
+    { const cv = $('tcv'), at = (e) => { const r = cv.getBoundingClientRect(); return TownArt.slotAt((e.clientX - r.left) * TW / r.width, (e.clientY - r.top) * TH / r.height, TW, TH); };
+      cv.onpointermove = (e) => { townHover = at(e); cv.style.cursor = townHover >= 0 ? 'pointer' : 'default'; };
+      cv.onpointerleave = () => { townHover = -1; };
+      cv.onclick = (e) => { const i = at(e); if (i >= 0) townSlotClick(t, i); }; }
     if (!townLoop) { townLoop = true; requestAnimationFrame(drawTown); }
     $('tClose').onclick = () => { $('modal').classList.add('hide'); renderAll(); };
     const again = () => { openTown(t); renderAll(); };

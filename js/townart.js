@@ -101,6 +101,17 @@ const TownArt = (() => {
   function tavern(g, lv, hue) { shadow(g, 24); wall(g, 10, 36, 44, 32, 28); poly(g, [[6, 36], [32, 14], [58, 36]], hsl(hue, 40, 30)); rect(g, 26, 56, 10, 12, '#2a1608'); win(g, 14, 44, true); win(g, 46, 44, true); line(g, 54, 40, 62, 40); rect(g, 56, 42, 8, 10, '#8a5a2b'); rect(g, 58, 44, 4, 6, '#f0c040'); g.strokeStyle = INK; g.strokeRect(62, 45, 3, 4); }
   function garrison(g, lv, hue) { shadow(g, 18); wall(g, 22, 22, 20, 46, 35); crenel(g, 22, 22, 20); poly(g, [[20, 22], [32, 8], [44, 22]], hsl(hue, 55, 36)); rect(g, 29, 56, 6, 12, '#2a1608'); rect(g, 31, 34, 2.4, 8, '#1c1710'); flag(g, 32, 10, hsl(hue, 70, 48)); }
   const cache = {};
+  function smithy(g, lv, hue) {
+    shadow(g, 26); wall(g, 8, 38, 42, 30, 34); poly(g, [[4, 40], [29, 22], [54, 40]], hsl(hue, 42, 30));       // low stone workshop under a castle-tinted roof
+    rect(g, 40, 8, 8, 30, '#6b6256'); rect(g, 38, 6, 12, 5, '#4c453c');                                          // chimney
+    g.fillStyle = 'rgba(210,205,198,.55)'; for (const [x, y, r] of [[44, 3, 4], [47, 0, 3.4], [43, -3, 3]]) { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+    poly(g, [[18, 68], [18, 52], [26, 46], [34, 52], [34, 68]], '#1a0f06');                                        // furnace mouth with a hot glow
+    { const fg = g.createRadialGradient(26, 62, 1, 26, 60, 10); fg.addColorStop(0, '#fff2b0'); fg.addColorStop(0.5, '#ff9a2a'); fg.addColorStop(1, 'rgba(255,60,10,0)'); g.fillStyle = fg; g.beginPath(); g.arc(26, 60, 10, 0, 7); g.fill(); }
+    poly(g, [[44, 66], [58, 66], [56, 62], [60, 58], [42, 58], [46, 62]], '#4a4e58'); rect(g, 46, 66, 10, 4, '#34363e');   // anvil
+    rect(g, 52, 50, 2, 9, '#8a5a2b'); rect(g, 49, 48, 8, 4, '#9aa0aa');                                           // hammer
+    g.fillStyle = '#ffd24a'; for (const [x, y] of [[49, 56], [56, 54], [53, 52]]) g.fillRect(x, y, 1.4, 1.4);
+    flag(g, 29, 22, hsl(hue, 70, 48));
+  }
   function sprite(kind, lv, fac, id) {
     const hue = hueOf(fac), key = [kind, lv, hue, id || ''].join('|');
     return cache[key] || (cache[key] = mk(128, 144, (g) => {
@@ -112,49 +123,98 @@ const TownArt = (() => {
         : [...(isUp ? ['buildings/' + fac + '_' + kind + '_up', 'buildings/' + kind + '_up'] : []), 'buildings/' + fac + '_' + kind + '_' + lv, 'buildings/' + kind + '_' + lv, 'buildings/' + fac + '_' + kind, 'buildings/' + kind];
       const ai = typeof Assets !== 'undefined' ? Assets.get(...nm) : null;
       if (ai) { const k = Math.min(128 / ai.width, 144 / ai.height); g.drawImage(ai, 64 - ai.width * k / 2, 144 - ai.height * k, ai.width * k, ai.height * k); return; }
-      g.scale(2, 2); const f = { dwell: () => dwelling(g, +(String(id).match(/(\d)(?:_\d)?$/) || [0, 1])[1], lv, hue, id), hall: () => hall(g, Math.max(1, lv), hue), guild: () => guild(g, Math.max(1, lv), hue), market: () => market(g, 1, hue), ship: () => ship(g, 1, hue), fort: () => fortKind(g, lv, hue), mines: () => minesKind(g, lv), tavern: () => tavern(g, 1, hue), garrison: () => garrison(g, 1, hue) }[kind]; if (f) f(); }));
+      g.scale(2, 2); const f = { dwell: () => dwelling(g, +(String(id).match(/(\d)(?:_\d)?$/) || [0, 1])[1], lv, hue, id), hall: () => hall(g, Math.max(1, lv), hue), guild: () => guild(g, Math.max(1, lv), hue), market: () => market(g, 1, hue), ship: () => ship(g, 1, hue), fort: () => fortKind(g, lv, hue), mines: () => minesKind(g, lv), tavern: () => tavern(g, 1, hue), garrison: () => garrison(g, 1, hue), smithy: () => smithy(g, 1, hue) }[kind]; if (f) f(); }));
   }
   const url = {};
   const pic = (kind, lv, fac, px = 40, id) => { const key = [kind, lv, fac, id || ''].join('|'); return `<img class="pic" style="width:${px}px;height:${Math.round(px * 1.12)}px;object-fit:contain" alt="" src="${url[key] || (url[key] = sprite(kind, lv, fac, id).toDataURL())}">`; };
 
   // ---- the full town panorama ----
-  function scene(g, t, now, anim, info, W, H) {
-    const hue = hueOf(t.fac), fort = t.fort || 0, hallLv = (t.b && t.b.hall) || 0;
-    const bgi = typeof Assets !== 'undefined' ? Assets.get('ui/town_' + t.fac) : null;
-    if (bgi) {
-      const kk = Math.max(W / bgi.width, H / bgi.height), dw = bgi.width * kk, dh = bgi.height * kk;
-      g.drawImage(bgi, (W - dw) / 2, -dh * 0.16, dw, dh);
-      const shade = g.createLinearGradient(0, H * 0.45, 0, H); shade.addColorStop(0, 'rgba(10,6,2,0)'); shade.addColorStop(1, 'rgba(10,6,2,.7)'); g.fillStyle = shade; g.fillRect(0, 0, W, H);
-    } else {
-    const sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#26386a'); sky.addColorStop(0.55, '#b9855a'); sky.addColorStop(1, '#e0a868'); g.fillStyle = sky; g.fillRect(0, 0, W, H);
-    g.fillStyle = 'rgba(255,255,255,.7)'; for (let i = 0; i < 18; i++) g.fillRect((i * 97) % W, (i * 31) % 50, 1.5, 1.5);
-    g.fillStyle = hsl(hue, 18, 26); poly(g, [[0, 120], [60, 60], [120, 100], [200, 50], [290, 105], [380, 66], [470, 108], [560, 58], [650, 100], [720, 70], [780, 112], [780, 130], [0, 130]], g.fillStyle, null);
-    g.fillStyle = hsl(hue, 20, 34); poly(g, [[0, 130], [90, 96], [190, 124], [320, 90], [430, 126], [540, 94], [660, 124], [780, 100], [780, 140], [0, 140]], g.fillStyle, null);
-    // the keep of the castle: grows with the Town Hall
-    const ks = 44 + hallLv * 12; g.drawImage(Art.obj({ t: 'town', owner: 0 }, t.fac), W / 2 - ks / 2, 122 - ks + 8, ks, ks);
+  // A painted sky, hills and meadow with the castle picture standing in the middle and the 11 building plots on a tidy grid:
+  // the 7 creature dwellings in a back row, and the Town Hall, Mage Guild, Marketplace, Shipyard, Tavern, Smithy, Garrison, Fortifications and Minefield in a larger front row.
+  const SKY = {
+    castle: ['#2c5594', '#a9cdeb'], rampart: ['#2c6a58', '#c2e6a4'], tower: ['#2a3a7c', '#b3c0f0'], inferno: ['#3a0c08', '#cf5a22'], necropolis: ['#1e1a34', '#76668c'],
+    dungeon: ['#26143c', '#84508f'], stronghold: ['#50401f', '#dca65e'], fortress: ['#2a4c3c', '#92bf9c'], conflux: ['#1c3c70', '#b0d6f4'],
+  };
+  const MEADOW = {
+    castle: ['#6a9a42', '#2e5226'], rampart: ['#5c9a48', '#1f4426'], tower: ['#6c7c8c', '#2c3646'], inferno: ['#5a2012', '#1c0a06'], necropolis: ['#40404c', '#16161e'],
+    dungeon: ['#3e3048', '#171020'], stronghold: ['#82703c', '#3a2c16'], fortress: ['#5e8248', '#223c1a'], conflux: ['#6e8cac', '#2a405c'],
+  };
+  const ROW_BACK = 0.62, ROW_FRONT = 0.925, SLOT_NAMES = ['hall', 'guild', 'market', 'ship', 'tavern', 'smithy', 'garrison', 'fort', 'mines'], NSLOTS = 16;
+  // where slot i stands: x centre, y of the ground under it, picture width/height (the back row is smaller, so it reads as further away)
+  function slotBox(i, W, H) {
+    const back = i < 7, n = back ? 7 : 9, j = back ? i : i - 7, ws = back ? Math.min(84, W / 12.4) : Math.min(92, W / 11.2);
+    return { x: W * (j + 0.5) / n, base: H * (back ? ROW_BACK : ROW_FRONT), ws, hs: ws * 1.125, back };
+  }
+  // which slot is under the pointer (canvas units), or -1
+  function slotAt(mx, my, W, H) {
+    for (let i = NSLOTS - 1; i >= 0; i--) { const b = slotBox(i, W, H); if (Math.abs(mx - b.x) <= b.ws * 0.58 && my >= b.base - b.hs * 0.98 && my <= b.base + 36) return i; }
+    return -1;
+  }
+  const ghosts = new WeakMap();
+  // a washed-out grey copy of a building picture: the plot where it will stand once built
+  function ghostOf(spr) {
+    let c = ghosts.get(spr); if (c) return c;
+    c = mk(spr.width, spr.height, (g) => { g.drawImage(spr, 0, 0); g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(70,86,128,.5)'; g.fillRect(0, 0, spr.width, spr.height); });
+    ghosts.set(spr, c); return c;
+  }
+  const roundRect = (g, x, y, w, h, r) => { g.beginPath(); if (g.roundRect) g.roundRect(x, y, w, h, r); else g.rect(x, y, w, h); };
+  function hammerBadge(g, x, y, locked, pulse) {
+    g.save(); g.translate(x, y);
+    g.beginPath(); g.arc(0, 0, 11, 0, 7); g.fillStyle = locked ? 'rgba(40,36,34,.92)' : 'rgba(30,20,8,.92)'; g.fill(); g.lineWidth = 1.6; g.strokeStyle = locked ? '#8a8478' : `rgba(240,200,90,${0.7 + 0.3 * pulse})`; g.stroke();
+    if (locked) { rect(g, -4.5, -1, 9, 7, '#a8a294', '#140a04'); g.strokeStyle = '#a8a294'; g.lineWidth = 1.8; g.beginPath(); g.arc(0, -1, 3.4, Math.PI, 0); g.stroke(); }
+    else { g.rotate(-0.6); rect(g, -1.2, -2, 2.4, 10, '#b07a3a', '#140a04'); rect(g, -5.5, -6, 11, 5, '#c4c8d0', '#140a04'); }
+    g.restore();
+  }
+  function scene(g, t, now, anim, info, W, H, hover = -1) {
+    const hue = hueOf(t.fac), fort = t.fort || 0, sky = SKY[t.fac] || [hsl(hue, 40, 22), hsl(hue, 45, 62)], mea = MEADOW[t.fac] || [hsl(hue, 30, 38), hsl(hue, 34, 16)];
+    const hy = H * 0.5;
+    // sky, a low sun glow, drifting clouds
+    g.fillStyle = (() => { const q = g.createLinearGradient(0, 0, 0, hy + 30); q.addColorStop(0, sky[0]); q.addColorStop(1, sky[1]); return q; })(); g.fillRect(0, 0, W, hy + 30);
+    { const sg = g.createRadialGradient(W * 0.16, hy - 10, 4, W * 0.16, hy - 10, 190); sg.addColorStop(0, 'rgba(255,236,170,.55)'); sg.addColorStop(1, 'rgba(255,220,140,0)'); g.fillStyle = sg; g.fillRect(0, 0, W, hy + 30); }
+    g.fillStyle = 'rgba(255,255,255,.16)'; for (let i = 0; i < 5; i++) { const cx = ((i * 263 + now * 0.004 * (1 + i * 0.2)) % (W + 260)) - 130, cy = 36 + (i * 53) % 110; for (const [dx, dy, r] of [[0, 0, 26], [28, 6, 20], [-26, 8, 18], [8, -10, 18]]) { g.beginPath(); g.ellipse(cx + dx, cy + dy, r * 1.6, r * 0.62, 0, 0, 7); g.fill(); } }
+    // two ranges of hills in the distance, tinted by the sky
+    for (const [off, amp, col, ph] of [[hy - 24, 26, mea[1], 1.3], [hy - 4, 16, mea[0], 3.1]]) {
+      g.beginPath(); g.moveTo(0, H); for (let x = 0; x <= W; x += 16) g.lineTo(x, off + Math.sin(x * 0.009 + ph) * amp + Math.sin(x * 0.023 + ph * 2) * amp * 0.35); g.lineTo(W, H); g.closePath();
+      g.globalAlpha = 0.9; g.fillStyle = col; g.fill(); g.globalAlpha = 1;
     }
-    const gy = H - 38;
-    drawFort(g, W, gy - 24, fort);
-    if (bgi) g.globalAlpha = 0.45;
-    g.fillStyle = lin(g, gy, H, '#6a9a4a', '#365a28'); g.fillRect(0, gy, W, H - gy);
-    g.fillStyle = 'rgba(190,160,110,.55)'; g.fillRect(0, gy + 18, W, 10);
-    g.globalAlpha = 1;
-    const base = gy + 30;
+    // the meadow
+    g.fillStyle = (() => { const q = g.createLinearGradient(0, hy, 0, H); q.addColorStop(0, mea[0]); q.addColorStop(1, mea[1]); return q; })(); g.fillRect(0, hy + 14, W, H - hy - 14);
+    g.fillStyle = 'rgba(255,255,255,.05)'; for (let y = hy + 30; y < H; y += 14) g.fillRect(0, y, W, 2);
+    // the castle
+    const bgi = typeof Assets !== 'undefined' ? Assets.get('ui/town_' + t.fac) : null, cb = H * ROW_BACK;
+    { const sh = g.createRadialGradient(W / 2, cb - 4, 10, W / 2, cb - 4, W * 0.28); sh.addColorStop(0, 'rgba(0,0,0,.42)'); sh.addColorStop(1, 'rgba(0,0,0,0)'); g.save(); g.translate(0, cb - 4); g.scale(1, 0.12); g.translate(0, -(cb - 4)); g.fillStyle = sh; g.fillRect(0, cb - 4 - W * 0.3, W, W * 0.6); g.restore(); }
+    if (bgi) { const dw = Math.min(W * 0.52, H * 1.12), dh = dw * bgi.height / bgi.width; g.drawImage(bgi, (W - dw) / 2, cb - dh * 0.95, dw, dh); }
+    else { const hallLv = (t.b && t.b.hall) || 0, ks = 120 + hallLv * 22; g.drawImage(Art.obj({ t: 'town', owner: 0 }, t.fac), W / 2 - ks / 2, cb - ks - 10, ks, ks); }
+    // the walls grow with the fortifications and stand between the castle and the dwellings
+    drawFort(g, W, cb - 30, fort);
     g.textAlign = 'center'; g.textBaseline = 'middle';
-    for (let i = 0; i < 11; i++) {
-      const x = 40 + i * 70, s = info(t, i), an = anim && anim.slot === i ? anim : null, p = an ? Math.min(1, (now - an.t0) / 1500) : 1;
-      if (!s.built) { g.setLineDash([4, 4]); g.strokeStyle = 'rgba(255,255,255,.45)'; g.strokeRect(x - 26, base - 44, 52, 44); g.setLineDash([]); g.strokeStyle = '#8a5a2b'; g.lineWidth = 2; g.beginPath(); g.moveTo(x - 20, base); g.lineTo(x - 20, base - 24); g.lineTo(x + 20, base - 24); g.lineTo(x + 20, base); g.moveTo(x - 20, base - 12); g.lineTo(x + 20, base - 12); g.stroke(); continue; }
-      const kind = i < 7 ? 'dwell' : ['hall', 'guild', 'market', 'ship'][i - 7], spr = sprite(kind, s.lv, t.fac, s.id);
-      const hs = 64, ws = 57, hgt = an && an.kind === 'build' ? Math.min(1, p * 1.5) : 1, bob = 0;
+    for (let i = 0; i < NSLOTS; i++) {
+      const b = slotBox(i, W, H), x = b.x, base = b.base, ws = b.ws, hs = b.hs, s = info(t, i), an = anim && anim.slot === i ? anim : null, p = an ? Math.min(1, (now - an.t0) / 1500) : 1, hov = hover === i;
+      const kind = i < 7 ? 'dwell' : SLOT_NAMES[i - 7], spr = sprite(kind, s.built ? s.lv : Math.max(1, s.lv || 1), t.fac, s.id), lift = hov ? -3 : 0;
+      // the stone pad every plot stands on
+      g.beginPath(); g.ellipse(x, base - 1, ws * 0.62, ws * 0.17, 0, 0, 7); g.fillStyle = hov ? 'rgba(255,226,150,.5)' : 'rgba(210,196,160,.38)'; g.fill(); g.lineWidth = 1.6; g.strokeStyle = hov ? 'rgba(255,214,110,.95)' : 'rgba(30,20,8,.55)'; g.stroke();
+      if (hov) { const gl = g.createRadialGradient(x, base - hs * 0.4, 4, x, base - hs * 0.4, ws * 0.95); gl.addColorStop(0, 'rgba(255,226,140,.34)'); gl.addColorStop(1, 'rgba(255,226,140,0)'); g.fillStyle = gl; g.fillRect(x - ws, base - hs * 1.3, ws * 2, hs * 1.5); }
+      // the building (a faint grey ghost while it is not built yet)
+      const hgt = an && an.kind === 'build' ? Math.min(1, p * 1.5) : 1;
       let sc = 1; if (an && an.kind === 'upgrade') sc = 1 + 0.18 * Math.sin(p * Math.PI);
-      g.save(); g.beginPath(); g.rect(x - 40, base - hs * 1.4 * hgt - 6, 80, hs * 1.4 * hgt + 14); g.clip();
-      g.translate(x, base + 2); g.scale(sc, sc); g.drawImage(spr, -ws / 2, -hs + 0 + bob - 6 + (1 - hgt) * 20, ws, ws * 1.125); g.restore();
-      if (an && an.kind === 'upgrade') { const rg = g.createRadialGradient(x, base - 36, 2, x, base - 36, 14 + p * 70); rg.addColorStop(0, `rgba(255,240,150,${0.9 * (1 - p)})`); rg.addColorStop(1, 'rgba(255,200,60,0)'); g.fillStyle = rg; g.beginPath(); g.arc(x, base - 36, 14 + p * 70, 0, 7); g.fill(); g.fillStyle = '#ffe680'; for (let k = 0; k < 8; k++) { g.globalAlpha = 1 - p; const sx = x + Math.cos(k * 0.8) * 36 * p, sy = base - 36 - p * 50 + Math.sin(k * 2.3) * 12; poly(g, [[sx, sy - 4], [sx + 1.2, sy - 1.2], [sx + 4, sy], [sx + 1.2, sy + 1.2], [sx, sy + 4], [sx - 1.2, sy + 1.2], [sx - 4, sy], [sx - 1.2, sy - 1.2]], '#ffe680', null); } g.globalAlpha = 1; }
-      if (an && an.kind === 'build') { const hx = x + 28, hy = base - 50 * hgt - 4 + Math.sin(now / 90) * 5; g.save(); g.translate(hx, hy); g.rotate(Math.sin(now / 90) * 0.5); rect(g, -1.6, -2, 3.2, 14, '#8a5a2b'); rect(g, -7, -8, 14, 6, '#8a8a94'); g.restore(); g.fillStyle = 'rgba(210,200,180,.5)'; for (let k = 0; k < 5; k++) { g.beginPath(); g.arc(x - 30 + k * 15, base - 3 - p * 8 * (k % 2 + 1), 3 + p * 5, 0, 7); g.fill(); } }
-      if (s.max > 1) { g.font = 'bold 11px sans-serif'; g.fillStyle = '#ffd24a'; g.strokeStyle = '#000'; g.lineWidth = 3; const st = '★'.repeat(s.lv) + '☆'.repeat(s.max - s.lv); g.strokeText(st, x, base + 10); g.fillText(st, x, base + 10); }
+      g.save(); g.translate(x, base + 3 + lift); g.scale(sc, sc);
+      if (!s.built && !(an && an.kind === 'build')) { g.globalAlpha = 0.72; g.drawImage(ghostOf(spr), -ws / 2, -hs, ws, hs); }
+      else { const sy = (1 - hgt) * spr.height; g.drawImage(spr, 0, sy, spr.width, spr.height - sy, -ws / 2, -hs * hgt, ws, hs * hgt); }
+      g.restore();
+      if (an && an.kind === 'upgrade') { const rg = g.createRadialGradient(x, base - hs * 0.45, 2, x, base - hs * 0.45, 14 + p * 70); rg.addColorStop(0, `rgba(255,240,150,${0.9 * (1 - p)})`); rg.addColorStop(1, 'rgba(255,200,60,0)'); g.fillStyle = rg; g.beginPath(); g.arc(x, base - hs * 0.45, 14 + p * 70, 0, 7); g.fill(); g.fillStyle = '#ffe680'; for (let k = 0; k < 8; k++) { g.globalAlpha = 1 - p; const sx = x + Math.cos(k * 0.8) * 36 * p, sy2 = base - hs * 0.45 - p * 50 + Math.sin(k * 2.3) * 12; poly(g, [[sx, sy2 - 4], [sx + 1.2, sy2 - 1.2], [sx + 4, sy2], [sx + 1.2, sy2 + 1.2], [sx, sy2 + 4], [sx - 1.2, sy2 + 1.2], [sx - 4, sy2], [sx - 1.2, sy2 - 1.2]], '#ffe680', null); } g.globalAlpha = 1; }
+      if (an && an.kind === 'build') { const hx = x + ws * 0.42, hy2 = base - hs * 0.6 * hgt - 4 + Math.sin(now / 90) * 5; g.save(); g.translate(hx, hy2); g.rotate(Math.sin(now / 90) * 0.5); rect(g, -1.6, -2, 3.2, 14, '#8a5a2b'); rect(g, -7, -8, 14, 6, '#8a8a94'); g.restore(); g.fillStyle = 'rgba(210,200,180,.5)'; for (let k = 0; k < 5; k++) { g.beginPath(); g.arc(x - ws * 0.4 + k * ws * 0.2, base - 3 - p * 8 * (k % 2 + 1), 3 + p * 5, 0, 7); g.fill(); } }
+      // badges: hammer (can be built) or padlock (needs a bigger Town Hall / no coast), ready recruits on built dwellings
+      if (!s.built && !(an && an.kind === 'build')) hammerBadge(g, x + ws * 0.36, base - hs * 0.86, !!(s.locked || s.na), 0.5 + 0.5 * Math.sin(now / 420 + i));
+      if (s.built && s.av > 0) { const bx = x - ws * 0.36, by = base - hs * 0.86; g.beginPath(); g.arc(bx, by, 10, 0, 7); g.fillStyle = '#d9a52a'; g.fill(); g.lineWidth = 1.6; g.strokeStyle = '#140a04'; g.stroke(); g.fillStyle = '#1c1204'; g.font = 'bold 11px Cinzel, Georgia, serif'; g.fillText(s.av > 99 ? '99+' : s.av, bx, by + 1); }
+      // name plate and level stars
+      const nm = s.name || '', pw = Math.max(62, nm.length * 6.6 + 16), py = base + 8;
+      g.font = 'bold 11px Cinzel, Georgia, serif'; roundRect(g, x - pw / 2, py, pw, 17, 5); g.fillStyle = hov ? 'rgba(48,32,10,.95)' : 'rgba(14,9,5,.84)'; g.fill(); g.lineWidth = 1.2; g.strokeStyle = s.built ? (hov ? '#ffd766' : '#c9a24a') : 'rgba(255,255,255,.28)'; g.stroke();
+      g.fillStyle = s.built ? '#f6ebc8' : '#aaa59a'; g.fillText(nm, x, py + 9);
+      if (s.max > 1 && s.built) { g.font = 'bold 11px sans-serif'; g.lineWidth = 3; g.strokeStyle = '#000'; g.fillStyle = '#ffd24a'; const st = '★'.repeat(s.lv) + '☆'.repeat(Math.max(0, s.max - s.lv)); g.strokeText(st, x, py + 25); g.fillText(st, x, py + 25); }
     }
-    for (let i = 0; i < (t.minel || 0); i++) { const mx = 120 + i * 220; g.fillStyle = '#2a2a30'; g.beginPath(); g.arc(mx, H - 7, 4.2, 0, 7); g.fill(); g.strokeStyle = '#f0b040'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(mx + 2, H - 10); g.lineTo(mx + 5, H - 14); g.stroke(); }
+    // soft vignette so the panorama sits in its frame
+    { const vg = g.createRadialGradient(W / 2, H / 2, H * 0.55, W / 2, H / 2, W * 0.62); vg.addColorStop(0, 'rgba(8,4,0,0)'); vg.addColorStop(1, 'rgba(8,4,0,.38)'); g.fillStyle = vg; g.fillRect(0, 0, W, H); }
   }
   const reload = () => { for (const k in cache) delete cache[k]; for (const k in url) delete url[k]; };
-  return { reload, sprite, pic, scene, drawFort, hueOf };
+  return { reload, sprite, pic, scene, drawFort, hueOf, slotAt, slotBox, NSLOTS };
 })();

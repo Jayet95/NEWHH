@@ -665,19 +665,28 @@
     const h = G.hero;
     const ab = artBonus(h), plus = (v) => v ? ` <span class="bonus">(${v > 0 ? '+' : ''}${v})</span>` : '';
     const perkTxt = Object.keys(PERKS).filter(k => perk(h, k) > 0).map(k => `<span title="${PERKS[k].d}">${PERKS[k].i}${PERKS[k].n} ${RANK_NAMES[perk(h, k)]}${ab.sk[k] ? '*' : ''}</span>`).join(' · ');
-    $('hero').innerHTML = `<div class="hlist">${G.heroes.map((x, i) => `<button class="hbtn${x === h ? ' on' : ''}" data-h="${i}" title="${x.name} (${clsLabel(x.cls)})">${Art.heroPic(x.icon, ownCol(0), 34, x.pid)}</button>`).join('')}</div>
-      <h3>${Art.heroPic(h.icon, ownCol(0), 34, h.pid)} ${h.name} <span class="small">${clsLabel(h.cls)} — Level ${h.lvl}</span></h3>
-      <div class="stats"><span>⚔️ Attack ${h.att}${plus(ab.att)}</span><span>🛡 Defense ${h.def}${plus(ab.def)}</span><span>✨ Spell Pow ${h.sp}${plus(ab.sp)}</span><span>📚 Knowledge ${h.kn}${plus(ab.kn)}</span></div>
-      <div class="small" title="Morale: each point = 4% chance of an extra turn (negative: of skipping a turn). Mixing creatures from different castles lowers it; undead and golems are immune. Luck: each point = 4% chance of double damage.">😀 Morale ${sgn(heroMorale(h))} · 🍀 Luck ${sgn(heroLuck(h))}</div>
-      <div class="small">Movement ${h.move}/${maxMove(h)}</div><div class="bar mv"><i style="width:${Math.min(100, h.move / maxMove(h) * 100)}%"></i></div>
+    $('hero').innerHTML = `<div class="hlist${G.heroes.length > 1 ? '' : ' solo'}">${G.heroes.map((x, i) => `<button class="hbtn${x === h ? ' on' : ''}" data-h="${i}" title="${x.name} (${clsLabel(x.cls)})">${Art.heroPic(x.icon, ownCol(0), 34, x.pid)}</button>`).join('')}</div>
+      <div class="hcard">
+        <div class="hport">${Art.heroPic(h.icon, ownCol(0), 84, h.pid)}<span class="hlvl" title="Level ${h.lvl}">${h.lvl}</span></div>
+        <div class="hhead"><b class="hname">${h.name}</b><span class="hcls">${clsLabel(h.cls)} · Level ${h.lvl}</span></div>
+        <div class="hgrid">
+          ${[['⚔️', h.att + plus(ab.att), '', 'ATK', 'Attack'], ['🛡', h.def + plus(ab.def), '', 'DEF', 'Defense'], ['✨', h.sp + plus(ab.sp), '', 'SP', 'Spell power'],
+            ['📚', h.kn + plus(ab.kn), '', 'KN', 'Knowledge'], ['👢', h.move, '/' + maxMove(h), 'MOVE', `Movement left today: ${h.move} of ${maxMove(h)}`, Math.min(100, h.move / maxMove(h) * 100)],
+            ['🔷', h.mana, '/' + maxMana(h), 'MANA', `Mana: ${h.mana} of ${maxMana(h)}`, Math.min(100, h.mana / maxMana(h) * 100)]]
+            .map(([ic, v, sub, lab, tip, bar]) => `<div class="hst${bar !== undefined ? ' hasbar' : ''}" title="${tip}"><span class="hi">${ic}</span><b>${v}${sub ? `<em>${sub}</em>` : ''}</b>${bar !== undefined ? `<u style="--p:${bar}%"></u>` : ''}<small>${lab}</small></div>`).join('')}
+        </div>
+      </div>
+      <div class="hbar xp" title="Experience: ${h.xp} of ${need(h.lvl)} to the next level"><i style="width:${Math.min(100, h.xp / need(h.lvl) * 100)}%"></i><span>XP ${h.xp}/${need(h.lvl)}</span></div>
+      <div class="hmood small" title="Morale: each point = 4% chance of an extra turn (negative: of skipping a turn). Mixing creatures from different castles lowers it; undead and golems are immune. Luck: each point = 4% chance of double damage.">😀 Morale ${sgn(heroMorale(h))} · 🍀 Luck ${sgn(heroLuck(h))}</div>
       ${h.boat != null ? '<div class="small">⛵ Sailing — walk onto a shore tile to disembark</div>' : ''}
-      <div class="small">Mana ${h.mana}/${maxMana(h)}</div><div class="bar mn"><i style="width:${Math.min(100, h.mana / maxMana(h) * 100)}%"></i></div>
-      <div class="small">XP ${h.xp}/${need(h.lvl)}</div><div class="bar xp"><i style="width:${Math.min(100, h.xp / need(h.lvl) * 100)}%"></i></div>
-      ${perkTxt ? `<div class="small">${perkTxt}</div>` : ''}
-      <div class="small" title="${G.spells.map(k => SPELLS[k].n).join(', ')}">Spells: ${G.spells.map(k => SPELLS[k].i).join(' ')}</div>
-      <button id="bEquip" class="small-btn" title="Equip artifacts">🎒 Equipment (${Object.values(h.arts).filter(Boolean).length} worn, ${h.pack.length} in pack)</button>
-      <button id="bPortal" class="small-btn" title="Teleport to your castle">🌀 Town Portal (${PORTAL_COST} mana)</button>
-      <div class="row2"><button id="bNext" class="small-btn" title="Select the next hero (Tab)">⏭ Next hero</button><button id="bSleep" class="small-btn" title="A sleeping hero is skipped by the end-turn reminder">${h.sleep ? '⏰ Wake' : '💤 Sleep'}</button></div>`;
+      ${perkTxt ? `<div class="small hperks">${perkTxt}</div>` : ''}
+      <div class="small hspells" title="${G.spells.map(k => SPELLS[k].n).join(', ')}">Spells: ${G.spells.map(k => SPELLS[k].i).join(' ')}</div>
+      <div class="hacts">
+        <button id="bEquip" class="small-btn" title="Equip artifacts (${Object.values(h.arts).filter(Boolean).length} worn, ${h.pack.length} in pack)">🎒 Equipment <span class="bcnt">${Object.values(h.arts).filter(Boolean).length}/${h.pack.length}</span></button>
+        <button id="bPortal" class="small-btn" title="Teleport to your castle (${PORTAL_COST} mana)">🌀 Portal <span class="bcnt">${PORTAL_COST}</span></button>
+        <button id="bNext" class="small-btn" title="Select the next hero (Tab)">⏭ Next hero</button>
+        <button id="bSleep" class="small-btn" title="A sleeping hero is skipped by the end-turn reminder">${h.sleep ? '⏰ Wake' : '💤 Sleep'}</button>
+      </div>`;
     $('hero').querySelectorAll('[data-h]').forEach(b => b.onclick = () => { if (busy) return; setActive(+b.dataset.h); G.path = null; centerOn(G.hero.x, G.hero.y); renderAll(); });
     $('bPortal').onclick = townPortal;
     $('bNext').onclick = nextHero;
@@ -692,7 +701,7 @@
       `<div class="small">Paying mines: ${mineIncome} · other zones: ${rest}</div>` +
       G.ais.map(ai => { const tw = G.objs.filter(o => o.t === 'town' && o.owner === ai.id).length, fr = G.objs.filter(o => o.t === 'fort' && o.owner === ai.id).length;
         return `<div class="zrow" title="Rival: ${FACTIONS[ai.fac].name}"><span class="zdot" style="background:${ownCol(ai.id)};color:${ownCol(ai.id)}"></span>${allyOfPlayer(ai.id) ? '🤝 ' : ''}${FACTIONS[ai.fac].icon} ${ai.alive ? `${tw} towns, ${fr} forts, ${ai.heroes.length} heroes` : '<s>eliminated</s>'}</div>`; }).join('');
-    const el = $('army'); el.innerHTML = '';
+    const el = $('army'); el.innerHTML = ''; el.title = 'Drag a stack onto another slot (or tap two slots) to move, merge or swap.';
     h.army.forEach((a, i) => {
       const b = document.createElement('button');
       b.className = 'slot' + (a ? '' : ' empty') + (i === selSlot ? ' sel' : '');
@@ -702,6 +711,8 @@
       armyDrag(b, i);
       el.appendChild(b);
     });
+    // the army is a tidy 4x2 grid: the spare eighth cell holds a heraldic plate
+    if (h.army.length % 4) { const dc = document.createElement('div'); dc.className = 'sdeco'; dc.setAttribute('aria-hidden', 'true'); el.appendChild(dc); }
     const sw = document.createElement('div'); sw.className = 'small'; sw.style.gridColumn = '1/-1'; sw.textContent = 'Drag a stack onto another slot — or tap two slots — to move, merge or swap.'; el.appendChild(sw);
     if (selSlot >= 0 && h.army[selSlot] && h.army[selSlot].n > 1 && h.army.some(x => !x)) { const a = h.army[selSlot], sp = document.createElement('button'); sp.style.gridColumn = '1/-1'; sp.className = 'splitb'; sp.textContent = `✂ Split ${Math.floor(a.n / 2)} into a new stack`; sp.onclick = () => { const e = h.army.findIndex(x => !x), k = Math.floor(a.n / 2); h.army[e] = { t: a.t, n: k }; a.n -= k; selSlot = -1; sfx('click'); renderAll(); }; el.appendChild(sp); }
     if (selSlot >= 0 && h.army[selSlot]) { const a = h.army[selSlot], db = document.createElement('button'); db.className = 'danger disb'; db.style.gridColumn = '1/-1'; db.textContent = `🗑 Disband ${a.n} ${C[a.t].n}`; db.onclick = () => disbandSlot(h.army, selSlot, a.n, db); el.appendChild(db); }
@@ -2328,7 +2339,7 @@
   $('mHero').onclick = () => sheetOpen('🏇 Hero', [$('hero')]);
   $('mArmy').onclick = () => G && sheetOpen(`⚔️ ${G.hero.name} — Army`, [$('army')]);
   $('mGear').onclick = () => G && !busy && openEquip(G.hero);
-  $('mLand').onclick = () => sheetOpen('🗺️ Territory', [$('mini'), $('terr')]);
+  $('mLand').onclick = () => sheetOpen('🗺️ Territory', [$('minipanel'), $('terr')]);
   $('mMenu').onclick = () => openMenu();
 
   // custom art from art/ finished loading: rebuild every cached picture, set the title artwork

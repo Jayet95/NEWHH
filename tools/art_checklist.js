@@ -23,7 +23,7 @@ out.push([
 sec('Creatures — `art/creatures/<id>.png`', '256×256, the figure facing right, feet at the bottom edge, no frame (the game adds the rarity frame, stars and wings marks).', base.map(k => `creatures/${k}  — ${C[k].n}${C[k].lair ? ' (Dragon Lair)' : ''}`));
 sec('Creature upgrades (optional) — `art/creatures/<id>_<2..5>.png`', 'Only if you want a different picture for upgraded versions.', base.filter(k => C[k + '_2']).slice(0, 3).map(k => `creatures/${k}_2 … creatures/${k}_5`).concat(['… the same for every castle creature']));
 sec('Heroes — `art/heroes/<name>.png`', '512×512 bust portrait for the sharpest result (256×256 minimum). The game crops it into a round medallion and shows it up to 150 px, so a bigger file looks cleaner.', Object.keys(HEROES).map(k => `heroes/${k}  — ${HEROES[k].cls}, ${FACTIONS[HEROES[k].fac].name}`));
-const kinds = ['hall (levels 1-5)', 'guild (1-3)', 'market', 'ship', 'fort (levels 0-3)', 'mines (levels 0-3)', 'tavern', 'garrison'];
+const kinds = ['hall (levels 1-5)', 'guild (1-3)', 'market', 'ship', 'fort (levels 0-3)', 'mines (levels 0-3)', 'tavern', 'garrison', 'smithy (war machines)'];
 sec('Town buildings — `art/buildings/…`', '256×288 (a little taller than wide), building standing on the bottom edge, transparent background. Name patterns, most specific wins: `<castle>_<kind>_<level>`, `<kind>_<level>`, `<castle>_<kind>`, `<kind>`.', kinds.map(k => 'buildings/' + k.split(' ')[0] + '_<level>   e.g. buildings/' + k.split(' ')[0] + '_2, buildings/castle_' + k.split(' ')[0] + '_2').concat(['', 'Creature dwellings: `buildings/<creature id>` (e.g. `buildings/castle1`, `buildings/castle1_3`) — one per castle creature and level, or just the base.', 'Castles are: ' + Object.keys(FACTIONS).join(', ')]));
 sec('Map objects — `art/objects/<type>.png`', '128×128, transparent, standing on the bottom edge.', ['town (or `town_<castle>`)', 'fort', 'mine_gold, mine_wood, mine_ore, mine_mercury, mine_sulfur, mine_crystal, mine_gems', 'pile_gold, pile_wood, … (resource piles)', 'dwelling (or `dwelling_<castle>`)', 'lair', 'chest', 'art (artifact on the ground)', 'merchant', 'wreck', 'spring', 'resobj_windmill, resobj_waterwheel, resobj_garden', 'stone', 'shrine', 'tower', 'bank_crypt, bank_utopia, bank_stockpile', 'mono', 'seer', 'boat']);
 sec('Terrain tiles — `art/terrain/<type>.png`', '64×74 pointy-top hexagon (the corners outside the hexagon transparent). Variants `grass_1…grass_4` are picked at random per tile.', ['grass', 'forest', 'mountain', 'water', 'road', 'sand']);
@@ -84,8 +84,12 @@ sec('Battle — siege (needs code)', 'Parts of the walls, gates and towers that 
   'battle/mine_explosion_<n>.webp  — mine blast, 6–8 frames',
   'battle/trench_smoke_<n>.webp  — smoke over the trenches, 4 frames',
 ]);
-sec('Battle and map — sound (needs code)', 'Short effects in `audio/sfx/` (under 1 second each, MP3 or OGG). Ambient loops in `audio/ambient/` (30–60 seconds, seamless).', [
-  ...CASTLES.flatMap(c => [`audio/sfx/hit_${c}.mp3  — ${c} unit hit`, `audio/sfx/shoot_${c}.mp3  — ${c} ranged shot`, `audio/sfx/death_${c}.mp3  — ${c} unit dies`]),
+sec('Battle and map — sound (creature sounds supported now)', 'Short effects in `audio/sfx/` (under 1 second each, MP3 or OGG), picked up automatically after `npm run art`. Every creature already has a synthesised attack, defend, death and shot sound; a file with the name below replaces it. Ambient loops in `audio/ambient/` (30–60 seconds, seamless; the game does not play these yet).', [
+  `audio/sfx/<creature id>_attack.mp3  — the creature's attack cry or weapon sound, all ${base.length} creatures (e.g. castle1_attack.mp3)`,
+  `audio/sfx/<creature id>_defend.mp3  — the creature being hit (grunt, roar, clang)`,
+  `audio/sfx/<creature id>_death.mp3  — the creature dying`,
+  `audio/sfx/<creature id>_shoot.mp3  — shooters only (${base.filter(k => C[k].shoot).length} creatures): the shot leaving the bow, staff or hand`,
+  'An upgraded creature may have its own file (castle2_2_attack.mp3); otherwise its base creature id is used. Missing files keep the synthesised voice.',
   ...SPELL_KEYS.map(k => `audio/sfx/spell_${k}.mp3  — ${SPELLS[k].n}`),
   ...BIOMES.map(b => `audio/ambient/${b}.mp3  — ${b} battle ambience`),
 ]);

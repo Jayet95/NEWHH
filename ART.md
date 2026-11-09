@@ -260,6 +260,7 @@ Only if you want a different picture for upgraded versions.
 - `buildings/mines_<level>   e.g. buildings/mines_2, buildings/castle_mines_2`
 - `buildings/tavern_<level>   e.g. buildings/tavern_2, buildings/castle_tavern_2`
 - `buildings/garrison_<level>   e.g. buildings/garrison_2, buildings/castle_garrison_2`
+- `buildings/smithy_<level>   e.g. buildings/smithy_2, buildings/castle_smithy_2`
 - ``
 - `Creature dwellings: `buildings/<creature id>` (e.g. `buildings/castle1`, `buildings/castle1_3`) — one per castle creature and level, or just the base.`
 - `Castles are: castle, rampart, tower, inferno, necropolis, dungeon, stronghold, fortress, conflux`
@@ -589,36 +590,14 @@ Parts of the walls, gates and towers that animate during a siege.
 - `battle/mine_explosion_<n>.webp  — mine blast, 6–8 frames`
 - `battle/trench_smoke_<n>.webp  — smoke over the trenches, 4 frames`
 
-## Battle and map — sound (needs code)
-Short effects in `audio/sfx/` (under 1 second each, MP3 or OGG). Ambient loops in `audio/ambient/` (30–60 seconds, seamless).
+## Battle and map — sound (creature sounds supported now)
+Short effects in `audio/sfx/` (under 1 second each, MP3 or OGG), picked up automatically after `npm run art`. Every creature already has a synthesised attack, defend, death and shot sound; a file with the name below replaces it. Ambient loops in `audio/ambient/` (30–60 seconds, seamless; the game does not play these yet).
 
-- `audio/sfx/hit_castle.mp3  — castle unit hit`
-- `audio/sfx/shoot_castle.mp3  — castle ranged shot`
-- `audio/sfx/death_castle.mp3  — castle unit dies`
-- `audio/sfx/hit_rampart.mp3  — rampart unit hit`
-- `audio/sfx/shoot_rampart.mp3  — rampart ranged shot`
-- `audio/sfx/death_rampart.mp3  — rampart unit dies`
-- `audio/sfx/hit_tower.mp3  — tower unit hit`
-- `audio/sfx/shoot_tower.mp3  — tower ranged shot`
-- `audio/sfx/death_tower.mp3  — tower unit dies`
-- `audio/sfx/hit_inferno.mp3  — inferno unit hit`
-- `audio/sfx/shoot_inferno.mp3  — inferno ranged shot`
-- `audio/sfx/death_inferno.mp3  — inferno unit dies`
-- `audio/sfx/hit_necropolis.mp3  — necropolis unit hit`
-- `audio/sfx/shoot_necropolis.mp3  — necropolis ranged shot`
-- `audio/sfx/death_necropolis.mp3  — necropolis unit dies`
-- `audio/sfx/hit_dungeon.mp3  — dungeon unit hit`
-- `audio/sfx/shoot_dungeon.mp3  — dungeon ranged shot`
-- `audio/sfx/death_dungeon.mp3  — dungeon unit dies`
-- `audio/sfx/hit_stronghold.mp3  — stronghold unit hit`
-- `audio/sfx/shoot_stronghold.mp3  — stronghold ranged shot`
-- `audio/sfx/death_stronghold.mp3  — stronghold unit dies`
-- `audio/sfx/hit_fortress.mp3  — fortress unit hit`
-- `audio/sfx/shoot_fortress.mp3  — fortress ranged shot`
-- `audio/sfx/death_fortress.mp3  — fortress unit dies`
-- `audio/sfx/hit_conflux.mp3  — conflux unit hit`
-- `audio/sfx/shoot_conflux.mp3  — conflux ranged shot`
-- `audio/sfx/death_conflux.mp3  — conflux unit dies`
+- `audio/sfx/<creature id>_attack.mp3  — the creature's attack cry or weapon sound, all 77 creatures (e.g. castle1_attack.mp3)`
+- `audio/sfx/<creature id>_defend.mp3  — the creature being hit (grunt, roar, clang)`
+- `audio/sfx/<creature id>_death.mp3  — the creature dying`
+- `audio/sfx/<creature id>_shoot.mp3  — shooters only (13 creatures): the shot leaving the bow, staff or hand`
+- `An upgraded creature may have its own file (castle2_2_attack.mp3); otherwise its base creature id is used. Missing files keep the synthesised voice.`
 - `audio/sfx/spell_arrow.mp3  — Magic Arrow`
 - `audio/sfx/spell_haste.mp3  — Haste`
 - `audio/sfx/spell_lightning.mp3  — Lightning Bolt`

@@ -182,7 +182,7 @@
   // ---------- new game / save ----------
   const DF = () => DIFFICULTY[(G && G.diff) || 'normal'];
   // interface mood follows the player's castle: bright for the human realms, black and ember for the demonic ones
-  function applyTheme(f) { const b = document.body; [...b.classList].filter(c => c.indexOf('th-') === 0).forEach(c => b.classList.remove(c)); if (f) b.classList.add('th-' + f); }
+  function applyTheme(f) { const b = document.body; [...b.classList].filter(c => c.indexOf('th-') === 0).forEach(c => b.classList.remove(c)); if (f) b.classList.add('th-' + f); if (typeof Sfx !== 'undefined' && Sfx.setFaction) Sfx.setFaction(f || null); }
   function seedFrom(s) {
     s = String(s || '').trim();
     if (!s) return Math.floor(Math.random() * 1e9);
@@ -2136,7 +2136,7 @@
     G.over = true; if (win) Ach.event('win', { diff: G.diff, size: G.size, day: G.day }); sfx(win ? 'fanfare' : 'lose'); if (win && typeof Celebrate !== 'undefined') Celebrate.game();
     try { localStorage.removeItem(SAVE); } catch (e) { /* ignore */ }
     if (win) { await victoryScreen(); $('title').classList.remove('hide'); refreshTitle(); return; }
-    await showModal(win ? `<h2>🏆 Victory!</h2><p>Every rival has lost its towns: you rule the realm on day ${G.day} (${DF().name}). Well fought!</p>` : `<h2>💀 Defeat</h2><p>${why || 'Your hero has fallen.'}</p>`, ['Main menu']);
+    await showModal(win ? `<h2>🏆 Victory!</h2><p>Every rival has lost its towns: you rule the realm on day ${G.day} (${DF().name}). Well fought!</p>` : window.vicBanner('Defeat', why || 'Your hero has fallen.', 'lose'), ['Main menu']);
     $('title').classList.remove('hide'); refreshTitle();
   }
 
@@ -2402,9 +2402,9 @@
   async function victoryScreen() {
     const sc = scoreParts();
     await new Promise((res) => {
-      modalOpen(`<h2>🏆 Victory!</h2><p>Every rival has lost its towns: you rule the realm on day ${G.day} (${DF().name}).</p><h4>Score</h4>${sc.parts.map(([l, v]) => `<div class="trow" style="grid-template-columns:1fr auto"><div>${l}</div><div>+${fmtN(v)}</div></div>`).join('')}
-        <div class="trow" style="grid-template-columns:1fr auto"><div>Difficulty × map size × rivals</div><div>×${sc.mult.toFixed(2)}</div></div>
-        <div class="trow" style="grid-template-columns:1fr auto"><div><b>Final score</b></div><div><b style="color:var(--gold);font-size:22px">${fmtN(sc.score)}</b></div></div>
+      modalOpen(`${window.vicBanner('Victory', `Every rival has lost its towns — you rule the realm on day ${G.day} (${DF().name}).`)}
+        <div class="vic-score">${sc.parts.map(([l, v]) => `<div class="vic-row"><span>${l}</span><b>+${fmtN(v)}</b></div>`).join('')}<div class="vic-row mult"><span>Difficulty × map size × rivals</span><b>×${sc.mult.toFixed(2)}</b></div></div>
+        <div class="vic-total"><span>Final score</span><b>${fmtN(sc.score)}</b></div>
         <div class="setrow"><div><b>Your name</b><div class="small">Shown on the leaderboard</div></div><input id="lbName" maxlength="16" value="${Board.name.replace(/"/g, '')}" placeholder="Commander" style="width:170px"></div>
         <div class="mb"><button id="lbSkip">Skip</button><button class="primary" id="lbSend">Submit score</button></div>`);
       $('lbSkip').onclick = () => { $('modal').classList.add('hide'); res(); };

@@ -1,7 +1,7 @@
 'use strict';
 // Tiny WebAudio synth: no audio files needed. Effects + a soft generative background tune (volumes come from Settings).
 const Sfx = (() => {
-  let ac = null, on = true, master = null, musicGain = null, mood = 'map', musicTimer = null, step = 0;
+  let qmul = 1, ac = null, on = true, master = null, musicGain = null, mood = 'map', musicTimer = null, step = 0;
   try { on = localStorage.getItem('h3js_snd') !== '0'; } catch (e) { /* ignore */ }
   const sv = () => (typeof Settings !== 'undefined' ? Settings.sfxVol : 0.8), mv = () => (typeof Settings !== 'undefined' ? Settings.musicVol : 0.35);
   // browsers only let sound start after a tap or key press; before that stay silent instead of spamming console warnings
@@ -19,7 +19,7 @@ const Sfx = (() => {
   function tone(f, d = 0.1, type = 'square', vol = 0.05, slide = 0, delay = 0, bus) {
     if (!on) return;
     const a = ctx(); if (!a) return;
-    const t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain(), v = vol * (bus === 'music' ? 1 : sv() * 1.25);
+    const t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain(), v = vol * (bus === 'music' ? 1 : sv() * 1.25 * qmul);
     if (v <= 0.0002) return;
     o.type = type; o.frequency.setValueAtTime(f, t);
     if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, f + slide), t + d);
@@ -33,7 +33,7 @@ const Sfx = (() => {
   function noise(d = 0.1, vol = 0.05, f = 1200, q = 0.7, type = 'bandpass', delay = 0, sweep = 0, bus) {
     if (!on) return;
     const a = ctx(); if (!a) return;
-    const v = vol * (bus === 'music' ? 1 : sv() * 1.25); if (v <= 0.0002) return;
+    const v = vol * (bus === 'music' ? 1 : sv() * 1.25 * qmul); if (v <= 0.0002) return;
     const t = a.currentTime + delay, s = a.createBufferSource(), flt = a.createBiquadFilter(), g = a.createGain();
     s.buffer = noiseBuf(a); s.loop = true; flt.type = type; flt.Q.value = q; flt.frequency.setValueAtTime(f, t);
     if (sweep) flt.frequency.exponentialRampToValueAtTime(Math.max(60, f + sweep), t + d);
@@ -62,11 +62,80 @@ const Sfx = (() => {
     day: () => seq([392, 523], 0.12, 'sine', 0.05, 0.1),
     ach: () => seq([659, 880, 1175, 1568], 0.16, 'triangle', 0.06, 0.1),
   };
+  // ---- creature voices ----
+  // Each creature has its own attack, defend (hurt), death and (for shooters) shot sound. A recording audio/sfx/<creature id>_<kind>.mp3
+  // (kind: attack, defend, death, shoot; listed in audio/sfx/index.json by `npm run art`) is used when it exists; otherwise a voice is
+  // synthesised from the creature's kind (bellow, hiss, screech, rattle ...) and a pitch that is different for every creature.
+  const VOICE = {
+    goblin: 'grunt', stronghold1: 'grunt', wolf: 'growl', stronghold2: 'growl', orc: 'grunt', stronghold3: 'grunt', ogre: 'bellow', stronghold4: 'bellow', troll: 'bellow', golem: 'stone', tower3: 'stone',
+    naga: 'hiss', tower6: 'hiss', dragon: 'roar', rampart7: 'roar', shark: 'growl', kraken: 'wet',
+    castle1: 'human', castle2: 'human', castle3: 'screech', castle4: 'human', castle5: 'chant', castle6: 'human', castle7: 'chant',
+    rampart1: 'human', rampart2: 'grunt', rampart3: 'elf', rampart4: 'screech', rampart5: 'wood', rampart6: 'chant',
+    tower1: 'imp', tower2: 'stone', tower4: 'chant', tower5: 'chant', tower7: 'bellow',
+    inferno1: 'imp', inferno2: 'imp', inferno3: 'growl', inferno4: 'bellow', inferno5: 'bellow', inferno6: 'fire', inferno7: 'roar',
+    necropolis1: 'bone', necropolis2: 'rasp', necropolis3: 'rasp', necropolis4: 'rasp', necropolis5: 'rasp', necropolis6: 'rasp', necropolis7: 'roar',
+    dungeon1: 'grunt', dungeon2: 'screech', dungeon3: 'eye', dungeon4: 'hiss', dungeon5: 'bellow', dungeon6: 'growl', dungeon7: 'roar',
+    stronghold5: 'screech', stronghold6: 'bellow', stronghold7: 'roar',
+    fortress1: 'grunt', fortress2: 'hiss', fortress3: 'buzz', fortress4: 'hiss', fortress5: 'bellow', fortress6: 'screech', fortress7: 'hiss',
+    conflux1: 'chant', conflux2: 'air', conflux3: 'water', conflux4: 'fire', conflux5: 'stone', conflux6: 'eye', conflux7: 'fire',
+    faerie: 'chant', rustd: 'roar', crystald: 'roar', azured: 'roar',
+  };
+  // kind -> [oscillator, base Hz, length, pitch slide, noise centre Hz, noise Q, noise filter]
+  const VP = {
+    grunt: ['sawtooth', 150, 0.14, -60, 700, 1.2, 'bandpass'], growl: ['sawtooth', 95, 0.26, -30, 400, 0.9, 'lowpass'], bellow: ['sawtooth', 80, 0.3, -20, 300, 0.8, 'lowpass'], roar: ['sawtooth', 70, 0.5, -25, 600, 0.9, 'bandpass'],
+    screech: ['sawtooth', 900, 0.22, 500, 3000, 1.5, 'bandpass'], hiss: ['sine', 420, 0.3, -60, 5000, 0.8, 'highpass'], rasp: ['square', 130, 0.2, -40, 1200, 2, 'bandpass'], bone: ['square', 420, 0.06, -100, 2600, 3, 'bandpass'],
+    stone: ['square', 90, 0.3, -20, 420, 0.8, 'lowpass'], human: ['triangle', 260, 0.12, -60, 1800, 1.5, 'bandpass'], chant: ['sine', 520, 0.25, 120, 2600, 2.5, 'bandpass'], elf: ['triangle', 700, 0.1, -200, 3200, 1.2, 'highpass'],
+    imp: ['square', 420, 0.1, -150, 2200, 1.4, 'bandpass'], wood: ['sawtooth', 120, 0.25, -30, 500, 0.9, 'lowpass'], eye: ['sine', 300, 0.35, 300, 2000, 2, 'bandpass'], buzz: ['sawtooth', 220, 0.25, 6, 2800, 1, 'bandpass'],
+    air: ['sine', 600, 0.35, 300, 1500, 0.9, 'bandpass'], water: ['sine', 300, 0.3, -100, 800, 0.8, 'lowpass'], fire: ['sawtooth', 140, 0.3, -30, 2500, 0.8, 'highpass'], wet: ['sine', 110, 0.18, -60, 600, 0.8, 'lowpass'],
+  };
+  function voice(kind, which, p) {
+    const [type, f, d, sl, nf, nq, nt] = VP[kind] || VP.grunt;
+    if (which === 'attack') {
+      tone(f * p, d, type, 0.05, sl * p); noise(d * 0.9, 0.045, nf * p, nq, nt, 0, nt === 'highpass' ? 0 : -nf * 0.4);
+      if (kind === 'bone' || kind === 'imp') { tone(f * p * 1.2, d, type, 0.04, sl, d * 0.9); tone(f * p * 0.9, d, type, 0.035, sl, d * 1.8); }
+    } else if (which === 'defend') { tone(f * p * 1.3, d * 0.8, type, 0.04, -Math.abs(sl) * p - 40); noise(d * 0.7, 0.03, nf * p * 1.2, nq, nt); }
+    else { tone(f * p * 0.9, d * 3, type, 0.05, -f * p * 0.5); noise(d * 3, 0.04, nf * p * 0.6, nq, nt === 'highpass' ? 'bandpass' : nt, 0.02, -nf * 0.3); }
+  }
+  // the sound of each kind of shot leaving the shooter
+  const SHOT = {
+    bolt: () => { noise(0.08, 0.06, 500, 1, 'lowpass'); tone(200, 0.1, 'square', 0.05, -90); },
+    twin: () => { S.shoot(); tone(900, 0.06, 'triangle', 0.025, -300, 0.07); },
+    glow: () => { noise(0.14, 0.04, 3400, 1.2, 'highpass', 0, -1500); tone(1100, 0.12, 'sine', 0.03, -500); },
+    javelin: () => noise(0.3, 0.06, 700, 1.2, 'bandpass', 0, 1200),
+    zap: () => { noise(0.22, 0.06, 4200, 1, 'highpass'); tone(1400, 0.2, 'sawtooth', 0.035, -1000); },
+    fire: () => { noise(0.35, 0.07, 800, 0.8, 'bandpass', 0, 900); tone(120, 0.3, 'sawtooth', 0.04, 80); },
+    holy: () => { tone(880, 0.3, 'sine', 0.045, 0); tone(1320, 0.35, 'sine', 0.03, 0, 0.05); tone(1760, 0.3, 'sine', 0.02, 0, 0.1); },
+    death: () => { tone(180, 0.5, 'sine', 0.06, -70); noise(0.45, 0.04, 600, 1, 'lowpass', 0, -300); },
+    venom: () => { noise(0.1, 0.05, 1800, 1.4, 'bandpass', 0, -900); tone(500, 0.1, 'sine', 0.04, -200); },
+    rock: () => { tone(100, 0.25, 'square', 0.06, -40); noise(0.3, 0.06, 350, 0.8, 'lowpass'); },
+    ball: () => { tone(90, 0.3, 'sawtooth', 0.07, -40); noise(0.35, 0.06, 600, 0.8, 'lowpass', 0, -300); },
+    gaze: () => tone(900, 0.4, 'sine', 0.045, -500),
+    orb: () => { tone(400, 0.3, 'sine', 0.05, 300); noise(0.3, 0.03, 1800, 2, 'bandpass', 0, 1200); },
+  };
+  let vidx = null, vlast = 0;
+  function loadVoiceIndex() {
+    if (vidx) return; vidx = {};
+    try { fetch('audio/sfx/index.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : [])).then(l => { (l || []).forEach(f => { vidx[String(f).replace(/\.[a-z0-9]+$/i, '')] = f; }); }).catch(() => { /* none */ }); } catch (e) { /* ignore */ }
+  }
+  function playVoiceFile(name) {
+    const f = vidx && vidx[name]; if (!f || !on || !ctx()) return false;
+    const el = new Audio('audio/sfx/' + f); el.volume = Math.min(1, sv() * 0.45); const p = el.play(); if (p && p.catch) p.catch(() => { /* needs a tap first */ }); return true;
+  }
+  function creatureVoice(id, kind, shot) {
+    const now = performance.now(); if (now - vlast < 45) return; vlast = now;   // a splash hitting several stacks must not turn into noise
+    loadVoiceIndex(); const base = String(id).replace(/_\d$/, '');
+    if (playVoiceFile(id + '_' + kind) || playVoiceFile(base + '_' + kind)) return;
+    if (!on) return;
+    if (kind === 'shoot') { qmul = 0.5; try { (SHOT[shot] || S.shoot)(); } finally { qmul = 1; } return; }
+    let h = 7; for (let i = 0; i < base.length; i++) h = (h * 31 + base.charCodeAt(i)) % 997;
+    qmul = 0.45;     // creature voices sit quietly under the music and the main hit sounds
+    try { voice(VOICE[base] || 'grunt', kind, 0.86 + (h % 40) / 100); } finally { qmul = 1; }
+  }
   const BUZZ = { hit: 14, crash: 40, win: [30, 40, 30], level: [20, 30, 20], build: 18, ach: [25, 40, 25] };
   // gentle generative tune: slow minor-pentatonic notes over a low drone; faster and edgier in battle
   const SCALE = { map: [220, 261.6, 293.7, 329.6, 392, 440, 523.3], battle: [196, 233.1, 261.6, 293.7, 349.2, 392, 466.2] };
   function musicTick() {
-    if (!on || mv() <= 0.001 || document.hidden || mood !== 'map' || (els.map && !els.map.paused) || !TRACKS.map) return;
+    if (!on || mv() <= 0.001 || document.hidden || mood !== 'map' || (els[wanted('map')] && !els[wanted('map')].paused) || !TRACKS[wanted('map')]) return;
     const a = ctx(); if (!a) return;
     const sc = SCALE[mood], vol = 0.035 * mv() * 2.2;
     const f = sc[(step * 3 + ((Math.random() * 3) | 0)) % sc.length] * (Math.random() < 0.2 ? 2 : 1);
@@ -77,7 +146,16 @@ const Sfx = (() => {
   // recorded music: audio/menu.mp3 on the title screen, audio/map.mp3 on the adventure map, audio/battle.mp3 in fights
   const TRACKS = { menu: 'audio/menu.mp3', map: 'audio/map.mp3', battle: 'audio/battle.mp3' };
   const els = {}; let cur = null, fade = {};
-  const trackVol = () => Math.min(1, mv() * 1.3);
+  let fac = null, prevMood = 'map', midx = null;
+  // castle themes: audio/music/<castle>_<town|battle|map>.mp3 (listed in audio/music/index.json by `npm run art`) replace the general track
+  // for that mood while that castle is yours; they play quietly (CASTLE_VOL of the normal music volume)
+  const CASTLE_VOL = 0.5;
+  function loadMusicIndex() {
+    if (midx) return; midx = {};
+    try { fetch('audio/music/index.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : [])).then(l => { (l || []).forEach(f => { const q = String(f).replace(/\.[a-z0-9]+$/i, '').split('_'); if (q.length === 2) TRACKS[q[1] + ':' + q[0]] = 'audio/music/' + f; }); if (fac) applyMood(false); }).catch(() => { /* none */ }); } catch (e) { /* ignore */ }
+  }
+  const wanted = (m) => (fac && TRACKS[(m || mood) + ':' + fac]) ? (m || mood) + ':' + fac : (m || mood);
+  const trackVol = (n) => Math.min(1, mv() * 1.3) * (String(n || wanted()).indexOf(':') > 0 ? CASTLE_VOL : 1);
   const trackEl = (n) => { if (!els[n]) { els[n] = new Audio(TRACKS[n]); els[n].loop = true; els[n].preload = 'auto'; } return els[n]; };
   function fadeTo(n, target, ms, then) {
     // equal-power curves (sine in, cosine out) so a mood change is a smooth crossfade with no dip in loudness
@@ -89,7 +167,7 @@ const Sfx = (() => {
     try {
       if (!TRACKS[n] || !on || mv() <= 0.001) return;
       const el = trackEl(n); if (fromStart) el.currentTime = 0; if (el.paused) { el.volume = 0; const p = el.play(); if (p && p.catch) p.catch(() => { /* needs a tap first; retried on the first gesture */ }); }
-      fadeTo(n, trackVol(), 1500);
+      fadeTo(n, trackVol(n), 1500);
     } catch (e) { /* ignore */ }
   }
   // ---- quiet, synthesised ambience for the town screen: a filtered noise bed plus a few random sounds per castle ----
@@ -109,6 +187,7 @@ const Sfx = (() => {
   };
   const townOpen = () => { const m = document.getElementById('modal'); return !!(m && !m.classList.contains('hide') && document.getElementById('tcv')); };
   function ambStop() {
+    if (mood === 'town') { mood = prevMood; applyMood(false); }
     if (!amb) return; const o = amb; amb = null; clearInterval(o.timer);
     try { const t = ac.currentTime; o.g.gain.cancelScheduledValues(t); o.g.gain.setTargetAtTime(0.0001, t, 0.5); o.src.stop(t + 2.5); } catch (e) { /* ignore */ }
   }
@@ -119,25 +198,28 @@ const Sfx = (() => {
     if (!on || mv() <= 0.001 || document.hidden || Math.random() < 0.3) return;
     amb.def.ev(ambK());
   }
-  function ambStart(fac) {
-    if (amb && amb.fac === fac) return;
-    ambStop(); if (!fac || !on || mv() <= 0.001) return;
+  function ambStart(f) {
+    if (amb && amb.fac === f) return;
+    ambStop(); if (!f || !on || mv() <= 0.001) return;
+    fac = f; if (TRACKS['town:' + f]) { prevMood = mood === 'town' ? 'map' : mood; mood = 'town'; applyMood(false); }
     const a = ctx(); if (!a) return;
-    const def = AMBS[fac] || AMBS.castle, src = a.createBufferSource(), flt = a.createBiquadFilter(), g = a.createGain();
+    const def = AMBS[f] || AMBS.castle, src = a.createBufferSource(), flt = a.createBiquadFilter(), g = a.createGain();
     src.buffer = noiseBuf(a); src.loop = true; flt.type = def.bed[0]; flt.frequency.value = def.bed[1]; flt.Q.value = def.bed[2]; g.gain.value = 0.0001;
     src.connect(flt); flt.connect(g); g.connect(musicGain); src.start();
-    amb = { fac, def, src, g, timer: setInterval(ambTick, 2300) }; ambLevel();
+    amb = { fac: f, def, src, g, timer: setInterval(ambTick, 2300) }; ambLevel();
   }
-  function applyMood(fromStart) { for (const n in TRACKS) if (n !== mood) stopTrack(n); if (TRACKS[mood]) playTrack(mood, fromStart); }
+  function applyMood(fromStart) { loadMusicIndex(); const w = wanted(); for (const n in TRACKS) if (n !== w) stopTrack(n); if (TRACKS[w]) playTrack(w, fromStart); }
   function startMusic() { if (musicTimer) return; musicTimer = setInterval(musicTick, 900); }
   return {
     play(n) { try { if (S[n]) S[n](); if (BUZZ[n] && typeof Settings !== 'undefined') Settings.buzz(BUZZ[n]); } catch (e) { /* ignore */ } },
     ambience(fac) { try { ambStart(fac); } catch (e) { /* ignore */ } },
+    setFaction(f) { if (f === fac) return; fac = f; applyMood(false); },
+    creature(id, kind, shot) { try { creatureVoice(id, kind, shot); } catch (e) { /* ignore */ } },
     unlock() { gest = true; },
     toggle() { on = !on; if (!on) { for (const n in els) els[n].pause(); ambStop(); } else applyMood(false); try { localStorage.setItem('h3js_snd', on ? '1' : '0'); } catch (e) { /* ignore */ } return on; },
     get on() { return on; },
     mood(m) { if (m === mood) return; mood = m; applyMood(m !== 'map'); },
-    refresh() { ambLevel(); for (const n in els) { if (els[n].paused) continue; if (!on || mv() <= 0.001) els[n].pause(); else if (n === mood) els[n].volume = trackVol(); } if (TRACKS[mood] && on && mv() > 0.001 && els[mood] && els[mood].paused) playTrack(mood, false); },
+    refresh() { ambLevel(); for (const n in els) { if (els[n].paused) continue; if (!on || mv() <= 0.001) els[n].pause(); else if (n === wanted()) els[n].volume = trackVol(n); } if (TRACKS[wanted()] && on && mv() > 0.001 && els[wanted()] && els[wanted()].paused) playTrack(wanted(), false); },
     resume() { applyMood(false); },
     startMusic,
   };

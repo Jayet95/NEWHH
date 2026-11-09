@@ -847,6 +847,34 @@ body.skin .eqt, body.skin .eqt:hover { border-image: none !important; border-wid
 /* game icons replacing emoji */
 .gi { display: inline-flex; width: 1.2em; height: 1.2em; vertical-align: -.26em; flex: none; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .6)); }
 .gi svg, .gi img { width: 100%; height: 100%; display: block; object-fit: contain; }
+/* ---- victory / defeat cards (battle result and end-of-game screen) ---- */
+.vic { position: relative; text-align: center; padding: 22px 8px 6px; overflow: hidden; margin: -6px -6px 8px; }
+.vic-rays { position: absolute; left: 50%; top: 56px; width: 520px; height: 520px; margin: -260px 0 0 -260px; background: repeating-conic-gradient(rgba(255, 214, 110, .17) 0 8deg, transparent 8deg 20deg); -webkit-mask: radial-gradient(circle, #000 0, transparent 68%); mask: radial-gradient(circle, #000 0, transparent 68%); animation: vicSpin 40s linear infinite; pointer-events: none; }
+.vic.lose .vic-rays { background: repeating-conic-gradient(rgba(200, 60, 60, .15) 0 8deg, transparent 8deg 20deg); }
+.vic-crest { position: relative; display: flex; margin: 0 auto; width: 84px; height: 84px; align-items: center; justify-content: center; font-size: 42px; border-radius: 50%; background: radial-gradient(circle at 35% 28%, #fff3b0, #d89a22 55%, #6b4510); border: 3px solid #2a1604; box-shadow: 0 0 0 3px #e6bf55, 0 0 26px rgba(255, 214, 110, .55), 0 8px 18px rgba(0, 0, 0, .6); animation: vicPop .7s cubic-bezier(.2, 1.6, .4, 1) both; }
+.vic-crest .gi { width: 46px; height: 46px; }
+.vic.lose .vic-crest { background: radial-gradient(circle at 35% 28%, #e8c8c8, #8a2a2a 55%, #3a0e0e); box-shadow: 0 0 0 3px #8a4a4a, 0 0 26px rgba(200, 60, 60, .45), 0 8px 18px rgba(0, 0, 0, .6); }
+.vic-ribbon { position: relative; display: table; margin: -10px auto 0; padding: 6px 46px 8px; font-family: var(--f-head); font-size: 30px; letter-spacing: 6px; text-transform: uppercase; color: #fff3c4; text-shadow: 0 2px 0 #000, 0 0 14px rgba(255, 200, 80, .5); background: linear-gradient(#c0392f, #7a1c1a); box-shadow: inset 0 0 0 2px #e6bf55; clip-path: polygon(0 0, 100% 0, calc(100% - 18px) 50%, 100% 100%, 0 100%, 18px 50%); animation: vicSlide .6s .15s ease-out both; }
+.vic.lose .vic-ribbon { background: linear-gradient(#585868, #24242e); box-shadow: inset 0 0 0 2px #9a8a6a; }
+.vic-sub { margin: 10px 0 0; font-family: var(--f-flav); font-size: 15px; opacity: .92; }
+.vic-hero { display: flex; align-items: center; gap: 12px; justify-content: center; margin: 10px 0 4px; text-align: left; }
+.vic-hero b { display: block; font-family: var(--f-head); color: var(--gold); font-size: 18px; } .vic-hero small { opacity: .75; }
+.vic-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+.vic-stats > div { background: rgba(0, 0, 0, .35); border: 1px solid #4a381c; border-radius: 10px; padding: 8px 4px; display: flex; flex-direction: column; align-items: center; }
+.vic-stats b { font-family: var(--f-head); font-size: 26px; color: var(--gold); } .vic-stats b.bad { color: #ff9a8a; } .vic-stats b.good { color: #8fe08f; }
+.vic-stats span { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; opacity: .7; }
+.vic-army { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 6px 0 10px; }
+.vic-unit { position: relative; width: 74px; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 4px; background: rgba(0, 0, 0, .3); border: 1px solid #4a381c; border-radius: 10px; }
+.vic-unit b { font-family: var(--f-head); font-size: 15px; } .vic-unit small { position: absolute; top: 3px; right: 5px; color: #ff9a8a; font-weight: 700; font-size: 11px; }
+.vic-unit span { font-size: 10px; opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 66px; } .vic-unit.fallen { opacity: .5; filter: grayscale(.8); }
+.vic-score { background: rgba(0, 0, 0, .3); border: 1px solid #4a381c; border-radius: 10px; padding: 4px 12px; margin: 8px 0; }
+.vic-row { display: flex; justify-content: space-between; gap: 12px; padding: 5px 2px; border-bottom: 1px solid rgba(255, 255, 255, .07); font-size: 14px; } .vic-row:last-child { border-bottom: 0; }
+.vic-row b { color: var(--gold); font-family: var(--f-head); } .vic-row.mult b { color: #bfe0ff; }
+.vic-total { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; margin: 8px 0 12px; border-radius: 12px; background: linear-gradient(#3a2a10, #1d1408); border: 2px solid var(--gold); box-shadow: 0 0 18px rgba(255, 200, 80, .25); }
+.vic-total span { font-family: var(--f-head); letter-spacing: 2px; text-transform: uppercase; } .vic-total b { font-family: var(--f-head); font-size: 34px; color: #ffe27a; text-shadow: 0 0 14px rgba(255, 200, 80, .55); }
+@keyframes vicSpin { to { transform: rotate(360deg); } } @keyframes vicPop { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } } @keyframes vicSlide { from { transform: translateX(-40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .vic-rays, .vic-crest, .vic-ribbon { animation: none; } }
+@media (max-width: 560px) { .vic-ribbon { font-size: 22px; letter-spacing: 3px; padding: 5px 32px 7px; } .vic-crest { width: 68px; height: 68px; } .vic-stats b { font-size: 21px; } .vic-total b { font-size: 28px; } }
 button .gi { margin-right: .15em; }
 h2 .gi { width: 1.1em; height: 1.1em; }
 .eqt .ghost { opacity: .32; display: flex; font-size: 34px; filter: grayscale(.6); } .eqt .ghost .gi { width: 38px; height: 38px; }

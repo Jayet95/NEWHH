@@ -35,6 +35,10 @@ const Battle = (() => {
   const stackAt = (c, r) => B.stacks.find(s => { if (s.dead) return false; if (s.c === c && s.r === r) return true; const t = tailAt(s); return !!t && t[0] === c && t[1] === r; });
   const COARSE = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false;
   const sfx = (n) => { if (typeof Sfx !== 'undefined') Sfx.play(n); };
+  // a creature's own voice: kind = attack | defend | death | shoot (shot = the shot style, for shooters)
+  const csfx = (t, kind, shot) => { if (typeof Sfx !== 'undefined' && Sfx.creature) Sfx.creature(t, kind, shot); };
+  // the crest, ribbon and subtitle at the top of the victory / defeat cards (also used by the end-of-game victory screen)
+  window.vicBanner = (title, sub, kind = 'win') => `<div class="vic ${kind}"><div class="vic-rays"></div><div class="vic-crest">${kind === 'win' ? '👑' : '💀'}</div><div class="vic-ribbon"><span>${title}</span></div>${sub ? `<p class="vic-sub">${sub}</p>` : ''}</div>`;
   const perk = (id) => (B.hero && B.hero.perks && B.hero.perks[id]) || 0;
   const speedOf = (s) => Math.max(1, C[s.t].s + (s.haste || 0) - (s.slow || 0));
   const abil = (s, k) => {
@@ -114,7 +118,7 @@ const Battle = (() => {
     if (target.side === 0) dmg = Math.max(1, Math.floor(dmg * (1 - 0.07 * perk('armorer'))));
     kind = kind || 'melee';
     const pool = totalHp(target), now = performance.now(), dn = kind === 'spell' && B.fxDelays ? (B.fxDelays.get(target) || 0) : 0, dl = dn / spd();
-    const killed = applyDmg(target, dmg); sfx('hit');
+    const killed = applyDmg(target, dmg); sfx('hit'); csfx(target.t, target.dead ? 'death' : 'defend');
     target.flash = now + dl; target.hurt = target.flash; if (target.dead) target.deadAt = target.flash;
     if (target.side === 1) B.xp += killed * C[target.t].hp;
     const p = hexPx(target.c, target.r);
@@ -472,7 +476,7 @@ const Battle = (() => {
     shark: { m: 'bite', mc: '200,230,255' }, kraken: { m: 'tentacle', mc: '90,200,190' },
     castle1: { m: 'stab', mc: '255,255,255' }, castle2: { s: 'arrow', pc: '#e0443a' }, castle3: { m: 'claw', mc: '255,232,150' }, castle4: { m: 'slash', mc: '255,255,255' },
     castle5: { m: 'holy', mc: '255,240,170', s: 'holy', pc: '#ffe27a' }, castle6: { m: 'stab', mc: '255,250,220' }, castle7: { m: 'holy', mc: '255,248,200' },
-    rampart1: { m: 'stab', mc: '230,210,160' }, rampart2: { m: 'smash', mc: '255,200,90' }, rampart3: { m: 'slash', mc: '170,240,130', s: 'twin', pc: '#7ddc5a' }, rampart4: { m: 'stab', mc: '255,255,255' },
+    rampart1: { m: 'stab', mc: '230,210,160' }, rampart2: { m: 'smash', mc: '255,200,90' }, rampart3: { m: 'slash', mc: '170,240,130', s: 'glow', pc: '#7ddc5a' }, rampart4: { m: 'stab', mc: '255,255,255' },
     rampart5: { m: 'smash', mc: '130,210,90' }, rampart6: { m: 'holy', mc: '255,255,255' },
     tower1: { m: 'claw', mc: '190,190,200', s: 'ball' }, tower2: { m: 'claw', mc: '180,180,195' }, tower4: { m: 'zap', mc: '170,215,255', s: 'zap', pc: '#aee0ff' }, tower5: { m: 'zap', mc: '255,225,140' }, tower7: { m: 'zap', mc: '190,225,255' },
     inferno1: { m: 'claw', mc: '255,110,80' }, inferno2: { m: 'slash', mc: '255,150,70', s: 'fire' }, inferno3: { m: 'fire', mc: '255,150,60' }, inferno4: { m: 'cleave', mc: '255,100,80' }, inferno5: { m: 'cleave', mc: '255,160,70' },
@@ -494,17 +498,18 @@ const Battle = (() => {
   };
   async function strike(s, t) {
     const a = hexPx(s.c, s.r), p = hexPx(t.c, t.r), now = performance.now();
-    s.anim = { kind: 'lunge', t0: now, dur: 300 / spd(), dx: p.x - a.x, dy: p.y - a.y };
+    s.anim = { kind: 'lunge', t0: now, dur: 300 / spd(), dx: p.x - a.x, dy: p.y - a.y }; csfx(s.t, 'attack');
     push((a.x + p.x) / 2, (a.y + p.y) / 2, 0.026, 560);
     (B.slashes = B.slashes || []).push({ x: p.x, y: p.y, t0: now + 110 / spd(), dur: 340 / spd(), style: styleOf(s).melee, mc: styleOf(s).mc, ang: Math.atan2(p.y - a.y, p.x - a.x) });
     await sleep(120);
   }
-  async function fireProj(s, tg) {
-    const a = hexPx(s.c, s.r), p = hexPx(tg.c, tg.r), now = performance.now(), st = styleOf(s), dur = Math.max(220, Math.min(520, Math.hypot(p.x - a.x, p.y - a.y) * 1.1)) / spd();
-    s.anim = { kind: 'shoot', t0: now, dur: 320 / spd(), dx: p.x - a.x, dy: p.y - a.y };
+  // quick = the second arrow of a double shot: a shorter draw and flight, so the pair reads as one quick volley
+  async function fireProj(s, tg, quick) {
+    const a = hexPx(s.c, s.r), p = hexPx(tg.c, tg.r), now = performance.now(), st = styleOf(s), dur = Math.max(220, Math.min(520, Math.hypot(p.x - a.x, p.y - a.y) * 1.1)) * (quick ? 0.85 : 1) / spd(), lead = quick ? 40 : 130;
+    s.anim = { kind: 'shoot', t0: now, dur: (quick ? 240 : 320) / spd(), dx: p.x - a.x, dy: p.y - a.y };
     push((a.x + p.x) / 2, (a.y + p.y) / 2, 0.02, Math.min(900, 520 + dur * spd()));
-    (B.proj = B.proj || []).push({ ax: a.x, ay: a.y - 6, bx: p.x, by: p.y - 6, t0: now + 130 / spd(), dur, style: st.shoot, col: st.col });
-    await sleep(130 + dur * spd());
+    (B.proj = B.proj || []).push({ ax: a.x, ay: a.y - 6, bx: p.x, by: p.y - 6, t0: now + lead / spd(), dur, style: st.shoot, col: st.col });
+    await sleep(lead + dur * spd());
   }
   async function doMelee(s, e, spot) {
     const origin = { c: s.c, r: s.r }, moved = hexDist(s, spot);
@@ -596,10 +601,10 @@ const Battle = (() => {
     log('💣 A mine is laid.'); sfx('click'); refreshButtons();
   }
   async function doShoot(s, e) {
-    s.ammo--; sfx('shoot');
-    await fireProj(s, e);
-    const shots = abil(s, 'dshot') ? 2 : 1;
+    s.ammo--;
+    const shots = abil(s, 'dshot') ? 2 : 1;      // Marksmen (upgraded Archers), Wood Elves and their upgrades shoot twice: two arrows, two hits
     for (let k = 0; k < shots && !e.dead; k++) {
+      csfx(s.t, 'shoot', styleOf(s).shoot); await fireProj(s, e, k > 0);
       const dmg = Math.max(1, Math.floor(calcDmg(s, e, false) * luckMul(s)));
       const ex = { c: e.c, r: e.r };
       hit(e, dmg, `${C[s.t].n} shoots`, 'ranged');
@@ -610,7 +615,7 @@ const Battle = (() => {
           hit(o, Math.max(1, Math.floor(dmg / 2)), abil(s, 'cloud') ? '☠ Death cloud hits' : '🔥 Splash hits', 'ranged');
         }
       }
-      if (k + 1 < shots) await sleep(160);
+      if (k + 1 < shots) await sleep(70);
     }
     await sleep(240);
   }
@@ -1245,8 +1250,8 @@ const Battle = (() => {
     return { x, y, rot, sx, sy };
   }
   // landing sparks per shot style (colour lists for burst, r,g,b for the spark star)
-  const IMP = { twin: ['#e8ffd0', '#7ddc5a'], bolt: ['#fff6d0', '#ffb04a'], javelin: ['#fff6d0', '#d8c28a'], zap: ['#ffffff', '#8cc8ff'], holy: ['#ffffff', '#ffe27a'], death: ['#bfffd0', '#4aff9a'], venom: ['#d8ff90', '#6ad02a'] };
-  const IMPC = { twin: '140,230,100', bolt: '255,176,74', javelin: '230,205,140', zap: '160,210,255', holy: '255,226,122', death: '90,255,160', venom: '120,220,50' };
+  const IMP = { twin: ['#e8ffd0', '#7ddc5a'], glow: ['#e8ffd0', '#7ddc5a'], bolt: ['#fff6d0', '#ffb04a'], javelin: ['#fff6d0', '#d8c28a'], zap: ['#ffffff', '#8cc8ff'], holy: ['#ffffff', '#ffe27a'], death: ['#bfffd0', '#4aff9a'], venom: ['#d8ff90', '#6ad02a'] };
+  const IMPC = { twin: '140,230,100', glow: '140,230,100', bolt: '255,176,74', javelin: '230,205,140', zap: '160,210,255', holy: '255,226,122', death: '90,255,160', venom: '120,220,50' };
   const rnd = (i, t) => { const v = Math.sin(i * 12.9898 + t * 78.233) * 43758.5453; return v - Math.floor(v); };
   function drawProjectiles(now) {
     B.proj = (B.proj || []).filter(p => {
@@ -1257,7 +1262,7 @@ const Battle = (() => {
         burst(p.bx, p.by + 6, p.style === 'fire' ? 12 : 7, { kind: p.style === 'ball' || p.style === 'rock' ? 'smoke' : 'spark', col: IMP[p.style] || (p.style === 'fire' ? PAL.fire : p.style === 'orb' ? PAL.dark : p.style === 'ball' || p.style === 'rock' ? PAL.dust : ['#fff6d0', '#ffd98a']), v0: 40, v1: 170, l0: 200, l1: 420, s0: p.style === 'ball' || p.style === 'rock' ? 5 : 1.2, s1: p.style === 'ball' || p.style === 'rock' ? 8 : 2.2, drag: 3, grow: 1 });
         return false;
       }
-      const arc = { arrow: 26, twin: 26, javelin: 30, bolt: 14, rock: 38, venom: 20, gaze: 0, zap: 0 }[p.style] ?? 12;
+      const arc = { arrow: 26, twin: 26, glow: 26, javelin: 30, bolt: 14, rock: 38, venom: 20, gaze: 0, zap: 0 }[p.style] ?? 12;
       const x = p.ax + (p.bx - p.ax) * k, y = p.ay + (p.by - p.ay) * k - arc * Math.sin(Math.PI * k), vx = p.bx - p.ax, vy = p.by - p.ay - arc * Math.PI * Math.cos(Math.PI * k), ang = Math.atan2(vy, vx);
       ctx.save();
       if (p.style === 'arrow') {
@@ -1266,9 +1271,9 @@ const Battle = (() => {
         ctx.translate(x, y); ctx.rotate(ang); ctx.strokeStyle = '#140a04'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(9, 0); ctx.stroke();
         ctx.strokeStyle = '#e8dcc0'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = '#d0d8e0'; ctx.beginPath(); ctx.moveTo(8, -3); ctx.lineTo(14, 0); ctx.lineTo(8, 3); ctx.closePath(); ctx.fill();
         ctx.fillStyle = p.col || '#e0443a'; ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(-14, -3); ctx.lineTo(-7, 0); ctx.lineTo(-14, 3); ctx.closePath(); ctx.fill();
-      } else if (p.style === 'twin' || p.style === 'bolt' || p.style === 'javelin') {
+      } else if (p.style === 'twin' || p.style === 'glow' || p.style === 'bolt' || p.style === 'javelin') {
         const col = p.col || '#e0443a', n = p.style === 'twin' ? 2 : 1, k0 = Math.max(0, k - 0.18), tx = p.ax + (p.bx - p.ax) * k0, ty = p.ay + (p.by - p.ay) * k0 - arc * Math.sin(Math.PI * k0);
-        const tg = ctx.createLinearGradient(tx, ty, x, y); tg.addColorStop(0, 'rgba(255,255,255,0)'); tg.addColorStop(1, p.style === 'twin' ? 'rgba(160,255,120,.6)' : 'rgba(255,245,210,.5)'); ctx.strokeStyle = tg; ctx.lineWidth = p.style === 'bolt' ? 3.4 : 2.4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(x, y); ctx.stroke();
+        const tg = ctx.createLinearGradient(tx, ty, x, y); tg.addColorStop(0, 'rgba(255,255,255,0)'); tg.addColorStop(1, p.style === 'twin' || p.style === 'glow' ? 'rgba(160,255,120,.6)' : 'rgba(255,245,210,.5)'); ctx.strokeStyle = tg; ctx.lineWidth = p.style === 'bolt' ? 3.4 : 2.4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(x, y); ctx.stroke();
         ctx.translate(x, y); ctx.rotate(ang);
         for (let i = 0; i < n; i++) {
           ctx.save(); ctx.translate(n === 2 && i ? -5 : 0, n === 2 ? (i ? 5 : -5) : 0);
@@ -1431,7 +1436,15 @@ const Battle = (() => {
       B.canRetreat = false;
       if (win && typeof Celebrate !== 'undefined') Celebrate.fight();
       const html = fled ? '<h2>🏳️ Retreat</h2><p>Your army fled the field.</p>'
-        : win ? `<h2>🏆 Victory!</h2><p>Your forces lost <b>${lost}</b> creatures.</p><p>Experience gained: <b>${res.xp}</b></p>`
+        : win ? (() => {
+          const army = B.armyIn.map((a, i) => a ? { t: a.t, n0: a.n, n1: surv[i] || 0 } : null).filter(Boolean);
+          const slain = B.stacks.filter(s => s.side === 1 && !s.summoned).reduce((p, s) => p + Math.max(0, (s.maxN || 0) - Math.max(0, s.n)), 0);
+          const hero = B.hero || {};
+          return `${window.vicBanner('Victory', 'The field is yours.')}
+            <div class="vic-hero">${Art.heroPic(hero.icon || '🛡️', '#2a5fb0', 56, hero.pid)}<div><b>${hero.name || 'Your hero'}</b><small>leads the army to victory</small></div></div>
+            <div class="vic-stats"><div><b>${slain}</b><span>Enemies slain</span></div><div><b class="${lost ? 'bad' : 'good'}">${lost}</b><span>Your losses</span></div><div><b>+${res.xp}</b><span>Experience</span></div></div>
+            <h4>Your army</h4><div class="vic-army">${army.map(u => `<div class="vic-unit${u.n1 ? '' : ' fallen'}">${Art.pic(u.t, 56)}<b>${u.n1}</b>${u.n0 - u.n1 ? `<small>−${u.n0 - u.n1}</small>` : ''}<span>${C[u.t].n}</span></div>`).join('')}</div>`;
+        })()
           : '<h2>💀 Defeat</h2><p>Your army has been destroyed. The hero retreats to town.</p>';
       if (win) await window.showModal(html, ['Continue']);
       document.body.classList.remove('inbattle'); rotateHint(false);

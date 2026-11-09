@@ -846,7 +846,7 @@ body.skin .eqt, body.skin .eqt:hover { border-image: none !important; border-wid
 
 /* game icons replacing emoji */
 .gi { display: inline-flex; width: 1.2em; height: 1.2em; vertical-align: -.26em; flex: none; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .6)); }
-.gi svg { width: 100%; height: 100%; display: block; }
+.gi svg, .gi img { width: 100%; height: 100%; display: block; object-fit: contain; }
 button .gi { margin-right: .15em; }
 h2 .gi { width: 1.1em; height: 1.1em; }
 .eqt .ghost { opacity: .32; display: flex; font-size: 34px; filter: grayscale(.6); } .eqt .ghost .gi { width: 38px; height: 38px; }

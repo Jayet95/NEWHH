@@ -2189,7 +2189,7 @@
     $('sBack').onclick = showDifficultySelect;
     $('sNext').onclick = () => { keep(); showFactionSelect(diff, { ...st }); };
     $('modal').classList.remove('hide');
-    Assets.need(['terrain/grass', 'terrain/water']).then(() => { if (!prevCache[Object.keys(MAPS)[0]] || !prevCache[Object.keys(MAPS)[0]].full) { const d = $('mbox').querySelectorAll('.mprev'); Object.keys(MAPS).forEach((k, i) => { delete prevCache[k]; if (d[i]) d[i].src = mapPreview(k); }); } });
+    Assets.need(['terrain/grass', 'terrain/water']).then(() => { if (!prevCache[Object.keys(MAPS)[0]] || !prevCache[Object.keys(MAPS)[0]].full) { const d = $('mbox').querySelectorAll('.mprev'); Object.keys(MAPS).forEach((k, i) => { delete prevCache[k]; if (d[i]) d[i].src = mapPreview(k, undefined, k); }); } });
   }
   // ---------- setup screens (wide layout): painted map previews, castle pictures with banners, hero chooser with detail panel ----------
   const FLAGS = ['blue', 'red', 'green', 'orange', 'purple', 'teal', 'pink', 'tan'];

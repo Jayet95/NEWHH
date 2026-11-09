@@ -142,7 +142,15 @@ const GI = (() => {
   const esc = (x) => Array.from(x).map(ch => '.*+?^${}()|[]\\'.includes(ch) ? '\\' + ch : ch).join('');
   const SRC = '(' + keys.map(esc).join('|') + ')\\uFE0F?', RE = new RegExp(SRC, 'g'), RT = new RegExp(SRC);
   const symbols = Object.keys(ICONS).map(id => `<symbol id="gi-${id}" viewBox="0 0 32 32">${ICONS[id]()}</symbol>`).join('');
-  const html = (id, cls = '') => `<span class="gi ${cls}" data-g="${id}"><svg viewBox="0 0 32 32" aria-hidden="true"><use href="#gi-${id}"/></svg></span>`;
+  // a painted picture art/icons/ui_<id> replaces the drawn icon when it exists
+  const custom = (id) => (typeof Assets !== 'undefined' && Assets.has('icons/ui_' + id)) ? Assets.url('icons/ui_' + id) : null;
+  const inner = (id) => { const u = custom(id); return u ? `<img src="${u}" alt="" draggable="false">` : `<svg viewBox="0 0 32 32" aria-hidden="true"><use href="#gi-${id}"/></svg>`; };
+  const html = (id, cls = '') => `<span class="gi ${cls}" data-g="${id}">${inner(id)}</span>`;
+  // the art list loads after the first screen is drawn: swap icons already on the page, and drop the cached canvas pictures
+  if (typeof document !== 'undefined') document.addEventListener('assets-ready', () => {
+    for (const k in cache) delete cache[k];
+    document.querySelectorAll('.gi[data-g]').forEach(el => { if (!el.querySelector('img') && custom(el.dataset.g)) el.innerHTML = inner(el.dataset.g); });
+  });
   const idOf = (ch) => MAP[norm(ch)] || null;
   // ---- DOM replacement ----
   const SKIP = /^(SCRIPT|STYLE|TEXTAREA|OPTION|TITLE|CANVAS|SVG|INPUT)$/;
@@ -165,6 +173,7 @@ const GI = (() => {
   const cache = {};
   function img(id) {
     if (cache[id]) return cache[id];
+    const pic = typeof Assets !== 'undefined' ? Assets.get('icons/ui_' + id) : null; if (pic) return (cache[id] = pic);
     const st = getComputedStyle(document.body), v = (n, d) => st.getPropertyValue(n).trim() || d;
     const defs = DEFS.replace('var(--ic-hi,#fff0b0)', v('--ic-hi', '#fff0b0')).replace('var(--ic-mid,#e0b040)', v('--ic-mid', '#e0b040')).replace('var(--ic-lo,#8a5f14)', v('--ic-lo', '#8a5f14'));
     const i = new Image(); i.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="64" height="64"><defs>${defs}</defs>${ICONS[id]()}</svg>`);

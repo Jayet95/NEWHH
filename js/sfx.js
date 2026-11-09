@@ -155,7 +155,18 @@ const Sfx = (() => {
     try { fetch('audio/music/index.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : [])).then(l => { (l || []).forEach(f => { const q = String(f).replace(/\.[a-z0-9]+$/i, '').split('_'); if (q.length === 2) TRACKS[q[1] + ':' + q[0]] = 'audio/music/' + f; }); if (fac) applyMood(false); }).catch(() => { /* none */ }); } catch (e) { /* ignore */ }
   }
   const wanted = (m) => (fac && TRACKS[(m || mood) + ':' + fac]) ? (m || mood) + ':' + fac : (m || mood);
-  const trackVol = (n) => Math.min(1, mv() * 1.3) * (String(n || wanted()).indexOf(':') > 0 ? CASTLE_VOL : 1);
+  // the winning song (audio/victory.mp3) plays once and holds the other music down while it does
+  let vic = null; const duck = () => (vic && !vic.paused && !vic.ended ? 0.15 : 1);
+  const trackVol = (n) => Math.min(1, mv() * 1.3) * (String(n || wanted()).indexOf(':') > 0 ? CASTLE_VOL : 1) * duck();
+  function victory() {
+    if (!on || mv() <= 0.001 || !ctx()) return false;
+    try {
+      if (!vic) { vic = new Audio('audio/victory.mp3'); vic.preload = 'auto'; vic.addEventListener('ended', () => { for (const n in els) if (!els[n].paused) fadeTo(n, trackVol(n), 1400); }); vic.addEventListener('error', () => { vic = null; }); }
+      vic.currentTime = 0; vic.volume = Math.min(1, mv() * 1.4);
+      for (const n in els) if (!els[n].paused) fadeTo(n, trackVol(n) * 0.15, 500);
+      const p = vic.play(); if (p && p.catch) p.catch(() => { vic = null; }); return true;
+    } catch (e) { return false; }
+  }
   const trackEl = (n) => { if (!els[n]) { els[n] = new Audio(TRACKS[n]); els[n].loop = true; els[n].preload = 'auto'; } return els[n]; };
   function fadeTo(n, target, ms, then) {
     // equal-power curves (sine in, cosine out) so a mood change is a smooth crossfade with no dip in loudness
@@ -208,11 +219,12 @@ const Sfx = (() => {
     src.connect(flt); flt.connect(g); g.connect(musicGain); src.start();
     amb = { fac: f, def, src, g, timer: setInterval(ambTick, 2300) }; ambLevel();
   }
-  function applyMood(fromStart) { loadMusicIndex(); const w = wanted(); for (const n in TRACKS) if (n !== w) stopTrack(n); if (TRACKS[w]) playTrack(w, fromStart); }
+  function applyMood(fromStart) { if (vic && !vic.paused && mood === 'battle') vic.pause(); loadMusicIndex(); const w = wanted(); for (const n in TRACKS) if (n !== w) stopTrack(n); if (TRACKS[w]) playTrack(w, fromStart); }
   function startMusic() { if (musicTimer) return; musicTimer = setInterval(musicTick, 900); }
   return {
     play(n) { try { if (S[n]) S[n](); if (BUZZ[n] && typeof Settings !== 'undefined') Settings.buzz(BUZZ[n]); } catch (e) { /* ignore */ } },
     ambience(fac) { try { ambStart(fac); } catch (e) { /* ignore */ } },
+    victory() { try { return victory(); } catch (e) { return false; } },
     setFaction(f) { if (f === fac) return; fac = f; applyMood(false); },
     creature(id, kind, shot) { try { creatureVoice(id, kind, shot); } catch (e) { /* ignore */ } },
     unlock() { gest = true; },

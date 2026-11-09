@@ -1428,7 +1428,7 @@ const Battle = (() => {
   // ------- setup / finish -------
   function finish(win, fled) {
     if (B.over) return;
-    B.over = true; sfx(win ? 'win' : fled ? 'click' : 'lose'); if (typeof Sfx !== 'undefined') Sfx.mood('map');
+    B.over = true; if (win) { if (!(typeof Sfx !== 'undefined' && Sfx.victory && Sfx.victory())) sfx('win'); } else sfx(fled ? 'click' : 'lose'); if (typeof Sfx !== 'undefined') Sfx.mood('map');
     const surv = B.armyIn.map((a, i) => { if (!a) return null; const st = B.stacks.find(s => s.side === 0 && s.slot === i); return st && !st.dead ? st.n : 0; });
     const lost = B.armyIn.map((a, i) => a ? a.n - (surv[i] || 0) : 0).reduce((p, v) => p + v, 0);
     const res = { win, fled, survivors: surv, xp: win ? Math.floor(B.xp) : 0, mana: B.hero.mana };

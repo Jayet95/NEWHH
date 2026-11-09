@@ -1079,6 +1079,25 @@ const Battle = (() => {
     const cache = B._obsSpr || (B._obsSpr = new Map()), k = oe + c + ',' + r; if (cache.has(k)) return cache.get(k);
     const spr = buildObstacle(oe, c * 17 + r * 31 + 3); if (spr) cache.set(k, spr); return spr;
   }
+  // ---- unit bases and target marks: soft ground discs and glows instead of flat hex outlines ----
+  function hexGlow(x, y, rgb, a) { const g = ctx.createRadialGradient(x, y, 2, x, y, HR); g.addColorStop(0, 'rgba(' + rgb + ',' + a + ')'); g.addColorStop(1, 'rgba(' + rgb + ',0)'); hexPath(x, y, HR - 1); ctx.fillStyle = g; ctx.fill(); }
+  function reticle(x, y, rx, ry, now) {
+    const pulse = 0.5 + 0.5 * Math.sin(now / 240);
+    ctx.save(); ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.ellipse(x, y, rx + 3 * pulse, ry + 1.2 * pulse, 0, 0, 7); ctx.strokeStyle = 'rgba(255,90,70,' + (0.7 + 0.25 * pulse).toFixed(2) + ')'; ctx.lineWidth = 2.2; ctx.shadowColor = 'rgba(255,60,40,.8)'; ctx.shadowBlur = 8; ctx.stroke();
+    ctx.shadowBlur = 0; ctx.strokeStyle = 'rgba(255,235,220,.9)'; ctx.lineWidth = 1.4;
+    for (let k = 0; k < 4; k++) { const a = now / 1100 + k * Math.PI / 2; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * (rx + 3), y + Math.sin(a) * (ry + 1.2)); ctx.lineTo(x + Math.cos(a) * (rx + 9), y + Math.sin(a) * (ry + 3.5)); ctx.stroke(); }
+    ctx.restore();
+  }
+  function unitBase(x, y, rx, ry, side, cur, flash, now) {
+    const tc = side === 0 ? '96,156,255' : '238,90,74';
+    ctx.save(); ctx.translate(x, y); ctx.scale(1, ry / rx);
+    const g = ctx.createRadialGradient(0, 0, 1, 0, 0, rx * 1.15); g.addColorStop(0, flash ? 'rgba(255,110,90,.65)' : 'rgba(0,0,0,.5)'); g.addColorStop(0.62, 'rgba(0,0,0,.26)'); g.addColorStop(1, 'rgba(' + tc + ',.16)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rx * 1.1, 0, 7); ctx.fill(); ctx.restore();
+    const pulse = 0.5 + 0.5 * Math.sin(now / 260);
+    ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, 7); ctx.lineWidth = cur ? 2.6 : 1.7; ctx.strokeStyle = cur ? 'rgba(255,214,90,' + (0.8 + 0.2 * pulse).toFixed(2) + ')' : 'rgba(' + tc + ',.85)'; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, y, rx - 2.2, ry - 0.9, 0, 0, 7); ctx.lineWidth = 0.7; ctx.strokeStyle = 'rgba(255,255,255,.22)'; ctx.stroke();
+  }
   const sprite = (img, x, y, w) => { const h = img.height * w / img.width; ctx.drawImage(img, x - w / 2, y - h + 24, w, h); };
   // resolution for the small painted portraits: enough pixels for sharp edges on dense screens
   const PS = () => (DPR > 1 ? 144 : 96);
@@ -1183,14 +1202,11 @@ const Battle = (() => {
         ctx.fillStyle = st.hp / st.max > 0.5 ? '#5c5' : st.hp / st.max > 0.25 ? '#ec4' : '#e55'; ctx.fillRect(p.x - 16, p.y + 15, 32 * Math.max(0, st.hp) / st.max, 5);
       }
     }
-    if (B.cur && !B.cur.dead) {
-      const p = hexPx(B.cur.c, B.cur.r);
-      hexPath(p.x, p.y, HR - 2); ctx.strokeStyle = '#ffd24a'; ctx.lineWidth = 3; ctx.stroke();
-    }
+    if (B.cur && !B.cur.dead) { const p = hexPx(B.cur.c, B.cur.r); hexGlow(p.x, p.y, '255,206,80', 0.2 + 0.07 * Math.sin(now / 300)); }
     if (hov) {
       const p = hexPx(hov.c, hov.r), t = stackAt(hov.c, hov.r);
-      hexPath(p.x, p.y, HR - 2);
-      ctx.strokeStyle = t && t.side === 1 ? '#ff5a4a' : '#fff'; ctx.lineWidth = 2; ctx.stroke();
+      if (t && t.side === 1) { const wt = isWide(t); hexGlow(p.x, p.y, '255,70,50', 0.26); reticle(p.x + (wt ? HW * 0.5 : 0), p.y + 22, wt ? 38 : 25, wt ? 10 : 9, now); }
+      else hexGlow(p.x, p.y, '255,255,255', 0.14);
     }
     const heroes = [B.hero, B.eHero];
     heroes.forEach((hh, i) => {
@@ -1252,8 +1268,7 @@ const Battle = (() => {
       if (pose) {
         const wd = isWide(s), fit = fr ? animFit(s.t) : null, kk = fit ? fit.k * (wd ? 1.25 : 1) : Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.25 : 1), pw = pose.width * kk, ph = pose.height * kk, fy = p.y + 22;
         if (wd) p.x += (s.side === 0 ? -1 : 1) * HW * 0.5;
-        ctx.beginPath(); ctx.ellipse(p.x, fy, wd ? 36 : 21, wd ? 9 : 7.5, 0, 0, 7); ctx.fillStyle = flash ? 'rgba(255,110,90,.6)' : 'rgba(0,0,0,.38)'; ctx.fill();
-        ctx.lineWidth = s === B.cur ? 3 : 2; ctx.strokeStyle = s === B.cur ? '#ffd24a' : (s.side === 0 ? '#4a8bff' : '#e0504a'); ctx.stroke();
+        unitBase(p.x, fy, wd ? 36 : 21, wd ? 9 : 7.5, s.side, s === B.cur, flash, now);
         ctx.save(); ctx.translate(p.x, fy); ctx.rotate(off.rot * 0.4); ctx.scale(brx, bry); if (mir) ctx.scale(-1, 1); if (flash) ctx.globalAlpha = 0.88; if (fit) ctx.drawImage(pose, -fit.cx * kk, -fit.by * kk, pw, ph); else ctx.drawImage(pose, -pw / 2, -ph, pw, ph); ctx.restore();
       } else {
       ctx.beginPath(); ctx.arc(p.x, p.y + 4, HR * 0.72, 0, 7);

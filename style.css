@@ -411,7 +411,7 @@ body.skin .seg button { border-radius: 0; }
 .hsstats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 6px 0; }
 .hsstats div { background: #0f0a05; border: 1px solid #4a381c; border-radius: 8px; padding: 5px 2px; } .hsstats b { display: block; font-size: 20px; } .hsstats span { font-size: 10px; color: var(--mut); }
 .hspan h4 { margin: 10px 0 4px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--mut); }
-.hsspells { display: flex; flex-wrap: wrap; gap: 4px; } .hsspells span { background: #0f0a05; border: 1px solid #4a381c; border-radius: 12px; padding: 2px 8px; font-size: 12px; }
+.hsspells { display: flex; flex-wrap: wrap; gap: 4px; } .hsspells > span { background: #0f0a05; border: 1px solid #4a381c; border-radius: 12px; padding: 2px 8px; font-size: 12px; }
 .hsarmy { display: flex; gap: 8px; justify-content: center; } .hsarmy div { display: flex; flex-direction: column; align-items: center; width: 90px; font-size: 11px; } .hsarmy .pic { border: 1px solid #000; }
 .hsgo { width: 100%; margin-top: 12px; padding: 11px; font-size: 17px; }
 @media (max-width: 860px) { .facgrid { grid-template-columns: repeat(2, 1fr); } .facpic { height: 130px; } .hsbody { grid-template-columns: 1fr; } .hspan { position: static; order: -1; } .hsgrid { grid-template-columns: repeat(3, 1fr); } }
@@ -883,9 +883,9 @@ h2 .gi { width: 1.1em; height: 1.1em; }
 .wpic img.pic { width: 112px !important; height: 112px !important; border-radius: 12px; object-fit: cover; filter: none; box-shadow: 0 4px 10px rgba(0, 0, 0, .6); }
 .wpic .bcr img.pic { width: 44px !important; height: 48px !important; border-radius: 8px; object-fit: contain; background: rgba(0, 0, 0, .55); border: 2px solid var(--gold-d); box-shadow: 0 2px 5px #000; padding: 1px; }
 .wav { position: absolute; left: 6px; top: 6px; min-width: 38px; height: 38px; padding: 0 6px; border-radius: 19px; display: flex; align-items: center; justify-content: center; font-family: var(--f-head); font-weight: 700; font-size: 17px; color: #2a1604; background: linear-gradient(var(--gold), color-mix(in srgb, var(--gold) 50%, #000)); border: 2px solid #1a0f05; box-shadow: 0 2px 5px #000; }
-.wstats { display: flex; flex-wrap: wrap; gap: 3px 5px; margin: 4px 0 3px; } .wstats span { font-family: var(--f-head); font-size: 11px; font-weight: 600; background: rgba(0, 0, 0, .38); border: 1px solid #4a381c; border-radius: 10px; padding: 1px 7px; white-space: nowrap; }
+.wstats { display: flex; flex-wrap: wrap; gap: 3px 5px; margin: 4px 0 3px; } .wstats > span { font-family: var(--f-head); font-size: 11px; font-weight: 600; background: rgba(0, 0, 0, .38); border: 1px solid #4a381c; border-radius: 10px; padding: 1px 7px; white-space: nowrap; }
 .wcard .bacts { display: flex; } .wcard .bacts input { width: 64px; flex: 0 0 64px; text-align: center; font-size: 16px; padding: 6px 2px; } .wcard .bacts button { padding: 8px 10px; }
-@media (max-width: 420px) { .wgrid { grid-template-columns: 1fr 1fr; gap: 6px; } .wpic { height: 100px; } .wpic img.pic { width: 86px !important; height: 86px !important; } .wav { height: 30px; min-width: 30px; font-size: 14px; } .wcard .bacts input { width: 100%; flex: 1 1 100%; } .wcard .bacts button { flex: 1 1 100%; } .wstats span { font-size: 10px; padding: 1px 5px; } }
+@media (max-width: 420px) { .wgrid { grid-template-columns: 1fr 1fr; gap: 6px; } .wpic { height: 100px; } .wpic img.pic { width: 86px !important; height: 86px !important; } .wav { height: 30px; min-width: 30px; font-size: 14px; } .wcard .bacts input { width: 100%; flex: 1 1 100%; } .wcard .bacts button { flex: 1 1 100%; } .wstats > span { font-size: 10px; padding: 1px 5px; } }
 @media (orientation: landscape) and (max-height: 540px) { .wgrid { grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 6px; } .wpic { height: 88px; } .wpic img.pic { width: 78px !important; height: 78px !important; } .wcard .bacts button, .wcard .bacts input { padding: 4px 6px !important; font-size: 12px !important; } .wcard .bacts input { width: 48px !important; flex: 0 0 48px; } }
 
 /* ---------- map setup as an aligned form ---------- */

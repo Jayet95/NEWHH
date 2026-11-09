@@ -462,12 +462,41 @@ const Battle = (() => {
     return best;
   }
   // ---- unit animations: melee lunge + weapon effect, ranged recoil + flying projectile, hurt shake, death fade ----
-  const styleOf = (s) => (typeof Figures !== 'undefined' && Figures.style) ? Figures.style(s.t) : { melee: 'slash', shoot: 'arrow', col: null };
+  // Each creature's own attack look: m = melee effect, mc = its colour (r,g,b), s = shot, pc = shot colour. Anything not listed
+  // falls back to the picture-based default (Figures.style).
+  const CFX = {
+    goblin: { m: 'stab', mc: '215,200,150' }, stronghold1: { m: 'stab', mc: '215,200,150' }, wolf: { m: 'bite', mc: '240,230,210' }, stronghold2: { m: 'bite', mc: '240,230,210' },
+    orc: { m: 'slash', mc: '235,130,90', s: 'bolt', pc: '#8a3a2a' }, stronghold3: { m: 'slash', mc: '235,130,90', s: 'bolt', pc: '#8a3a2a' },
+    ogre: { m: 'smash', mc: '255,190,90' }, stronghold4: { m: 'smash', mc: '255,190,90' }, troll: { m: 'smash', mc: '140,210,110' }, golem: { m: 'smash', mc: '200,200,215' }, tower3: { m: 'smash', mc: '200,200,215' },
+    naga: { m: 'tentacle', mc: '120,210,255' }, tower6: { m: 'tentacle', mc: '120,210,255' }, dragon: { m: 'claw', mc: '150,235,120' }, rampart7: { m: 'claw', mc: '150,235,120' },
+    shark: { m: 'bite', mc: '200,230,255' }, kraken: { m: 'tentacle', mc: '90,200,190' },
+    castle1: { m: 'stab', mc: '255,255,255' }, castle2: { s: 'arrow', pc: '#e0443a' }, castle3: { m: 'claw', mc: '255,232,150' }, castle4: { m: 'slash', mc: '255,255,255' },
+    castle5: { m: 'holy', mc: '255,240,170', s: 'holy', pc: '#ffe27a' }, castle6: { m: 'stab', mc: '255,250,220' }, castle7: { m: 'holy', mc: '255,248,200' },
+    rampart1: { m: 'stab', mc: '230,210,160' }, rampart2: { m: 'smash', mc: '255,200,90' }, rampart3: { m: 'slash', mc: '170,240,130', s: 'twin', pc: '#7ddc5a' }, rampart4: { m: 'stab', mc: '255,255,255' },
+    rampart5: { m: 'smash', mc: '130,210,90' }, rampart6: { m: 'holy', mc: '255,255,255' },
+    tower1: { m: 'claw', mc: '190,190,200', s: 'ball' }, tower2: { m: 'claw', mc: '180,180,195' }, tower4: { m: 'zap', mc: '170,215,255', s: 'zap', pc: '#aee0ff' }, tower5: { m: 'zap', mc: '255,225,140' }, tower7: { m: 'zap', mc: '190,225,255' },
+    inferno1: { m: 'claw', mc: '255,110,80' }, inferno2: { m: 'slash', mc: '255,150,70', s: 'fire' }, inferno3: { m: 'fire', mc: '255,150,60' }, inferno4: { m: 'cleave', mc: '255,100,80' }, inferno5: { m: 'cleave', mc: '255,160,70' },
+    inferno6: { m: 'fire', mc: '255,170,60' }, inferno7: { m: 'fire', mc: '255,90,60' },
+    necropolis1: { m: 'slash', mc: '235,230,205' }, necropolis2: { m: 'claw', mc: '190,210,170' }, necropolis3: { m: 'drain', mc: '170,255,200' }, necropolis4: { m: 'drain', mc: '210,40,70' },
+    necropolis5: { m: 'drain', mc: '190,120,255', s: 'death', pc: '#7dffa6' }, necropolis6: { m: 'cleave', mc: '150,90,210' }, necropolis7: { m: 'bite', mc: '200,235,225' },
+    dungeon1: { m: 'stab', mc: '210,190,150' }, dungeon2: { m: 'claw', mc: '230,160,200' }, dungeon3: { s: 'gaze' }, dungeon4: { m: 'stab', mc: '160,230,110', s: 'venom', pc: '#8fe04a' }, dungeon5: { m: 'cleave', mc: '255,120,90' },
+    dungeon6: { m: 'sting', mc: '255,170,70' }, dungeon7: { m: 'fire', mc: '255,110,50' },
+    stronghold5: { m: 'zap', mc: '255,235,150' }, stronghold6: { m: 'smash', mc: '255,200,120', s: 'rock' }, stronghold7: { m: 'cleave', mc: '230,150,110' },
+    fortress1: { m: 'stab', mc: '215,195,150' }, fortress2: { m: 'stab', mc: '170,230,130', s: 'javelin', pc: '#c9b27a' }, fortress3: { m: 'sting', mc: '160,230,90' }, fortress4: { m: 'bite', mc: '160,230,110' },
+    fortress5: { m: 'smash', mc: '210,170,110' }, fortress6: { m: 'sting', mc: '120,230,110' }, fortress7: { m: 'bite', mc: '110,210,160' },
+    conflux1: { m: 'zap', mc: '255,170,230' }, conflux2: { m: 'zap', mc: '210,235,255' }, conflux3: { m: 'frost', mc: '140,200,255' }, conflux4: { m: 'fire', mc: '255,140,50' }, conflux5: { m: 'smash', mc: '180,145,95' },
+    conflux6: { m: 'gaze', mc: '255,120,230' }, conflux7: { m: 'fire', mc: '255,160,60' },
+    faerie: { m: 'zap', mc: '225,170,255' }, rustd: { m: 'poison', mc: '210,150,70' }, crystald: { m: 'frost', mc: '200,240,255' }, azured: { m: 'zap', mc: '140,200,255' },
+  };
+  const styleOf = (s) => {
+    const base = (typeof Figures !== 'undefined' && Figures.style) ? Figures.style(s.t) : { melee: 'slash', shoot: 'arrow', col: null }, f = CFX[String(s.t).replace(/_\d$/, '')];
+    return f ? { melee: f.m || base.melee, shoot: f.s || base.shoot, col: f.pc || base.col, mc: f.mc || null } : base;
+  };
   async function strike(s, t) {
     const a = hexPx(s.c, s.r), p = hexPx(t.c, t.r), now = performance.now();
     s.anim = { kind: 'lunge', t0: now, dur: 300 / spd(), dx: p.x - a.x, dy: p.y - a.y };
     push((a.x + p.x) / 2, (a.y + p.y) / 2, 0.026, 560);
-    (B.slashes = B.slashes || []).push({ x: p.x, y: p.y, t0: now + 110 / spd(), dur: 340 / spd(), style: styleOf(s).melee, ang: Math.atan2(p.y - a.y, p.x - a.x) });
+    (B.slashes = B.slashes || []).push({ x: p.x, y: p.y, t0: now + 110 / spd(), dur: 340 / spd(), style: styleOf(s).melee, mc: styleOf(s).mc, ang: Math.atan2(p.y - a.y, p.x - a.x) });
     await sleep(120);
   }
   async function fireProj(s, tg) {
@@ -1215,16 +1244,20 @@ const Battle = (() => {
     if (s.hurt) { const k = (now - s.hurt) / 280; if (k >= 0 && k < 1) { x += Math.sin(k * 40) * (1 - k) * 4; if (!seqOf(s.t, 'defend')) { sy *= 1 - 0.06 * Math.sin(k * Math.PI); sx *= 1 + 0.04 * Math.sin(k * Math.PI); } } }
     return { x, y, rot, sx, sy };
   }
+  // landing sparks per shot style (colour lists for burst, r,g,b for the spark star)
+  const IMP = { twin: ['#e8ffd0', '#7ddc5a'], bolt: ['#fff6d0', '#ffb04a'], javelin: ['#fff6d0', '#d8c28a'], zap: ['#ffffff', '#8cc8ff'], holy: ['#ffffff', '#ffe27a'], death: ['#bfffd0', '#4aff9a'], venom: ['#d8ff90', '#6ad02a'] };
+  const IMPC = { twin: '140,230,100', bolt: '255,176,74', javelin: '230,205,140', zap: '160,210,255', holy: '255,226,122', death: '90,255,160', venom: '120,220,50' };
+  const rnd = (i, t) => { const v = Math.sin(i * 12.9898 + t * 78.233) * 43758.5453; return v - Math.floor(v); };
   function drawProjectiles(now) {
     B.proj = (B.proj || []).filter(p => {
       const k = (now - p.t0) / p.dur;
       if (k < 0) return true;
       if (k >= 1) {
         (B.slashes = B.slashes || []).push({ x: p.bx, y: p.by + 6, t0: now, dur: 280, style: 'spark', col: p.col, shoot: p.style });
-        burst(p.bx, p.by + 6, p.style === 'fire' ? 12 : 7, { kind: p.style === 'ball' || p.style === 'rock' ? 'smoke' : 'spark', col: p.style === 'fire' ? PAL.fire : p.style === 'orb' ? PAL.dark : p.style === 'ball' || p.style === 'rock' ? PAL.dust : ['#fff6d0', '#ffd98a'], v0: 40, v1: 170, l0: 200, l1: 420, s0: p.style === 'ball' || p.style === 'rock' ? 5 : 1.2, s1: p.style === 'ball' || p.style === 'rock' ? 8 : 2.2, drag: 3, grow: 1 });
+        burst(p.bx, p.by + 6, p.style === 'fire' ? 12 : 7, { kind: p.style === 'ball' || p.style === 'rock' ? 'smoke' : 'spark', col: IMP[p.style] || (p.style === 'fire' ? PAL.fire : p.style === 'orb' ? PAL.dark : p.style === 'ball' || p.style === 'rock' ? PAL.dust : ['#fff6d0', '#ffd98a']), v0: 40, v1: 170, l0: 200, l1: 420, s0: p.style === 'ball' || p.style === 'rock' ? 5 : 1.2, s1: p.style === 'ball' || p.style === 'rock' ? 8 : 2.2, drag: 3, grow: 1 });
         return false;
       }
-      const arc = p.style === 'arrow' ? 26 : p.style === 'rock' ? 38 : p.style === 'gaze' ? 0 : 12;
+      const arc = { arrow: 26, twin: 26, javelin: 30, bolt: 14, rock: 38, venom: 20, gaze: 0, zap: 0 }[p.style] ?? 12;
       const x = p.ax + (p.bx - p.ax) * k, y = p.ay + (p.by - p.ay) * k - arc * Math.sin(Math.PI * k), vx = p.bx - p.ax, vy = p.by - p.ay - arc * Math.PI * Math.cos(Math.PI * k), ang = Math.atan2(vy, vx);
       ctx.save();
       if (p.style === 'arrow') {
@@ -1232,7 +1265,40 @@ const Battle = (() => {
         { const k0 = Math.max(0, k - 0.16), tx = p.ax + (p.bx - p.ax) * k0, ty = p.ay + (p.by - p.ay) * k0 - arc * Math.sin(Math.PI * k0); const tg = ctx.createLinearGradient(tx, ty, x, y); tg.addColorStop(0, 'rgba(255,245,210,0)'); tg.addColorStop(1, 'rgba(255,245,210,.55)'); ctx.strokeStyle = tg; ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(x, y); ctx.stroke(); }
         ctx.translate(x, y); ctx.rotate(ang); ctx.strokeStyle = '#140a04'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(9, 0); ctx.stroke();
         ctx.strokeStyle = '#e8dcc0'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = '#d0d8e0'; ctx.beginPath(); ctx.moveTo(8, -3); ctx.lineTo(14, 0); ctx.lineTo(8, 3); ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#e0443a'; ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(-14, -3); ctx.lineTo(-7, 0); ctx.lineTo(-14, 3); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = p.col || '#e0443a'; ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(-14, -3); ctx.lineTo(-7, 0); ctx.lineTo(-14, 3); ctx.closePath(); ctx.fill();
+      } else if (p.style === 'twin' || p.style === 'bolt' || p.style === 'javelin') {
+        const col = p.col || '#e0443a', n = p.style === 'twin' ? 2 : 1, k0 = Math.max(0, k - 0.18), tx = p.ax + (p.bx - p.ax) * k0, ty = p.ay + (p.by - p.ay) * k0 - arc * Math.sin(Math.PI * k0);
+        const tg = ctx.createLinearGradient(tx, ty, x, y); tg.addColorStop(0, 'rgba(255,255,255,0)'); tg.addColorStop(1, p.style === 'twin' ? 'rgba(160,255,120,.6)' : 'rgba(255,245,210,.5)'); ctx.strokeStyle = tg; ctx.lineWidth = p.style === 'bolt' ? 3.4 : 2.4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(x, y); ctx.stroke();
+        ctx.translate(x, y); ctx.rotate(ang);
+        for (let i = 0; i < n; i++) {
+          ctx.save(); ctx.translate(n === 2 && i ? -5 : 0, n === 2 ? (i ? 5 : -5) : 0);
+          if (p.style === 'bolt') {          // a short, heavy crossbow-style bolt
+            ctx.strokeStyle = '#140a04'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(7, 0); ctx.stroke(); ctx.strokeStyle = col; ctx.lineWidth = 3.4; ctx.stroke();
+            ctx.fillStyle = '#c8ccd2'; ctx.strokeStyle = '#140a04'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(6, -4.5); ctx.lineTo(13, 0); ctx.lineTo(6, 4.5); ctx.closePath(); ctx.fill(); ctx.stroke();
+          } else if (p.style === 'javelin') { // a long spear that wobbles in flight
+            ctx.rotate(Math.sin(k * 26) * 0.1); ctx.strokeStyle = '#140a04'; ctx.lineWidth = 4.4; ctx.beginPath(); ctx.moveTo(-15, 0); ctx.lineTo(11, 0); ctx.stroke(); ctx.strokeStyle = col; ctx.lineWidth = 2.4; ctx.stroke();
+            ctx.fillStyle = '#dfe6ea'; ctx.strokeStyle = '#140a04'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(15, -3.4); ctx.lineTo(21, 0); ctx.lineTo(15, 3.4); ctx.closePath(); ctx.fill(); ctx.stroke();
+          } else {                           // wood-elf arrows: slim, glowing, in a pair
+            ctx.shadowColor = col; ctx.shadowBlur = 9; ctx.strokeStyle = '#140a04'; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.moveTo(-11, 0); ctx.lineTo(9, 0); ctx.stroke(); ctx.strokeStyle = '#eaffd8'; ctx.lineWidth = 1.6; ctx.stroke();
+            ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(8, -3); ctx.lineTo(14, 0); ctx.lineTo(8, 3); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(-11, 0); ctx.lineTo(-15, -3); ctx.lineTo(-8, 0); ctx.lineTo(-15, 3); ctx.closePath(); ctx.fill();
+          }
+          ctx.restore();
+        }
+      } else if (p.style === 'zap') {       // a jagged lightning bolt from the shooter to the head of the shot
+        const sx = p.ax, sy = p.ay, tn = Math.floor(now / 45), segs = 8, dx = x - sx, dy = y - sy, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.shadowColor = '#8cc8ff'; ctx.shadowBlur = 12;
+        for (const [w, c] of [[6, 'rgba(120,180,255,.35)'], [2.2, '#eaf6ff']]) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(sx, sy); for (let i = 1; i <= segs; i++) { const t = i / segs, j = i < segs ? (rnd(i, tn) - 0.5) * 16 : 0; ctx.lineTo(sx + dx * t + nx * j, sy + dy * t + ny * j); } ctx.stroke(); }
+      } else if (p.style === 'holy') {      // a golden orb with a turning four-point flare
+        for (let i = 3; i >= 1; i--) { const kk = Math.max(0, k - i * 0.05); ctx.globalAlpha = 0.35 - i * 0.08; ctx.fillStyle = '#ffe9a0'; ctx.beginPath(); ctx.arc(p.ax + (p.bx - p.ax) * kk, p.ay + (p.by - p.ay) * kk - arc * Math.sin(Math.PI * kk), 6 - i, 0, 7); ctx.fill(); }
+        ctx.globalAlpha = 1; const g = ctx.createRadialGradient(x, y, 1, x, y, 12); g.addColorStop(0, '#ffffff'); g.addColorStop(0.45, '#ffe27a'); g.addColorStop(1, 'rgba(255,210,90,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 12, 0, 7); ctx.fill();
+        ctx.translate(x, y); ctx.rotate(now / 160); ctx.strokeStyle = 'rgba(255,255,230,.9)'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(-11, 0); ctx.lineTo(11, 0); ctx.moveTo(0, -11); ctx.lineTo(0, 11); ctx.stroke();
+      } else if (p.style === 'death') {     // a dark green orb with wisps circling it
+        for (let i = 4; i >= 1; i--) { const kk = Math.max(0, k - i * 0.05); ctx.globalAlpha = 0.4 - i * 0.07; ctx.fillStyle = '#2a8a56'; ctx.beginPath(); ctx.arc(p.ax + (p.bx - p.ax) * kk, p.ay + (p.by - p.ay) * kk - arc * Math.sin(Math.PI * kk), 7 - i, 0, 7); ctx.fill(); }
+        ctx.globalAlpha = 1; const g = ctx.createRadialGradient(x, y, 1, x, y, 13); g.addColorStop(0, '#0a1a10'); g.addColorStop(0.55, 'rgba(60,200,120,.75)'); g.addColorStop(1, 'rgba(60,200,120,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 13, 0, 7); ctx.fill();
+        ctx.fillStyle = '#9dffc4'; for (let i = 0; i < 3; i++) { const a2 = now / 120 + i * 2.1; ctx.beginPath(); ctx.arc(x + Math.cos(a2) * 9, y + Math.sin(a2) * 7, 1.8, 0, 7); ctx.fill(); }
+      } else if (p.style === 'venom') {     // a glob of green venom shedding drops
+        for (let i = 4; i >= 1; i--) { const kk = Math.max(0, k - i * 0.06); ctx.globalAlpha = 0.45 - i * 0.09; ctx.fillStyle = '#6ad02a'; ctx.beginPath(); ctx.arc(p.ax + (p.bx - p.ax) * kk, p.ay + (p.by - p.ay) * kk - arc * Math.sin(Math.PI * kk) + i * 1.2, 4.2 - i * 0.5, 0, 7); ctx.fill(); }
+        ctx.globalAlpha = 1; const g = ctx.createRadialGradient(x - 1, y - 1, 1, x, y, 7); g.addColorStop(0, '#e8ffb0'); g.addColorStop(0.5, '#8fe04a'); g.addColorStop(1, '#3a8a1a'); ctx.fillStyle = g; ctx.strokeStyle = '#1a3a0a'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.fill(); ctx.stroke();
       } else if (p.style === 'orb' || p.style === 'fire') {
         const col = p.style === 'fire' ? '255,140,40' : (p.col || 'hsl(280,80%,65%)');
         for (let i = 4; i >= 0; i--) { const kk = Math.max(0, k - i * 0.04), tx = p.ax + (p.bx - p.ax) * kk, ty = p.ay + (p.by - p.ay) * kk - arc * Math.sin(Math.PI * kk); ctx.globalAlpha = 0.5 - i * 0.09; ctx.fillStyle = p.style === 'fire' ? '#ff8a2a' : col; ctx.beginPath(); ctx.arc(tx, ty, 7 - i, 0, 7); ctx.fill(); }
@@ -1253,22 +1319,50 @@ const Battle = (() => {
       const k = (now - sl.t0) / sl.dur;
       if (k < 0) return true;
       if (k >= 1) return false;
-      const ux = Math.cos(sl.ang || 0), uy = Math.sin(sl.ang || 0), a = 1 - k;
+      const ux = Math.cos(sl.ang || 0), uy = Math.sin(sl.ang || 0), a = 1 - k, mc = sl.mc || '255,255,255';
       ctx.save(); ctx.lineCap = 'round';
       if (sl.style === 'slash') {
         const r = 22, a0 = (sl.ang || 0) - 1.25, a1 = a0 + 2.5 * Math.min(1, k * 1.6);
-        ctx.shadowColor = '#fff'; ctx.shadowBlur = 10; ctx.strokeStyle = 'rgba(255,255,255,' + a + ')'; ctx.lineWidth = 2 + 6 * a; ctx.beginPath(); ctx.arc(sl.x - ux * 6, sl.y - uy * 6, r, a0, a1); ctx.stroke();
+        ctx.shadowColor = 'rgb(' + mc + ')'; ctx.shadowBlur = 10; ctx.strokeStyle = 'rgba(' + mc + ',' + a + ')'; ctx.lineWidth = 2 + 6 * a; ctx.beginPath(); ctx.arc(sl.x - ux * 6, sl.y - uy * 6, r, a0, a1); ctx.stroke();
       } else if (sl.style === 'stab') {
-        const len = 34 * Math.min(1, k * 2.2); ctx.shadowColor = '#fff'; ctx.shadowBlur = 8; ctx.strokeStyle = 'rgba(255,255,255,' + a + ')'; ctx.lineWidth = 2 + 4 * a; ctx.beginPath(); ctx.moveTo(sl.x - ux * 30, sl.y - uy * 30); ctx.lineTo(sl.x - ux * 30 + ux * len, sl.y - uy * 30 + uy * len); ctx.stroke();
+        const len = 34 * Math.min(1, k * 2.2); ctx.shadowColor = 'rgb(' + mc + ')'; ctx.shadowBlur = 8; ctx.strokeStyle = 'rgba(' + mc + ',' + a + ')'; ctx.lineWidth = 2 + 4 * a; ctx.beginPath(); ctx.moveTo(sl.x - ux * 30, sl.y - uy * 30); ctx.lineTo(sl.x - ux * 30 + ux * len, sl.y - uy * 30 + uy * len); ctx.stroke();
         ctx.fillStyle = 'rgba(255,240,170,' + a + ')'; for (let i = 0; i < 5; i++) { const an = i * 1.26 + 0.3; ctx.beginPath(); ctx.arc(sl.x + Math.cos(an) * (6 + 16 * k), sl.y + Math.sin(an) * (6 + 16 * k), 2.2 * a, 0, 7); ctx.fill(); }
       } else if (sl.style === 'smash') {
-        ctx.strokeStyle = 'rgba(255,200,90,' + a + ')'; ctx.lineWidth = 2 + 5 * a; ctx.beginPath(); ctx.arc(sl.x, sl.y + 8, 6 + 28 * k, 0, 7); ctx.stroke();
+        ctx.strokeStyle = 'rgba(' + (sl.mc || '255,200,90') + ',' + a + ')'; ctx.lineWidth = 2 + 5 * a; ctx.beginPath(); ctx.arc(sl.x, sl.y + 8, 6 + 28 * k, 0, 7); ctx.stroke();
         ctx.strokeStyle = 'rgba(140,110,70,' + a + ')'; ctx.lineWidth = 3; for (let i = 0; i < 8; i++) { const an = i * 0.785; ctx.beginPath(); ctx.moveTo(sl.x + Math.cos(an) * (10 + 10 * k), sl.y + 8 + Math.sin(an) * (10 + 10 * k)); ctx.lineTo(sl.x + Math.cos(an) * (16 + 16 * k), sl.y + 8 + Math.sin(an) * (16 + 16 * k)); ctx.stroke(); }
       } else if (sl.style === 'claw' || sl.style === 'gaze') {
-        ctx.strokeStyle = sl.style === 'gaze' ? 'rgba(255,80,160,' + a + ')' : 'rgba(255,70,60,' + a + ')'; ctx.lineWidth = 3.4 * a + 1; ctx.shadowColor = '#ff3a2a'; ctx.shadowBlur = 6;
+        ctx.strokeStyle = sl.mc ? 'rgba(' + sl.mc + ',' + a + ')' : sl.style === 'gaze' ? 'rgba(255,80,160,' + a + ')' : 'rgba(255,70,60,' + a + ')'; ctx.lineWidth = 3.4 * a + 1; ctx.shadowColor = '#ff3a2a'; ctx.shadowBlur = 6;
         for (let i = 0; i < 3; i++) { const pr = Math.min(1, k * 2 - i * 0.12); if (pr <= 0) continue; const x0 = sl.x - 14 + i * 9, y0 = sl.y - 16; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + 18 * pr, y0 + 30 * pr); ctx.stroke(); }
+      } else if (sl.style === 'bite') {       // jaws snap shut on the target
+        const gap = 15 * (1 - Math.min(1, k * 2.6)) + 1.5; ctx.translate(sl.x, sl.y); ctx.rotate((sl.ang || 0) + Math.PI / 2); ctx.fillStyle = 'rgba(' + mc + ',' + a + ')'; ctx.strokeStyle = 'rgba(40,12,12,' + a + ')'; ctx.lineWidth = 1.1;
+        for (const sg of [-1, 1]) for (let i = -2; i <= 2; i++) { const bx = i * 6, base = sg * (gap + 9), tip = sg * gap; ctx.beginPath(); ctx.moveTo(bx - 3.2, base); ctx.lineTo(bx, tip); ctx.lineTo(bx + 3.2, base); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+      } else if (sl.style === 'fire') {        // a gout of flame
+        ctx.globalCompositeOperation = 'lighter'; const r = 8 + 26 * k, g = ctx.createRadialGradient(sl.x, sl.y, 2, sl.x, sl.y, r); g.addColorStop(0, 'rgba(255,240,170,' + a + ')'); g.addColorStop(0.5, 'rgba(' + mc + ',' + (a * 0.8) + ')'); g.addColorStop(1, 'rgba(255,60,20,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sl.x, sl.y, r, 0, 7); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,170,60,' + a + ')'; ctx.lineWidth = 3; for (let i = 0; i < 6; i++) { const fx = sl.x + (i - 2.5) * 6, h = (10 + 12 * rnd(i, 3)) * (0.4 + k); ctx.beginPath(); ctx.moveTo(fx, sl.y + 8); ctx.quadraticCurveTo(fx + (rnd(i, 7) - 0.5) * 8, sl.y - h * 0.5, fx + (rnd(i, 9) - 0.5) * 6, sl.y - h); ctx.stroke(); }
+      } else if (sl.style === 'cleave') {      // a heavy double sweep
+        const an = sl.ang || 0, sweep = 2.8 * Math.min(1, k * 1.5);
+        for (const [off, w, c] of [[0, 11, 'rgba(' + mc + ',' + a + ')'], [0.22, 5, 'rgba(255,255,255,' + a + ')']]) { ctx.shadowColor = 'rgb(' + mc + ')'; ctx.shadowBlur = 12; ctx.strokeStyle = c; ctx.lineWidth = w * a + 1; ctx.beginPath(); ctx.arc(sl.x - ux * 8, sl.y - uy * 8, 27, an - 1.4 + off, an - 1.4 + off + sweep); ctx.stroke(); }
+      } else if (sl.style === 'drain') {       // wisps of life pulled from the target back toward the attacker
+        ctx.fillStyle = 'rgba(' + mc + ',' + a + ')'; for (let i = 0; i < 6; i++) { const d = Math.max(0, k * 44 - i * 6); ctx.beginPath(); ctx.arc(sl.x - ux * d - uy * Math.sin(d * 0.3 + i) * 6, sl.y - uy * d + ux * Math.sin(d * 0.3 + i) * 6, 3.4 - i * 0.4, 0, 7); ctx.fill(); }
+        ctx.strokeStyle = 'rgba(' + mc + ',' + a * 0.7 + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sl.x, sl.y, 6 + 14 * k, 0, 7); ctx.stroke();
+      } else if (sl.style === 'frost') {       // ice shards burst out
+        ctx.strokeStyle = 'rgba(' + mc + ',' + a + ')'; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.arc(sl.x, sl.y, 6 + 24 * k, 0, 7); ctx.stroke();
+        ctx.strokeStyle = 'rgba(235,250,255,' + a + ')'; ctx.lineWidth = 2; for (let i = 0; i < 8; i++) { const an = i * 0.785 + 0.2, r0 = 7 + 14 * k; ctx.beginPath(); ctx.moveTo(sl.x + Math.cos(an) * r0, sl.y + Math.sin(an) * r0); ctx.lineTo(sl.x + Math.cos(an) * (r0 + 9), sl.y + Math.sin(an) * (r0 + 9)); ctx.stroke(); }
+      } else if (sl.style === 'holy') {        // a flare of light
+        ctx.globalCompositeOperation = 'lighter'; const r = 10 + 20 * k, g = ctx.createRadialGradient(sl.x, sl.y, 1, sl.x, sl.y, r); g.addColorStop(0, 'rgba(255,255,255,' + a + ')'); g.addColorStop(0.5, 'rgba(' + mc + ',' + a * 0.6 + ')'); g.addColorStop(1, 'rgba(' + mc + ',0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sl.x, sl.y, r, 0, 7); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,235,' + a + ')'; ctx.lineWidth = 2; for (let i = 0; i < 4; i++) { const an = i * 1.5708 + k * 1.2; ctx.beginPath(); ctx.moveTo(sl.x + Math.cos(an) * 6, sl.y + Math.sin(an) * 6); ctx.lineTo(sl.x + Math.cos(an) * (16 + 14 * k), sl.y + Math.sin(an) * (16 + 14 * k)); ctx.stroke(); }
+      } else if (sl.style === 'sting') {       // a quick needle strike with a bead of venom
+        const len = 32 * Math.min(1, k * 3); ctx.strokeStyle = 'rgba(' + mc + ',' + a + ')'; ctx.lineWidth = 2 + 2.5 * a; ctx.shadowColor = 'rgb(' + mc + ')'; ctx.shadowBlur = 6; ctx.beginPath(); ctx.moveTo(sl.x - ux * 30, sl.y - uy * 30); ctx.lineTo(sl.x - ux * 30 + ux * len, sl.y - uy * 30 + uy * len); ctx.stroke();
+        ctx.fillStyle = 'rgba(160,235,90,' + a + ')'; ctx.beginPath(); ctx.arc(sl.x + ux * 2, sl.y + uy * 2 + 8 * k, 3 * a + 1, 0, 7); ctx.fill();
+      } else if (sl.style === 'zap') {         // a crack of lightning at the target
+        const tn = Math.floor(performance.now() / 50); ctx.shadowColor = 'rgb(' + mc + ')'; ctx.shadowBlur = 10; ctx.lineJoin = 'round';
+        for (const [w, c] of [[5, 'rgba(' + mc + ',' + a * 0.4 + ')'], [2, 'rgba(255,255,255,' + a + ')']]) { ctx.strokeStyle = c; ctx.lineWidth = w; for (let b = 0; b < 2; b++) { ctx.beginPath(); ctx.moveTo(sl.x - ux * 28 + (b ? 6 : -6), sl.y - uy * 28 - 12 + b * 10); for (let i = 1; i <= 6; i++) { const t = i / 6; ctx.lineTo(sl.x - ux * 28 * (1 - t) + (rnd(i + b * 9, tn) - 0.5) * 12, sl.y - uy * 28 * (1 - t) + (rnd(i + 3 + b * 9, tn) - 0.5) * 12 - 12 * (1 - t)); } ctx.stroke(); } }
+      } else if (sl.style === 'poison') {      // a spreading cloud
+        for (let i = 0; i < 5; i++) { const an = i * 1.26, r = 4 + 12 * k; ctx.fillStyle = 'rgba(' + mc + ',' + a * 0.45 + ')'; ctx.beginPath(); ctx.arc(sl.x + Math.cos(an) * 9 * k, sl.y + Math.sin(an) * 7 * k - 4 * k, r, 0, 7); ctx.fill(); }
+      } else if (sl.style === 'tentacle') {    // a sweeping tentacle lash
+        const sw = Math.sin(Math.min(1, k * 1.4) * Math.PI); for (const [w, c] of [[7, 'rgba(' + mc + ',' + a + ')'], [2.4, 'rgba(255,255,255,' + a * 0.6 + ')']]) { ctx.strokeStyle = c; ctx.lineWidth = w * a + 1; ctx.beginPath(); ctx.moveTo(sl.x - ux * 36, sl.y - uy * 36 + 10); ctx.quadraticCurveTo(sl.x - ux * 10 - uy * 22 * sw, sl.y - uy * 10 + ux * 22 * sw, sl.x + ux * 8 * Math.min(1, k * 2), sl.y + uy * 8 * Math.min(1, k * 2)); ctx.stroke(); }
       } else if (sl.style === 'spark') {
-        ctx.strokeStyle = sl.shoot === 'fire' ? 'rgba(255,150,40,' + a + ')' : sl.shoot === 'orb' ? 'rgba(210,140,255,' + a + ')' : 'rgba(255,240,180,' + a + ')'; ctx.lineWidth = 2.2;
+        ctx.strokeStyle = IMPC[sl.shoot] ? 'rgba(' + IMPC[sl.shoot] + ',' + a + ')' : sl.shoot === 'fire' ? 'rgba(255,150,40,' + a + ')' : sl.shoot === 'orb' ? 'rgba(210,140,255,' + a + ')' : 'rgba(255,240,180,' + a + ')'; ctx.lineWidth = 2.2;
         for (let i = 0; i < 7; i++) { const an = i * 0.9 + 0.2; ctx.beginPath(); ctx.moveTo(sl.x + Math.cos(an) * (3 + 6 * k), sl.y + Math.sin(an) * (3 + 6 * k)); ctx.lineTo(sl.x + Math.cos(an) * (8 + 14 * k), sl.y + Math.sin(an) * (8 + 14 * k)); ctx.stroke(); }
       }
       ctx.restore();

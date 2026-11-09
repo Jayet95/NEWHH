@@ -104,6 +104,8 @@
         <path d="M60 4v112" stroke="#e6bf55" stroke-width="1.5" opacity=".7"/>
       </svg>
       <h1>Day &amp; Night</h1>
+      <div class="loadbar indet" id="loadbar" aria-hidden="true"><i id="loadfill"></i></div>
+      <p class="loadtip" id="loadtip" aria-live="off"></p>
       <p class="small" id="loadmsg"></p>
       <p class="sub">Hex Kingdoms — rule by sword and spell</p>
       <div class="col">
@@ -137,6 +139,7 @@
 <script src="js/map.js"></script>
 <script src="js/battle.js"></script>
 <script src="js/main.js"></script>
+<script src="js/uifx.js"></script>
 <script>
   // installable + offline on https hosts (e.g. Cloudflare Pages); skipped on localhost so development is never cached
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});

@@ -21,7 +21,9 @@ const hex = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
   for (const fac in PALETTE) {
     const P = PALETTE[fac]; fs.mkdirSync(path.join(OUT, fac), { recursive: true });
     for (const name in FILES) {
-      const file = path.join(SRC, FILES[name] + '.webp'); if (!fs.existsSync(file)) continue;
+      let file = path.join(SRC, FILES[name] + '.png'); if (!fs.existsSync(file)) file = path.join(SRC, FILES[name] + '.webp'); if (!fs.existsSync(file)) continue;
+      // the supplied interface art is used as it is for every castle; set TINT=1 to recolour it per castle instead
+      if (!process.env.TINT) { await sharp(file).webp({ lossless: true }).toFile(path.join(OUT, fac, name + '.webp')); continue; }
       const night = name === 'topbar_night', day = name === 'topbar_day';
       const bright = night ? P.b * 0.7 : day ? P.b * (P.day || 1.25) : P.b;
       const K = P.k === undefined ? 0.55 : P.k;

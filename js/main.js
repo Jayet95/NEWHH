@@ -2347,7 +2347,7 @@
     try { Art.reload(); TownArt.reload(); Icons.reload(); } catch (e) { /* ignore */ }
     document.body.classList.toggle('skin', Assets.has('ui/btn_normal') && Assets.has('ui/frame_scroll'));
     const bg = Assets.get('ui/title'); if (bg) $('title').style.background = `url(${bg.src}) center / cover no-repeat`;
-    const logo = Assets.get('ui/logo'); if (logo) { const h1 = document.querySelector('#title h1'); if (h1) h1.innerHTML = `<img src="${logo.src}" alt="Day &amp; Night" style="max-width:100%;max-height:150px">`; }
+    const logo = Assets.get('ui/logo'); if (logo) { const h1 = document.querySelector('#title h1'); if (h1) h1.innerHTML = `<img src="${logo.src}" alt="Day &amp; Night" style="max-width:100%;max-height:150px">`; const cr = document.querySelector('#title .crest'); if (cr) cr.style.display = 'none'; }
     if (G) { buildTerrain(); renderAll(); }
   });
   document.addEventListener('assets-progress', (e) => { const d = e.detail, el = $('loadmsg'); if (el) el.textContent = d.done >= d.total ? '' : 'Loading art… ' + Math.round(100 * d.done / d.total) + '%'; });

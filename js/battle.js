@@ -1121,16 +1121,28 @@ const Battle = (() => {
     heroes.forEach((hh, i) => {
       if (!hh || !hh.icon) return;
       const hp = HERO_POS[i], isPlayer = i === 0, flash = isPlayer && B.heroFlash && now - B.heroFlash[0] < 500;
-      ctx.beginPath(); ctx.arc(hp.x, hp.y, 27, 0, 7);
-      ctx.fillStyle = isPlayer ? '#2a4f8a' : '#8a2a2a'; ctx.fill();
-      ctx.lineWidth = flash ? 5 : 3; ctx.strokeStyle = flash ? '#fff' : '#ffd24a'; ctx.stroke();
-      ctx.drawImage(Art.heroCanvas(hh.icon, isPlayer ? '#3a8aff' : '#e04a3a', PS(), hh.pid), hp.x - 22, hp.y - 22, 44, 44);
-      ctx.fillStyle = '#000b'; ctx.fillRect(hp.x - 36, hp.y + 31, 72, isPlayer ? 41 : 28);
+      const him = typeof Assets !== 'undefined' && hh.pid ? Assets.get('mounted/' + hh.pid + '_' + (isPlayer ? 'east' : 'west')) : null;
+      let plateY = hp.y + 31;
+      if (him) {
+        // the hero himself stands beside the field (taller than any creature): shadow, a slow breath, a surge of light when he casts or strikes
+        const k = Math.min(90 / him.height, 98 / him.width), w = him.width * k, h = him.height * k, fy = hp.y + 40, cast = isPlayer && B.heroFlash && now - B.heroFlash[0] < 600 ? 1 - (now - B.heroFlash[0]) / 600 : 0, br = reduced() ? 0 : Math.sin(now / 520 + i * 2);
+        ctx.beginPath(); ctx.ellipse(hp.x + 4, fy + 1, w * 0.4, 8, 0, 0, 7); ctx.fillStyle = 'rgba(0,0,0,.42)'; ctx.fill();
+        if (cast > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; glow(hp.x + 4, fy - h * 0.5, 54, '#9fd0ff', 0.6 * cast); ctx.restore(); }
+        ctx.save(); ctx.translate(hp.x + 4 + (isPlayer ? 1 : -1) * cast * 6, fy); ctx.scale(1 - cast * 0.02, 1 + 0.012 * br + cast * 0.05);
+        ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2; ctx.drawImage(him, -w / 2, -h, w, h); ctx.restore();
+        plateY = fy + 5;
+      } else {
+        ctx.beginPath(); ctx.arc(hp.x, hp.y, 27, 0, 7);
+        ctx.fillStyle = isPlayer ? '#2a4f8a' : '#8a2a2a'; ctx.fill();
+        ctx.lineWidth = flash ? 5 : 3; ctx.strokeStyle = flash ? '#fff' : '#ffd24a'; ctx.stroke();
+        ctx.drawImage(Art.heroCanvas(hh.icon, isPlayer ? '#3a8aff' : '#e04a3a', PS(), hh.pid), hp.x - 22, hp.y - 22, 44, 44);
+      }
+      const plH = isPlayer ? 41 : 28; ctx.fillStyle = 'rgba(12,7,3,.84)'; ctx.fillRect(hp.x - 36, plateY, 72, plH); ctx.strokeStyle = '#8a6a2a'; ctx.lineWidth = 1; ctx.strokeRect(hp.x - 35.5, plateY + 0.5, 71, plH - 1);
       ctx.fillStyle = '#f3e7bd'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(hh.name, hp.x, hp.y + 40);
+      ctx.fillText(hh.name, hp.x, plateY + 9);
       if (isPlayer) {
-        ctx.font = '10px sans-serif'; ctx.fillText(`⚔${hh.att} 🛡${hh.def} 🔷${hh.mana}`, hp.x, hp.y + 53);
-        ctx.fillStyle = hh.morale < 0 || hh.luck < 0 ? '#ffb3a8' : '#bfe3a8'; ctx.fillText(`😀${hh.morale >= 0 ? '+' : ''}${hh.morale} 🍀${hh.luck >= 0 ? '+' : ''}${hh.luck}`, hp.x, hp.y + 65);
+        ctx.font = '10px sans-serif'; ctx.fillText(`⚔${hh.att} 🛡${hh.def} 🔷${hh.mana}`, hp.x, plateY + 22);
+        ctx.fillStyle = hh.morale < 0 || hh.luck < 0 ? '#ffb3a8' : '#bfe3a8'; ctx.fillText(`😀${hh.morale >= 0 ? '+' : ''}${hh.morale} 🍀${hh.luck >= 0 ? '+' : ''}${hh.luck}`, hp.x, plateY + 34);
       }
     });
     // a fallen stack slumps, shrinks and fades (a stack killed by a delayed spell stays whole until the effect lands)
@@ -1138,10 +1150,10 @@ const Battle = (() => {
       const k = Math.max(0, (now - s.deadAt) / 700), dfr = frameOf(s, 'death', now, s.deadAt, 600), e = k * k * (3 - 2 * k), dir = s.side === 1 ? -1 : 1, pose = dfr || poseOf(s, 'defending');
       ctx.save(); ctx.globalAlpha = dfr ? Math.min(1, Math.max(0, (1 - k) * 4)) : Math.max(0, 1 - Math.pow(k, 1.5));
       if (dfr) {
-        const wd = isWide(s), kk = Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.3 : 1), pw = pose.width * kk, ph = pose.height * kk;
+        const wd = isWide(s), kk = Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.25 : 1), pw = pose.width * kk, ph = pose.height * kk;
         ctx.translate(s.px + (wd ? (s.side === 0 ? -1 : 1) * HW * 0.5 : 0), s.py + 22); if (s.side === 1) ctx.scale(-1, 1); ctx.drawImage(pose, -pw / 2, -ph, pw, ph);
       } else if (pose) {
-        const wd = isWide(s), kk = Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.3 : 1), pw = pose.width * kk, ph = pose.height * kk;
+        const wd = isWide(s), kk = Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.25 : 1), pw = pose.width * kk, ph = pose.height * kk;
         ctx.translate(s.px + (wd ? (s.side === 0 ? -1 : 1) * HW * 0.5 : 0), s.py + 22 + e * 6); ctx.rotate(dir * e * 0.85); ctx.scale(1 + e * 0.1, 1 - e * 0.5); ctx.drawImage(pose, -pw / 2, -ph, pw, ph);
       } else {
         const sz = HR * 1.28; ctx.translate(s.px, s.py + 3 + e * 14); ctx.rotate(dir * e * 0.85); ctx.scale(1 + e * 0.1, 1 - e * 0.45); ctx.drawImage(Art.portraitCanvas(s.t, PS()), -sz / 2, -sz / 2, sz, sz);
@@ -1163,7 +1175,7 @@ const Battle = (() => {
       brx *= off.sx; bry *= off.sy;
       if (s === B.cur && !B.over) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.55 + 0.25 * Math.sin(now / 260); glow(p.x + (pose && isWide(s) ? (s.side === 0 ? -1 : 1) * HW * 0.5 : 0), p.y + 20, 34, '#ffd24a', 0.5); ctx.restore(); }
       if (pose) {
-        const wd = isWide(s), kk = Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.3 : 1), pw = pose.width * kk, ph = pose.height * kk, fy = p.y + 22;
+        const wd = isWide(s), kk = Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.25 : 1), pw = pose.width * kk, ph = pose.height * kk, fy = p.y + 22;
         if (wd) p.x += (s.side === 0 ? -1 : 1) * HW * 0.5;
         ctx.beginPath(); ctx.ellipse(p.x, fy, wd ? 36 : 21, wd ? 9 : 7.5, 0, 0, 7); ctx.fillStyle = flash ? 'rgba(255,110,90,.6)' : 'rgba(0,0,0,.38)'; ctx.fill();
         ctx.lineWidth = s === B.cur ? 3 : 2; ctx.strokeStyle = s === B.cur ? '#ffd24a' : (s.side === 0 ? '#4a8bff' : '#e0504a'); ctx.stroke();
@@ -1458,6 +1470,7 @@ const Battle = (() => {
     if (typeof Assets === 'undefined') return;
     const ids = new Set(); [...(opts.army || []), ...(opts.enemy || [])].forEach(x => { if (x) ids.add(String(x.t)); });
     const list = []; ids.forEach(t => { const bb = t.replace(/_\d$/, ''), u = /_\d$/.test(t) ? '_up' : ''; for (const d of ['left', 'right']) for (const st of ['idle', 'fighting', 'defending']) list.push('poses/' + d + '/' + st + '/' + bb + u); ANIM_STATES.forEach(st => { const q = seqOf(t, st); if (q) list.push(...q); }); });
+    [opts.hero, opts.eHero].forEach(h => { if (h && h.pid) list.push('mounted/' + h.pid + '_east', 'mounted/' + h.pid + '_west'); });
     await Promise.race([Assets.need(list), new Promise(r => setTimeout(r, 5000))]);
   }
   async function run(opts) {

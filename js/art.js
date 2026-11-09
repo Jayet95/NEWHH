@@ -464,9 +464,9 @@ const Art = (() => {
       c.save(); c.lineCap = 'round';
       for (let i = 0; i < 6; i++) { const p = nb[i]; if (p[0] < 0 || p[1] < 0 || p[0] >= G.W || p[1] >= G.H) continue; const isR = (G.river[p[1]] && G.river[p[1]][p[0]]) || G.tiles[p[1]][p[0]] === T.WATER; if (!isR) continue; any = true;
         const nx = (p[0] + .5 + (p[1] & 1) * .5) * 32, ny = p[1] * HR * 1.5 + HR, mx = (cxp + nx) / 2, my = (cyp + ny) / 2;
-        c.beginPath(); c.moveTo(cxp, cyp); c.lineTo(mx, my); c.lineWidth = 9.5; c.strokeStyle = 'rgba(60,48,28,.38)'; c.stroke();                    // muddy bank
-        c.lineWidth = 7.2; c.strokeStyle = groundPat(c, 'water') || '#2f6f9c'; c.stroke(); c.lineWidth = 1.6; c.strokeStyle = 'rgba(190,226,246,.28)'; c.stroke(); }   // water, with a faint glint
-      c.beginPath(); c.arc(cxp, cyp, any ? 4.6 : 5.4, 0, 7); c.fillStyle = groundPat(c, 'water') || '#2f6f9c'; c.fill(); c.lineWidth = 1.2; c.strokeStyle = 'rgba(60,48,28,.4)'; c.stroke();
+        c.beginPath(); c.moveTo(cxp, cyp); c.lineTo(mx, my); c.lineWidth = 8; c.strokeStyle = 'rgba(60,48,28,.3)'; c.stroke();                    // muddy bank
+        c.lineWidth = 5.8; c.strokeStyle = groundPat(c, 'water') || '#2f6f9c'; c.stroke(); c.lineWidth = 1.6; c.strokeStyle = 'rgba(190,226,246,.28)'; c.stroke(); }   // water, with a faint glint
+      c.beginPath(); c.arc(cxp, cyp, any ? 3.8 : 4.8, 0, 7); c.fillStyle = groundPat(c, 'water') || '#2f6f9c'; c.fill(); c.lineWidth = 1.2; c.strokeStyle = 'rgba(60,48,28,.4)'; c.stroke();
       c.restore();
     }
     if (t === T.ROAD) {                                   // road pieces: a half-road from the centre to every connected neighbour plus a hub

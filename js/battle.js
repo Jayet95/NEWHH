@@ -498,15 +498,16 @@ const Battle = (() => {
   };
   async function strike(s, t) {
     const a = hexPx(s.c, s.r), p = hexPx(t.c, t.r), now = performance.now();
-    s.anim = { kind: 'lunge', t0: now, dur: 300 / spd(), dx: p.x - a.x, dy: p.y - a.y }; csfx(s.t, 'attack');
+    const ad = animDur(s.t, 'attack'), hitAt = ad ? 2.5 * ANIM_MS.attack : 120;    // with its own frames the blow lands on the impact frame
+    s.anim = { kind: 'lunge', t0: now, dur: ad || 300 / spd(), dx: p.x - a.x, dy: p.y - a.y }; csfx(s.t, 'attack');
     push((a.x + p.x) / 2, (a.y + p.y) / 2, 0.026, 560);
-    (B.slashes = B.slashes || []).push({ x: p.x, y: p.y, t0: now + 110 / spd(), dur: 340 / spd(), style: styleOf(s).melee, mc: styleOf(s).mc, ang: Math.atan2(p.y - a.y, p.x - a.x) });
-    await sleep(120);
+    (B.slashes = B.slashes || []).push({ x: p.x, y: p.y, t0: now + (ad ? 2 * ANIM_MS.attack : 110) / spd(), dur: 340 / spd(), style: styleOf(s).melee, mc: styleOf(s).mc, ang: Math.atan2(p.y - a.y, p.x - a.x) });
+    await sleep(hitAt);
   }
   // quick = the second arrow of a double shot: a shorter draw and flight, so the pair reads as one quick volley
   async function fireProj(s, tg, quick) {
-    const a = hexPx(s.c, s.r), p = hexPx(tg.c, tg.r), now = performance.now(), st = styleOf(s), dur = Math.max(220, Math.min(520, Math.hypot(p.x - a.x, p.y - a.y) * 1.1)) * (quick ? 0.85 : 1) / spd(), lead = quick ? 40 : 130;
-    s.anim = { kind: 'shoot', t0: now, dur: (quick ? 240 : 320) / spd(), dx: p.x - a.x, dy: p.y - a.y };
+    const a = hexPx(s.c, s.r), p = hexPx(tg.c, tg.r), now = performance.now(), st = styleOf(s), dur = Math.max(220, Math.min(520, Math.hypot(p.x - a.x, p.y - a.y) * 1.1)) * (quick ? 0.85 : 1) / spd(), ad = animDur(s.t, 'attack'), lead = ad ? (quick ? 0.9 : 2.2) * ANIM_MS.attack : quick ? 40 : 130;
+    s.anim = { kind: 'shoot', t0: now, dur: ad || (quick ? 240 : 320) / spd(), dx: p.x - a.x, dy: p.y - a.y };
     push((a.x + p.x) / 2, (a.y + p.y) / 2, 0.02, Math.min(900, 520 + dur * spd()));
     (B.proj = B.proj || []).push({ ax: a.x, ay: a.y - 6, bx: p.x, by: p.y - 6, t0: now + lead / spd(), dur, style: st.shoot, col: st.col });
     await sleep(lead + dur * spd());
@@ -1032,6 +1033,8 @@ const Battle = (() => {
   // Frames face right; the enemy side is mirrored. Any state without frames keeps the still picture, moved by a motion style that is
   // different for each creature (see profOf), so every creature already animates before its frames exist.
   const ANIM_STATES = ['idle', 'attack', 'defend', 'death'], seqCache = {};
+  const ANIM_MS = { idle: 160, attack: 110, defend: 120, death: 180 };    // milliseconds per frame; the blow lands on attack frame 3
+  const animDur = (t, state) => { const q = seqOf(t, state); return q ? q.length * ANIM_MS[state] / spd() : 0; };
   function seqOf(t, state) {
     const key = t + '|' + state; if (key in seqCache) return seqCache[key];
     let out = null;
@@ -1045,7 +1048,7 @@ const Battle = (() => {
   // the frame to show now, or null when this creature has no frames for the state (or they have not loaded)
   function frameOf(s, state, now, t0, dur) {
     const seq = seqOf(s.t, state); if (!seq) return null;
-    const n = seq.length, i = state === 'idle' ? Math.floor(now / 125 + s.c * 3 + s.r * 5) % n : Math.min(n - 1, Math.max(0, Math.floor((now - t0) / dur * n)));
+    const n = seq.length, i = state === 'idle' ? Math.floor(now / (ANIM_MS.idle / spd()) + s.c * 3 + s.r * 5) % n : Math.min(n - 1, Math.max(0, Math.floor((now - t0) / dur * n)));
     return Assets.get(seq[i]) || null;
   }
   // Animation frames of one creature may have any canvas size as long as they are all the same: the figure's feet (bottom centre of the
@@ -1158,8 +1161,8 @@ const Battle = (() => {
       }
     });
     // a fallen stack slumps, shrinks and fades (a stack killed by a delayed spell stays whole until the effect lands)
-    for (const s of B.stacks) if (s.dead && s.deadAt && now - s.deadAt < 700 && s.px !== undefined) {
-      const k = Math.max(0, (now - s.deadAt) / 700), dfr = frameOf(s, 'death', now, s.deadAt, 600), e = k * k * (3 - 2 * k), dir = s.side === 1 ? -1 : 1, pose = dfr || poseOf(s, 'defending');
+    for (const s of B.stacks) if (s.dead && s.deadAt && now - s.deadAt < Math.max(700, animDur(s.t, 'death') + 40) && s.px !== undefined) {
+      const k = Math.max(0, (now - s.deadAt) / 700), dfr = frameOf(s, 'death', now, s.deadAt, animDur(s.t, 'death') || 600), e = k * k * (3 - 2 * k), dir = s.side === 1 ? -1 : 1, pose = dfr || poseOf(s, 'defending');
       ctx.save(); ctx.globalAlpha = dfr ? Math.min(1, Math.max(0, (1 - k) * 4)) : Math.max(0, 1 - Math.pow(k, 1.5));
       if (dfr) {
         const wd = isWide(s), fit = animFit(s.t), kk = fit ? fit.k * (wd ? 1.25 : 1) : Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.25 : 1), pw = pose.width * kk, ph = pose.height * kk;
@@ -1175,15 +1178,15 @@ const Battle = (() => {
     const stacks = alive().sort((a, b) => a.py - b.py);
     for (const s of stacks) {
       const hd = s.hurt ? now - s.hurt : -1, fa = now - (s.flash || 0);
-      const fighting = !!(s.anim && now - s.anim.t0 < s.anim.dur), defending = hd >= 0 && hd < 320;
+      const fighting = !!(s.anim && now - s.anim.t0 < s.anim.dur), defending = hd >= 0 && hd < (animDur(s.t, 'defend') || 320);
       const off = animOff(s, now), p = { x: s.px + off.x, y: s.py + off.y }, flash = fa >= 0 && fa < 220;
       const pst = fighting ? 'fighting' : defending ? 'defending' : 'idle';
-      const fr = fighting ? frameOf(s, 'attack', now, s.anim.t0, s.anim.dur) : defending ? frameOf(s, 'defend', now, s.hurt, 320) : frameOf(s, 'idle', now), mir = !!fr && s.side === 1;
+      const fr = fighting ? frameOf(s, 'attack', now, s.anim.t0, s.anim.dur) : defending ? frameOf(s, 'defend', now, s.hurt, animDur(s.t, 'defend') || 320) : frameOf(s, 'idle', now), mir = !!fr && s.side === 1;
       const pose = fr || poseOf(s, pst), pf = profOf(s.t);
       // idle breathing: a tiny squash and stretch about the feet (own speed per creature, out of step between stacks); flyers also flap
-      const bph = now / (pf.fly ? 330 : pf.spd) + pf.ph + s.c * 1.7 + s.r * 0.9, breathing = !fr && !fighting && !defending && !reduced();
-      let bry = breathing ? 1 + pf.amp * Math.sin(bph) : 1, brx = breathing ? 1 - pf.amp * 0.55 * Math.sin(bph) : 1;
-      if (breathing && pf.fly) { const fl = Math.sin(now / 110 + pf.ph); brx *= 1 + 0.045 * fl; bry *= 1 - 0.03 * fl; }
+      const bph = now / (pf.fly ? 330 : pf.spd) + pf.ph + s.c * 1.7 + s.r * 0.9, breathing = !fighting && !defending && !reduced();
+      const ba = pf.amp * (fr ? 0.6 : 1); let bry = breathing ? 1 + ba * Math.sin(bph) : 1, brx = breathing ? 1 - ba * 0.55 * Math.sin(bph) : 1;   // a creature with its own frames only gets a gentle extra breath
+      if (breathing && pf.fly && !fr) { const fl = Math.sin(now / 110 + pf.ph); brx *= 1 + 0.045 * fl; bry *= 1 - 0.03 * fl; }
       brx *= off.sx; bry *= off.sy;
       if (s === B.cur && !B.over) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.55 + 0.25 * Math.sin(now / 260); glow(p.x + (pose && isWide(s) ? (s.side === 0 ? -1 : 1) * HW * 0.5 : 0), p.y + 20, 34, '#ffd24a', 0.5); ctx.restore(); }
       if (pose) {

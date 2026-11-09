@@ -11,7 +11,9 @@
   const MOVE_PER_DAY = 1700;
   const FLEE_RATIO = 3;
   const cmap = $('map'), cx = cmap.getContext('2d'), mini = $('mini'), mx = mini.getContext('2d');
-  let G = null, cam = { x: 0, y: 0 }, hover = null, busy = false, selSlot = -1, terrain = null;
+  let G = null, cam = { x: 0, y: 0 }, hover = null, busy = false, selSlot = -1, terrain = null, tsc = 1;
+  const DPR = () => Math.min(2, window.devicePixelRatio || 1);
+  const RM = () => !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   // ---------- helpers ----------
   window.toast = (t) => {
@@ -241,8 +243,11 @@
   // ---------- terrain rendering ----------
   function hash(x, y) { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
   function buildTerrain() {
-    terrain = document.createElement('canvas'); terrain.width = Math.ceil((G.W + 0.5) * TS); terrain.height = Math.ceil(G.H * RH + HR * 0.5);
-    const c = terrain.getContext('2d');
+    // painted at up to 2x on sharp screens (as large as memory allows) so the ground stays crisp
+    const w1 = Math.ceil((G.W + 0.5) * TS), h1 = Math.ceil(G.H * RH + HR * 0.5);
+    tsc = Math.max(1, Math.min(DPR() > 1 ? 2 : 1, Math.sqrt(16e6 / (w1 * h1))));
+    terrain = document.createElement('canvas'); terrain.width = Math.ceil(w1 * tsc); terrain.height = Math.ceil(h1 * tsc);
+    const c = terrain.getContext('2d'); c.scale(tsc, tsc);
     for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) Art.tile(c, G.tiles[y][x], x, y, G);
     for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) Art.tileOverlay(c, G.tiles[y][x], x, y, G);
   }
@@ -302,9 +307,10 @@
   function centerOn(x, y) { resizeMap(); cam.x = hcx(x, Math.floor(y)) - VW / 2; cam.y = hcy(y) - VH / 2; clampCam(); }
   function resizeMap() {
     const w = cmap.clientWidth, h = cmap.clientHeight; if (w < 50 || h < 50) return;
-    if (cmap.width === w && cmap.height === h && VW === w / Z) return;
+    const dw = Math.round(w * DPR()), dh = Math.round(h * DPR());
+    if (cmap.width === dw && cmap.height === dh && VW === w / Z) return;
     const mx0 = cam.x + VW / 2, my0 = cam.y + VH / 2;
-    cmap.width = w; cmap.height = h; VW = w / Z; VH = h / Z;
+    cmap.width = dw; cmap.height = dh; VW = w / Z; VH = h / Z;
     if (G) { cam.x = mx0 - VW / 2; cam.y = my0 - VH / 2; clampCam(); }
   }
   function setZoom(nz, ax, ay) {
@@ -358,7 +364,10 @@
     const im = Assets.get('mounted/' + h.pid + '_' + (h.dir || 'south')); if (!im) return false;
     const k = Math.min(46 / im.height, 50 / im.width), w = im.width * k, hh = im.height * k;
     cx.beginPath(); cx.ellipse(px, py + 14, 14, 5.5, 0, 0, 7); cx.fillStyle = 'rgba(0,0,0,.35)'; cx.fill(); cx.lineWidth = ring ? 3 : 2; cx.strokeStyle = ring ? '#ffd24a' : col; cx.stroke();
-    cx.drawImage(im, px - w / 2, py + 15 - hh, w, hh); drawBanner(px, py, col, rel); return true;
+    // a little walking bob while the hero moves, a slow breath when standing, and dust kicked up on each new tile
+    const nw = performance.now(); if (h._lx !== h.x || h._ly !== h.y) { if (h._lx !== undefined) { h._mvT = nw; if (!RM()) for (let i = 0; i < 3; i++) dust.push({ x: px + cam.x - 4 + i * 4, y: py + cam.y + 13, vx: (i - 1) * 0.8, t0: nw }); } h._lx = h.x; h._ly = h.y; }
+    const bob = RM() ? 0 : nw - (h._mvT || 0) < 300 ? -Math.abs(Math.sin(nw / 75)) * 2.6 : Math.sin(nw / 650 + h.x * 3) * 0.7;
+    cx.drawImage(im, px - w / 2, py + 15 - hh + bob, w, hh); drawBanner(px, py + bob, col, rel); return true;
   }
   const relOf = (o) => o === 0 ? 'me' : o === null || o === undefined ? 'none' : allyOfPlayer(o) ? 'ally' : 'enemy';
   function objIcon(o) {
@@ -389,14 +398,90 @@
       case 'monster': return C[o.guard[0].t].i;
     }
   }
+  // ---------- map polish: water glints, ambient particles, dust, soft fog, time of day ----------
+  const dust = [];
+  function drawWaterGlints(x0, y0, vx, vy, now) {
+    const t = now / 1000; cx.save(); cx.lineCap = 'round'; cx.lineWidth = 1.2;
+    for (let y = Math.max(0, y0); y < Math.min(G.H, y0 + vy); y++) for (let x = Math.max(0, x0); x < Math.min(G.W, x0 + vx); x++) {
+      if (G.tiles[y][x] !== T.WATER) continue; if (fogOn() && !G.expl[y * G.W + x]) continue;
+      const h = hash(x, y), a = 0.5 + 0.5 * Math.sin(t * 1.3 + h * 40); if (a < 0.6) continue;
+      const px = hcx(x, y) - cam.x + (h - 0.5) * 14, py = hcy(y) - cam.y + (hash(y, x) - 0.5) * 12, w = 5 + h * 6;
+      cx.strokeStyle = 'rgba(235,248,255,' + ((a - 0.6) * 1.1).toFixed(2) + ')'; cx.beginPath(); cx.moveTo(px - w / 2, py); cx.quadraticCurveTo(px, py - 1.6, px + w / 2, py); cx.stroke();
+    }
+    cx.restore();
+  }
+  // drifting specks that fit the land under the camera: pollen, sand, snow, fireflies, embers
+  function drawAmbient(now) {
+    const mx0 = Math.max(0, Math.min(G.W - 1, Math.floor((cam.x + VW / 2) / TS))), my0 = Math.max(0, Math.min(G.H - 1, Math.floor((cam.y + VH / 2) / RH)));
+    const bm = G.biome && G.biome[my0] ? G.biome[my0][mx0] || 0 : 0, t = now / 1000, n = Math.min(70, Math.round(VW * VH / 9000));
+    cx.save();
+    for (let i = 0; i < n; i++) {
+      const s = hash(i, 91), s2 = hash(91, i), sp = 0.4 + s2;
+      let vxs = 6, vys = -2, r = 0.9 + s * 0.9, col = '255,245,205', al = 0.34;
+      if (bm === 1) { vxs = 38 + 30 * s; vys = 3; r = 0.8; col = '236,206,140'; al = 0.3; }
+      else if (bm === 2) { vxs = 6 * Math.sin(t * 0.6 + i); vys = 22 + 16 * s; r = 1.1 + s * 1.2; col = '255,255,255'; al = 0.7; }
+      else if (bm === 3) { vxs = 5; vys = -3; r = 1.2 + s; col = '190,255,120'; al = 0.25 + 0.55 * Math.max(0, Math.sin(t * 1.7 * sp + i * 3)); }
+      else if (bm === 4) { vxs = 4 * Math.sin(t + i); vys = -18 - 14 * s; r = 0.9 + s * 1.1; col = '255,140,50'; al = 0.6; }
+      const x = (((s * VW + t * vxs * sp - cam.x * 0.25) % VW) + VW) % VW, y = (((s2 * VH + t * vys * sp - cam.y * 0.25) % VH) + VH) % VH;
+      cx.fillStyle = 'rgba(' + col + ',' + al.toFixed(2) + ')';
+      if (bm === 1) cx.fillRect(x, y, 7, 1); else { cx.beginPath(); cx.arc(x, y, r, 0, 7); cx.fill(); }
+      if (bm === 3 && al > 0.5) { cx.fillStyle = 'rgba(190,255,120,.12)'; cx.beginPath(); cx.arc(x, y, r * 4, 0, 7); cx.fill(); }
+    }
+    cx.restore();
+  }
+  function drawDust(now) {
+    for (let i = dust.length - 1; i >= 0; i--) {
+      const d = dust[i], k = (now - d.t0) / 520; if (k >= 1) { dust.splice(i, 1); continue; }
+      cx.beginPath(); cx.arc(d.x - cam.x + d.vx * k * 10, d.y - cam.y - k * 7, 2 + k * 4.5, 0, 7); cx.fillStyle = 'rgba(190,170,130,' + (0.32 * (1 - k)).toFixed(2) + ')'; cx.fill();
+    }
+  }
+  // fog painted small and stretched back up, so its edges are soft instead of hex-shaped
+  let fogCv = null, fogCx = null;
+  function drawFog(x0, y0, vx, vy) {
+    const fs = 0.22, w = Math.max(8, Math.ceil(VW * fs)), h = Math.max(8, Math.ceil(VH * fs));
+    if (!fogCv) { fogCv = document.createElement('canvas'); fogCx = fogCv.getContext('2d'); }
+    if (fogCv.width !== w || fogCv.height !== h) { fogCv.width = w; fogCv.height = h; }
+    const f = fogCx; f.setTransform(1, 0, 0, 1, 0, 0); f.clearRect(0, 0, w, h); f.setTransform(w / VW, 0, 0, h / VH, 0, 0);
+    for (let y = Math.max(0, y0); y < Math.min(G.H, y0 + vy); y++) for (let x = Math.max(0, x0); x < Math.min(G.W, x0 + vx); x++) {
+      const fi = y * G.W + x;
+      if (!G.expl[fi]) { Art.hexPath(f, hcx(x, y) - cam.x, hcy(y) - cam.y, HR + 1.2); f.fillStyle = '#05030a'; f.fill(); }
+      else if (!vis[fi]) { Art.hexPath(f, hcx(x, y) - cam.x, hcy(y) - cam.y, HR + 1.2); f.fillStyle = 'rgba(5,3,10,.5)'; f.fill(); }
+    }
+    const sm = cx.imageSmoothingEnabled; cx.imageSmoothingEnabled = true; cx.drawImage(fogCv, 0, 0, w, h, 0, 0, VW, VH); cx.imageSmoothingEnabled = sm;
+  }
+  // time of day follows the hero's movement left today: golden dawn with full movement, dusk and night as it runs out
+  const TOD = [[0, [255, 232, 196]], [0.3, [255, 255, 255]], [0.62, [255, 222, 178]], [0.85, [255, 176, 136]], [1, [118, 134, 206]]];
+  let todCur = 0, todG = null;
+  function todColor(t) {
+    for (let i = 1; i < TOD.length; i++) if (t <= TOD[i][0]) { const a = TOD[i - 1], b = TOD[i], k = (t - a[0]) / (b[0] - a[0]); return a[1].map((v, j) => Math.round(v + (b[1][j] - v) * k)); }
+    return TOD[TOD.length - 1][1];
+  }
+  function drawTimeOfDay() {
+    const hh = G.hero, target = hh ? 1 - Math.max(0, Math.min(1, hh.move / Math.max(1, maxMove(hh)))) : 0.3;
+    if (todG !== G) { todG = G; todCur = target; } else todCur += (target - todCur) * 0.05;
+    document.body.classList.toggle('night', todCur > 0.82);
+    const c = todColor(todCur);
+    cx.save(); cx.setTransform(1, 0, 0, 1, 0, 0);
+    if (c[0] + c[1] + c[2] < 760) { cx.globalCompositeOperation = 'multiply'; cx.fillStyle = 'rgb(' + c.join(',') + ')'; cx.fillRect(0, 0, cmap.width, cmap.height); cx.globalCompositeOperation = 'source-over'; }
+    const W = cmap.width, H = cmap.height, vg = cx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.45, W / 2, H / 2, Math.hypot(W, H) * 0.62);
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(8,4,0,.3)'); cx.fillStyle = vg; cx.fillRect(0, 0, W, H);
+    cx.restore();
+    if (todCur > 0.55) {   // warm lamplight around towns and forts as night falls
+      const a = Math.min(0.55, (todCur - 0.55) * 1.3); cx.save(); cx.globalCompositeOperation = 'lighter';
+      for (const o of G.objs) { if (o.t !== 'town' && o.t !== 'fort') continue; if (fogOn() && !G.expl[o.y * G.W + o.x]) continue; const px = hcx(o.x, o.y) - cam.x, py = hcy(o.y) - cam.y; if (px < -40 || py < -40 || px > VW + 40 || py > VH + 40) continue; const g =cx.createRadialGradient(px, py, 2, px, py, 34); g.addColorStop(0, 'rgba(255,190,90,' + a.toFixed(2) + ')'); g.addColorStop(1, 'rgba(255,150,50,0)'); cx.fillStyle = g; cx.fillRect(px - 34, py - 34, 68, 68); }
+      cx.restore();
+    }
+  }
   const monNeed = new Set(), fpFar = {};
   let reachKey = '', reachSet = new Map();
   function draw() {
     if (!G) return;
-    cx.setTransform(1, 0, 0, 1, 0, 0); cx.fillStyle = '#000'; cx.fillRect(0, 0, cmap.width, cmap.height); cx.setTransform(Z, 0, 0, Z, 0, 0);
-    cx.imageSmoothingEnabled = Z < 1.4;
-    cx.drawImage(terrain, cam.x, cam.y, VW, VH, 0, 0, VW, VH);
+    const ds = cmap.width / (VW * Z), now = performance.now();
+    cx.setTransform(1, 0, 0, 1, 0, 0); cx.fillStyle = '#000'; cx.fillRect(0, 0, cmap.width, cmap.height); cx.setTransform(Z * ds, 0, 0, Z * ds, 0, 0);
+    cx.imageSmoothingEnabled = Z * ds / tsc < 1.4; cx.imageSmoothingQuality = 'high';
+    cx.drawImage(terrain, cam.x * tsc, cam.y * tsc, VW * tsc, VH * tsc, 0, 0, VW, VH);
     const x0 = Math.floor(cam.x / TS) - 1, y0 = Math.floor(cam.y / RH) - 1, vx = Math.ceil(VW / TS) + 3, vy = Math.ceil(VH / RH) + 3;
+    if (!RM()) drawWaterGlints(x0, y0, vx, vy, now);
     cx.textAlign = 'center'; cx.textBaseline = 'middle';
     cx.lineWidth = 2; cx.strokeStyle = 'rgba(255,255,255,.45)';
     const zo = {}; for (const o of G.objs) if (o.t === 'fort' || o.t === 'town') zo[o.zone] = o.owner;
@@ -468,7 +553,11 @@
         }
       }
       const spr = o.t === 'monster' ? null : Art.obj(o, o.fac);
-      if (spr) { const sz = o.t === 'town' ? 50 : o.t === 'fort' || o.t === 'lair' ? 46 : o.t === 'dwelling' ? 44 : o.t === 'pile' ? 30 : 38; cx.drawImage(spr, px - sz / 2, py - sz / 2 - (o.t === 'town' ? 5 : 2), sz, sz); }
+      if (spr) {
+        const sz = o.t === 'town' ? 50 : o.t === 'fort' || o.t === 'lair' ? 46 : o.t === 'dwelling' ? 44 : o.t === 'pile' ? 30 : 38;
+        cx.beginPath(); cx.ellipse(px, py + sz * 0.3, sz * 0.38, sz * 0.12, 0, 0, 7); cx.fillStyle = 'rgba(0,0,0,.26)'; cx.fill();   // soft ground shadow
+        cx.drawImage(spr, px - sz / 2, py - sz / 2 - (o.t === 'town' ? 5 : 2), sz, sz);
+      }
       else if (o.t !== 'monster') { if (typeof GI !== 'undefined') GI.text(cx, objIcon(o), px, py + 1, 28, { fill: '#fff' }); else { cx.font = `26px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(objIcon(o), px, py + 1); } }
       if (o.t === 'fort') {
         drawFlag(px + 13, py - 8, ownCol(o.owner), relOf(o.owner), 1.1);
@@ -503,13 +592,10 @@
       cx.strokeStyle = h === G.hero ? '#ffd24a' : '#fff'; cx.lineWidth = h === G.hero ? 3 : 1.5; cx.stroke();
       { const hs = h.boat != null ? 18 : 26; cx.drawImage(Art.heroCanvas(h.icon, ownCol(0), 72, h.pid), px - hs / 2, py - (h.boat != null ? 6 : 0) - hs / 2, hs, hs); drawBanner(px, py - (h.boat != null ? 6 : 0), ownCol(0), 'me'); }
     });
-    if (fogOn()) {
-      for (let y = Math.max(0, y0); y < Math.min(G.H, y0 + vy); y++) for (let x = Math.max(0, x0); x < Math.min(G.W, x0 + vx); x++) {
-        const fi = y * G.W + x;
-        if (!G.expl[fi]) { Art.hexPath(cx, hcx(x, y) - cam.x, hcy(y) - cam.y, HR + 0.8); cx.fillStyle = '#05030a'; cx.fill(); }
-        else if (!vis[fi]) { Art.hexPath(cx, hcx(x, y) - cam.x, hcy(y) - cam.y, HR + 0.8); cx.fillStyle = 'rgba(5,3,10,.5)'; cx.fill(); }
-      }
-    }
+    drawDust(now);
+    if (!RM()) drawAmbient(now);
+    if (fogOn()) drawFog(x0, y0, vx, vy);
+    drawTimeOfDay();
     if (hover) { Art.hexPath(cx, hcx(hover.x, hover.y) - cam.x, hcy(hover.y) - cam.y, HR - 1); cx.strokeStyle = 'rgba(255,255,255,.85)'; cx.lineWidth = 2; cx.stroke(); }
     drawMini();
   }
@@ -555,7 +641,7 @@
   }
   function loop() {
     if (G && !document.body.classList.contains('inbattle')) {
-      if (cmap.clientWidth && (cmap.clientWidth !== cmap.width || cmap.clientHeight !== cmap.height)) resizeMap();
+      if (cmap.clientWidth && (Math.round(cmap.clientWidth * DPR()) !== cmap.width || Math.round(cmap.clientHeight * DPR()) !== cmap.height)) resizeMap();
       draw();
     }
     requestAnimationFrame(loop);
@@ -683,7 +769,7 @@
   // ---------- map input ----------
   function tileFromEvent(ev) {
     const r = cmap.getBoundingClientRect();
-    const px = (ev.clientX - r.left) * (cmap.width / r.width) / Z + cam.x, py = (ev.clientY - r.top) * (cmap.height / r.height) / Z + cam.y;
+    const px = (ev.clientX - r.left) * (cmap.clientWidth / r.width) / Z + cam.x, py = (ev.clientY - r.top) * (cmap.clientHeight / r.height) / Z + cam.y;
     const qx = px - TS / 2, qy = py - HR, q = (Math.sqrt(3) / 3 * qx - qy / 3) / HR, rr = (2 / 3 * qy) / HR;
     let rx = Math.round(q), rz = Math.round(rr), ry = Math.round(-q - rr);
     const ddx = Math.abs(rx - q), ddz = Math.abs(rz - rr), ddy = Math.abs(ry + q + rr);
@@ -804,7 +890,7 @@
     if (!G) return; e.preventDefault();
     const r = cmap.getBoundingClientRect(); setZoom(Z * (e.deltaY < 0 ? 1.12 : 1 / 1.12), e.clientX - r.left, e.clientY - r.top);
   }, { passive: false });
-  const zoomMid = (f) => setZoom(Z * f, cmap.width / 2, cmap.height / 2);
+  const zoomMid = (f) => setZoom(Z * f, cmap.clientWidth / 2, cmap.clientHeight / 2);
   $('zIn').onclick = () => zoomMid(1.25); $('zOut').onclick = () => zoomMid(0.8);
   $('zHome').onclick = () => { if (G) centerOn(G.hero.x, G.hero.y); };
   window.addEventListener('resize', resizeMap); window.addEventListener('orientationchange', () => setTimeout(resizeMap, 200));
@@ -2201,7 +2287,7 @@
   $('bSave').onclick = () => G && !busy && openSlots();
   $('bEnd').onclick = endTurn;
   $('bTown').onclick = () => G && !busy && openTown();
-  function fitZoom() { if (!G) return; setZoom(Math.min(cmap.width / ((G.W + 0.5) * TS), cmap.height / (G.H * RH + HR * 0.5)), 0, 0); clampCam(); }
+  function fitZoom() { if (!G) return; setZoom(Math.min(cmap.clientWidth / ((G.W + 0.5) * TS), cmap.clientHeight / (G.H * RH + HR * 0.5)), 0, 0); clampCam(); }
   $('mEnd').onclick = endTurn;
   $('mTown').onclick = () => G && !busy && openTown();
   // phone action bar: the side panels open as sheets (the real elements are moved into the dialog and back, so they stay live)

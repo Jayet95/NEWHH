@@ -69,6 +69,15 @@ input, select { background: #120d08; color: var(--txt); border: 1px solid var(--
 .inbattle #batui { display: block; }
 .inbattle #stage canvas#bat { display: block; }
 .inbattle #map, .inbattle #mini, .inbattle #terr, .inbattle #hero, .inbattle #army, .inbattle .btns, .inbattle #tip, .inbattle #banner { display: none !important; }
+/* battles use the whole window on big screens: the page width cap is lifted and the battlefield grows to the height available */
+@media (min-width: 1000px) and (min-height: 600px) {
+  body.inbattle #app { max-width: none; padding: 6px 12px; }
+  body.inbattle #top { margin-bottom: 6px; }
+  body.inbattle #game { flex-direction: row; gap: 10px; align-items: stretch; }
+  body.inbattle #stage { flex: 1 1 auto; width: auto; display: flex; justify-content: center; align-items: center; background: #000; height: calc(100vh - 96px); height: calc(100dvh - 96px); }
+  body.inbattle #stage canvas#bat { flex: none; height: auto; aspect-ratio: 960/640; width: min(100%, calc((100vh - 100px) * 1.5)); width: min(100%, calc((100dvh - 100px) * 1.5)); }
+  body.inbattle #side { width: 330px; flex: none; display: flex; flex-direction: column; overflow-y: auto; max-height: calc(100vh - 96px); max-height: calc(100dvh - 96px); }
+}
 #batui .row { display: flex; gap: 5px; margin-bottom: 5px; flex-wrap: wrap; align-items: center; }
 #batui .row button { flex: 1; padding: 6px 4px; font-size: 13px; }
 .pill { background: #0b0805; border: 1px solid var(--edge); padding: 3px 8px; border-radius: 12px; font-size: 12px; }
@@ -365,7 +374,7 @@ body.skin .seg button { border-radius: 0; }
   body:not(.inbattle) #stage canvas#map { width: 100%; height: 100%; aspect-ratio: auto; }
   body:not(.inbattle) #side { overflow-y: auto; min-height: 0; width: 290px; }
   body:not(.inbattle) #mbar { display: none; }
-  body.inbattle #app { max-width: 1300px; }
+  body.inbattle #app { max-width: none; }
 }
 
 /* ---------- setup screens: wide, quiet stone frames, gold only for the selection ---------- */

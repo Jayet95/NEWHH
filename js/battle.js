@@ -993,6 +993,34 @@ const Battle = (() => {
     const pb = String(s.t).replace(/_\d$/, ''), pu = /_\d$/.test(String(s.t)) ? '_up' : '', pd = s.side === 0 ? 'right' : 'left';
     return Assets.get('poses/' + pd + '/' + pst + '/' + pb + pu, 'poses/' + pd + '/idle/' + pb + pu, 'poses/' + pd + '/idle/' + pb);
   };
+  // ---- creature animation ----
+  // Frame sequences from art/anim/<creature id>/<state>_<n>.webp (n = 1, 2, 3 …; states: idle, attack, defend (or hurt), death).
+  // Frames face right; the enemy side is mirrored. Any state without frames keeps the still picture, moved by a motion style that is
+  // different for each creature (see profOf), so every creature already animates before its frames exist.
+  const ANIM_STATES = ['idle', 'attack', 'defend', 'death'], seqCache = {};
+  function seqOf(t, state) {
+    const key = t + '|' + state; if (key in seqCache) return seqCache[key];
+    let out = null;
+    if (typeof Assets !== 'undefined') for (const id of [String(t), String(t).replace(/_\d$/, '')]) for (const nm of (state === 'defend' ? ['defend', 'hurt'] : [state])) {
+      if (out) break;
+      const list = []; for (let n = 1; n <= 24 && Assets.has('anim/' + id + '/' + nm + '_' + n); n++) list.push('anim/' + id + '/' + nm + '_' + n);
+      if (list.length) out = list;
+    }
+    return (seqCache[key] = out);
+  }
+  // the frame to show now, or null when this creature has no frames for the state (or they have not loaded)
+  function frameOf(s, state, now, t0, dur) {
+    const seq = seqOf(s.t, state); if (!seq) return null;
+    const n = seq.length, i = state === 'idle' ? Math.floor(now / 125 + s.c * 3 + s.r * 5) % n : Math.min(n - 1, Math.max(0, Math.floor((now - t0) / dur * n)));
+    return Assets.get(seq[i]) || null;
+  }
+  const PROF = {};
+  function profOf(t) {
+    const id = String(t).replace(/_\d$/, ''); if (PROF[id]) return PROF[id];
+    let h = 2166136261; for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
+    const r = (n) => ((h >>> (n * 5)) & 31) / 31, c = C[t] || {};
+    return (PROF[id] = { fly: !!c.fly, shoot: !!c.shoot, spd: 480 + r(1) * 220, amp: 0.014 + r(2) * 0.014, lunge: 20 + r(3) * 10, ph: r(4) * 6.28, style: c.fly ? 'swoop' : c.shoot ? 'recoil' : r(0) > 0.62 ? 'rear' : r(0) > 0.3 ? 'lunge' : 'stomp' });
+  }
   function structSprite(st, p) {
     if (typeof Assets === 'undefined') return false;
     const frac = st.hp / st.max;
@@ -1073,9 +1101,12 @@ const Battle = (() => {
     });
     // a fallen stack slumps, shrinks and fades (a stack killed by a delayed spell stays whole until the effect lands)
     for (const s of B.stacks) if (s.dead && s.deadAt && now - s.deadAt < 700 && s.px !== undefined) {
-      const k = Math.max(0, (now - s.deadAt) / 700), e = k * k * (3 - 2 * k), dir = s.side === 1 ? -1 : 1, pose = poseOf(s, 'defending');
-      ctx.save(); ctx.globalAlpha = Math.max(0, 1 - Math.pow(k, 1.5));
-      if (pose) {
+      const k = Math.max(0, (now - s.deadAt) / 700), dfr = frameOf(s, 'death', now, s.deadAt, 600), e = k * k * (3 - 2 * k), dir = s.side === 1 ? -1 : 1, pose = dfr || poseOf(s, 'defending');
+      ctx.save(); ctx.globalAlpha = dfr ? Math.min(1, Math.max(0, (1 - k) * 4)) : Math.max(0, 1 - Math.pow(k, 1.5));
+      if (dfr) {
+        const wd = isWide(s), kk = Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.3 : 1), pw = pose.width * kk, ph = pose.height * kk;
+        ctx.translate(s.px + (wd ? (s.side === 0 ? -1 : 1) * HW * 0.5 : 0), s.py + 22); if (s.side === 1) ctx.scale(-1, 1); ctx.drawImage(pose, -pw / 2, -ph, pw, ph);
+      } else if (pose) {
         const wd = isWide(s), kk = Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.3 : 1), pw = pose.width * kk, ph = pose.height * kk;
         ctx.translate(s.px + (wd ? (s.side === 0 ? -1 : 1) * HW * 0.5 : 0), s.py + 22 + e * 6); ctx.rotate(dir * e * 0.85); ctx.scale(1 + e * 0.1, 1 - e * 0.5); ctx.drawImage(pose, -pw / 2, -ph, pw, ph);
       } else {
@@ -1088,17 +1119,21 @@ const Battle = (() => {
       const hd = s.hurt ? now - s.hurt : -1, fa = now - (s.flash || 0);
       const fighting = !!(s.anim && now - s.anim.t0 < s.anim.dur), defending = hd >= 0 && hd < 320;
       const off = animOff(s, now), p = { x: s.px + off.x, y: s.py + off.y }, flash = fa >= 0 && fa < 220;
-      const pst = fighting ? 'fighting' : defending ? 'defending' : 'idle', pose = poseOf(s, pst);
-      // idle breathing: a tiny squash and stretch about the feet, out of step between stacks
-      const bph = now / (C[s.t].fly ? 330 : 560) + s.c * 1.7 + s.r * 0.9, breathing = !fighting && !defending && !reduced();
-      const bry = breathing ? 1 + 0.018 * Math.sin(bph) : 1, brx = breathing ? 1 - 0.01 * Math.sin(bph) : 1;
+      const pst = fighting ? 'fighting' : defending ? 'defending' : 'idle';
+      const fr = fighting ? frameOf(s, 'attack', now, s.anim.t0, s.anim.dur) : defending ? frameOf(s, 'defend', now, s.hurt, 320) : frameOf(s, 'idle', now), mir = !!fr && s.side === 1;
+      const pose = fr || poseOf(s, pst), pf = profOf(s.t);
+      // idle breathing: a tiny squash and stretch about the feet (own speed per creature, out of step between stacks); flyers also flap
+      const bph = now / (pf.fly ? 330 : pf.spd) + pf.ph + s.c * 1.7 + s.r * 0.9, breathing = !fr && !fighting && !defending && !reduced();
+      let bry = breathing ? 1 + pf.amp * Math.sin(bph) : 1, brx = breathing ? 1 - pf.amp * 0.55 * Math.sin(bph) : 1;
+      if (breathing && pf.fly) { const fl = Math.sin(now / 110 + pf.ph); brx *= 1 + 0.045 * fl; bry *= 1 - 0.03 * fl; }
+      brx *= off.sx; bry *= off.sy;
       if (s === B.cur && !B.over) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.55 + 0.25 * Math.sin(now / 260); glow(p.x + (pose && isWide(s) ? (s.side === 0 ? -1 : 1) * HW * 0.5 : 0), p.y + 20, 34, '#ffd24a', 0.5); ctx.restore(); }
       if (pose) {
         const wd = isWide(s), kk = Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.3 : 1), pw = pose.width * kk, ph = pose.height * kk, fy = p.y + 22;
         if (wd) p.x += (s.side === 0 ? -1 : 1) * HW * 0.5;
         ctx.beginPath(); ctx.ellipse(p.x, fy, wd ? 36 : 21, wd ? 9 : 7.5, 0, 0, 7); ctx.fillStyle = flash ? 'rgba(255,110,90,.6)' : 'rgba(0,0,0,.38)'; ctx.fill();
         ctx.lineWidth = s === B.cur ? 3 : 2; ctx.strokeStyle = s === B.cur ? '#ffd24a' : (s.side === 0 ? '#4a8bff' : '#e0504a'); ctx.stroke();
-        ctx.save(); ctx.translate(p.x, fy); ctx.rotate(off.rot * 0.4); ctx.scale(brx, bry); if (flash) ctx.globalAlpha = 0.88; ctx.drawImage(pose, -pw / 2, -ph, pw, ph); ctx.restore();
+        ctx.save(); ctx.translate(p.x, fy); ctx.rotate(off.rot * 0.4); ctx.scale(brx, bry); if (mir) ctx.scale(-1, 1); if (flash) ctx.globalAlpha = 0.88; ctx.drawImage(pose, -pw / 2, -ph, pw, ph); ctx.restore();
       } else {
       ctx.beginPath(); ctx.arc(p.x, p.y + 4, HR * 0.72, 0, 7);
       ctx.fillStyle = flash ? '#ff8a7a' : (s.side === 0 ? '#2a4f8a' : '#8a2a2a'); ctx.fill();
@@ -1157,20 +1192,28 @@ const Battle = (() => {
     requestAnimationFrame(draw);
   }
   function animOff(s, now) {
-    const fly = C[s.t].fly;
-    let x = 0, y = Math.sin(now / (fly ? 260 : 430) + s.c * 3 + s.r) * (fly ? 2.6 : 1.2) - (fly ? 4 : 0), rot = 0;
-    const a = s.anim;
+    const pf = profOf(s.t), fly = pf.fly, style = isWide(s) ? 'rear' : pf.style, hasFr = !!seqOf(s.t, 'idle');
+    // a creature with its own frames animates itself, so the code motion stays small for it
+    let x = 0, y = hasFr ? 0 : Math.sin(now / (fly ? 260 : pf.spd * 0.77) + s.c * 3 + s.r) * (fly ? 2.6 : 1.2) - (fly ? 4 : 0), rot = 0, sx = 1, sy = 1;
+    const a = s.anim, own = !!seqOf(s.t, 'attack');
     if (a) {
       const k = (now - a.t0) / a.dur;
       if (k >= 1) s.anim = null;
       else {
-        const d = Math.hypot(a.dx, a.dy) || 1, ux = a.dx / d, uy = a.dy / d, sg = Math.sign(ux) || 1;
-        if (a.kind === 'lunge') { const pr = k < 0.4 ? k / 0.4 : 1 - (k - 0.4) / 0.6, e = pr * pr * (3 - 2 * pr), m = Math.min(26, d * 0.55); x += ux * e * m; y += uy * e * m; rot = e * 0.28 * sg; }
-        else { const pr = k < 0.35 ? k / 0.35 : 1 - (k - 0.35) / 0.65; x -= ux * pr * 5; y -= uy * pr * 5; rot = -pr * 0.16 * sg; }
+        const d = Math.hypot(a.dx, a.dy) || 1, ux = a.dx / d, uy = a.dy / d, sg = Math.sign(ux) || 1, f = own ? 0.4 : 1;
+        if (a.kind === 'lunge') {
+          const pr = k < 0.4 ? k / 0.4 : 1 - (k - 0.4) / 0.6, e = pr * pr * (3 - 2 * pr), m = Math.min(pf.lunge, d * 0.55);
+          x += ux * e * m * f; y += uy * e * m * f; rot = e * 0.28 * sg * f;
+          if (!own) {
+            if (style === 'swoop') { y -= Math.sin(k * Math.PI) * 16; rot = e * 0.4 * sg; }                                   // flyers dive in along an arc
+            else if (style === 'rear') { const rr = k < 0.35 ? Math.sin(k / 0.35 * Math.PI / 2) : Math.max(0, 1 - (k - 0.35) / 0.65); sy = 1 + 0.12 * rr; sx = 1 - 0.05 * rr; y -= rr * 6; rot = e * 0.12 * sg; }   // big ones rear up and slam
+            else if (style === 'stomp') { sx = 1 + 0.07 * e; sy = 1 - 0.07 * e; y += e * 2; rot = e * 0.1 * sg; }               // heavy ones squash into the blow
+          }
+        } else { const pr = k < 0.35 ? k / 0.35 : 1 - (k - 0.35) / 0.65; x -= ux * pr * 5 * f; y -= uy * pr * 5 * f; rot = -pr * 0.16 * sg * f; if (!own) { sx = 1 + 0.03 * pr; sy = 1 - 0.03 * pr; } }
       }
     }
-    if (s.hurt) { const k = (now - s.hurt) / 280; if (k >= 0 && k < 1) x += Math.sin(k * 40) * (1 - k) * 4; }
-    return { x, y, rot };
+    if (s.hurt) { const k = (now - s.hurt) / 280; if (k >= 0 && k < 1) { x += Math.sin(k * 40) * (1 - k) * 4; if (!seqOf(s.t, 'defend')) { sy *= 1 - 0.06 * Math.sin(k * Math.PI); sx *= 1 + 0.04 * Math.sin(k * Math.PI); } } }
+    return { x, y, rot, sx, sy };
   }
   function drawProjectiles(now) {
     B.proj = (B.proj || []).filter(p => {
@@ -1307,7 +1350,7 @@ const Battle = (() => {
   async function preloadPoses(opts) {
     if (typeof Assets === 'undefined') return;
     const ids = new Set(); [...(opts.army || []), ...(opts.enemy || [])].forEach(x => { if (x) ids.add(String(x.t)); });
-    const list = []; ids.forEach(t => { const bb = t.replace(/_\d$/, ''), u = /_\d$/.test(t) ? '_up' : ''; for (const d of ['left', 'right']) for (const st of ['idle', 'fighting', 'defending']) list.push('poses/' + d + '/' + st + '/' + bb + u); });
+    const list = []; ids.forEach(t => { const bb = t.replace(/_\d$/, ''), u = /_\d$/.test(t) ? '_up' : ''; for (const d of ['left', 'right']) for (const st of ['idle', 'fighting', 'defending']) list.push('poses/' + d + '/' + st + '/' + bb + u); ANIM_STATES.forEach(st => { const q = seqOf(t, st); if (q) list.push(...q); }); });
     await Promise.race([Assets.need(list), new Promise(r => setTimeout(r, 5000))]);
   }
   async function run(opts) {

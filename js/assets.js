@@ -5,7 +5,7 @@
 const Assets = (() => {
   const BASE = 'art/', stems = {}, files = {}, pending = {};
   const stem = (f) => f.replace(/\.(png|webp|jpe?g|svg|gif)$/i, '');
-  const LAZY = /^(poses|mounted)\/|^ui\/(castle_select|hero_select|adventure|town_)/;
+  const LAZY = /^(poses|mounted|anim)\/|^ui\/(castle_select|hero_select|adventure|town_)/;
   const loadOne = (s) => {
     if (stems[s]) return Promise.resolve(stems[s]);
     if (!files[s]) return Promise.resolve(null);

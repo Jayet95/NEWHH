@@ -438,12 +438,12 @@ The preview pictures on "Choose your map" (the four map types) and on the Scenar
 - `maps/scn_embers  — Siege of Embers (scenario)`
 - `maps/scn_warlords  — War of the Warlords (scenario)`
 
-## Battle — creature animation frames (needs code)
-Frames are numbered from 1 with no gaps (`name_1.webp`, `name_2.webp`, …) and play in order. Use the same size and framing as the still picture they replace. Right-facing; the game mirrors them for the enemy side unless left-facing frames are supplied. 4–6 frames per action.
+## Battle — creature animation frames (supported now)
+Frames are numbered from 1 with no gaps (`name_1.webp`, `name_2.webp`, …) and play in order. Use the same size and framing as the still picture they replace. The game plays these in battle for every creature that has them; a creature or a state without frames keeps the still picture, moved by code in a style that differs per creature. Right-facing; the game mirrors them for the enemy side. For an upgraded creature name the folder with its id (castle1_2), otherwise the base id (castle1) is used. 4–6 frames per action; idle loops at about 8 frames per second, the other states play once over the action.
 
 - `anim/<creature id>/idle_<n>.webp  — idle loop, all 77 creatures`
 - `anim/<creature id>/attack_<n>.webp  — attack swing or shot`
-- `anim/<creature id>/hurt_<n>.webp  — flinch when hit, 3–4 frames`
+- `anim/<creature id>/defend_<n>.webp  — defending / flinching when hit, 3–4 frames (hurt_<n> also works)`
 - `anim/<creature id>/death_<n>.webp  — fall and fade; the last frame stays as the corpse`
 
 ## Battle — background layers (needs code)

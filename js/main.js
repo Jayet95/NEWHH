@@ -472,6 +472,29 @@
       cx.restore();
     }
   }
+  // ---- how guards are presented on the map: a ground shadow with a soft threat-coloured glow instead of a flat red disc, and a heraldic shield badge ----
+  const hexRgb = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const hexA = (h, a) => { const [r, g, b] = hexRgb(h); return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')'; };
+  const hexLight = (h, k) => { const [r, g, b] = hexRgb(h); return 'rgb(' + [r, g, b].map(v => Math.round(v + (255 - v) * k)).join(',') + ')'; };
+  function drawMonsterBase(px, py, now, col, deadly) {
+    const pulse = 0.5 + 0.5 * Math.sin(now / 560 + px * 0.05), a0 = (deadly ? 0.34 : 0.22) + 0.1 * pulse;
+    cx.beginPath(); cx.ellipse(px, py + 13, 15, 5.4, 0, 0, 7); cx.fillStyle = 'rgba(0,0,0,.42)'; cx.fill();
+    const g = cx.createRadialGradient(px, py + 12, 1, px, py + 12, 21); g.addColorStop(0, hexA(col, a0)); g.addColorStop(1, hexA(col, 0));
+    cx.fillStyle = g; cx.beginPath(); cx.ellipse(px, py + 12, 21, 9, 0, 0, 7); cx.fill();
+    cx.beginPath(); cx.ellipse(px, py + 12.5, 14.5, 5.2, 0, 0, 7); cx.strokeStyle = hexA(col, 0.5 + 0.2 * pulse); cx.lineWidth = 1.3; cx.stroke();
+  }
+  function drawThreatBadge(bx, by, th) {
+    cx.save(); cx.translate(bx, by);
+    cx.beginPath(); cx.moveTo(-6, -7); cx.lineTo(6, -7); cx.lineTo(6, 1); cx.quadraticCurveTo(6, 6, 0, 8.6); cx.quadraticCurveTo(-6, 6, -6, 1); cx.closePath();
+    const g = cx.createLinearGradient(0, -7, 0, 9); g.addColorStop(0, hexLight(th.col, 0.45)); g.addColorStop(1, th.col);
+    cx.shadowColor = 'rgba(0,0,0,.6)'; cx.shadowBlur = 3; cx.fillStyle = g; cx.fill(); cx.shadowBlur = 0;
+    cx.lineWidth = 1.7; cx.strokeStyle = '#140a04'; cx.stroke(); cx.lineWidth = 0.8; cx.strokeStyle = 'rgba(255,226,150,.9)'; cx.stroke();
+    cx.strokeStyle = 'rgba(255,255,255,.95)'; cx.fillStyle = 'rgba(255,255,255,.95)'; cx.lineWidth = 1.5; cx.lineCap = 'round';
+    if (th.label === 'Deadly') { cx.beginPath(); cx.moveTo(-2.6, -2.6); cx.lineTo(2.6, 2.6); cx.moveTo(2.6, -2.6); cx.lineTo(-2.6, 2.6); cx.stroke(); }
+    else if (th.label === 'Hard') { cx.beginPath(); cx.moveTo(-2.8, 0.6); cx.lineTo(0, -2.2); cx.lineTo(2.8, 0.6); cx.moveTo(-2.8, 3.6); cx.lineTo(0, 0.8); cx.lineTo(2.8, 3.6); cx.stroke(); }
+    else { cx.beginPath(); cx.arc(0, 0.6, 1.7, 0, 7); cx.fill(); }
+    cx.restore();
+  }
   const monNeed = new Set(), fpFar = {};
   let reachKey = '', reachSet = new Map();
   function draw() {
@@ -539,14 +562,11 @@
       if (o.x < x0 - 1 || o.x > x0 + vx || o.y < y0 - 1 || o.y > y0 + vy) continue;
       if (fogOn()) { const fi = o.y * G.W + o.x; if (!G.expl[fi] || (o.t === 'monster' && !vis[fi])) continue; }
       const px = hcx(o.x, o.y) - cam.x, py = hcy(o.y) - cam.y;
-      if (o.t === 'monster') {
-        cx.beginPath(); cx.arc(px, py, 15, 0, 7);
-        cx.fillStyle = o.t === 'monster' ? 'rgba(90,10,10,.65)' : 'rgba(0,0,0,.45)'; cx.fill();
-      }
+      if (o.t === 'monster') { const th0 = threatOfDef(defenderOf(o)); drawMonsterBase(px, py, now, th0 ? th0.col : '#e0443a', !!th0 && th0.label === 'Deadly'); }
       if (o.t === 'monster') {
         const mt = o.guard[0].t, mb = mt.replace(/_\d$/, ''), mu = /_\d$/.test(mt) ? '_up' : '', ms = 'poses/left/idle/' + mb + mu;
         const pimg = typeof Assets !== 'undefined' ? Assets.get(ms, 'poses/left/idle/' + mb) : null;
-        if (pimg) { const k = Math.min(50 / pimg.height, 44 / pimg.width), w = pimg.width * k, h = pimg.height * k; cx.drawImage(pimg, px - w / 2, py + 14 - h, w, h); }
+        if (pimg) { const k = Math.min(56 / pimg.height, 50 / pimg.width), w = pimg.width * k, h = pimg.height * k, bob = RM() ? 0 : Math.sin(now / 700 + o.x * 2.1 + o.y * 1.3) * 1.1; cx.save(); cx.shadowColor = 'rgba(0,0,0,.6)'; cx.shadowBlur = 5; cx.shadowOffsetY = 2; cx.drawImage(pimg, px - w / 2, py + 14 - h + bob, w, h); cx.restore(); }
         else {
           cx.drawImage(Art.portraitCanvas(mt), px - 15, py - 15, 30, 30);
           if (typeof Assets !== 'undefined' && Assets.has(ms) && !monNeed.has(ms)) { monNeed.add(ms); Assets.need([ms, 'poses/left/idle/' + mb]).then(() => draw()); }
@@ -567,7 +587,7 @@
       if (o.col && (o.t === 'keytent' || o.t === 'gate')) { cx.beginPath(); cx.arc(px + 13, py - 14, 6, 0, 7); cx.fillStyle = { red: '#e03a3a', blue: '#3a8aff', green: '#46b84a', gold: '#ffd24a' }[o.col] || '#fff'; cx.fill(); cx.lineWidth = 2; cx.strokeStyle = '#140a04'; cx.stroke(); }
       if (o.t === 'mine' || o.t === 'dwelling' || o.t === 'lair') drawFlag(px + 11, py - 4, ownCol(o.owner), relOf(o.owner), 0.85);
       if (o.t === 'town') drawFlag(px + 15, py - 10, ownCol(o.owner), relOf(o.owner), 1.25);
-      { const df = defenderOf(o); if (df && (o.t !== 'monster' || vis[o.y * G.W + o.x] || !fogOn())) { const th = threatOfDef(df); if (th) { const bx = px - 14, by = py + 12; cx.beginPath(); cx.arc(bx, by, 5.5, 0, 7); cx.fillStyle = th.col; cx.fill(); cx.lineWidth = 1.6; cx.strokeStyle = '#140a04'; cx.stroke(); if (th.label === 'Deadly') { cx.strokeStyle = '#fff'; cx.lineWidth = 1.4; cx.beginPath(); cx.moveTo(bx - 2.4, by - 2.4); cx.lineTo(bx + 2.4, by + 2.4); cx.moveTo(bx + 2.4, by - 2.4); cx.lineTo(bx - 2.4, by + 2.4); cx.stroke(); } } } }
+      { const df = defenderOf(o); if (df && (o.t !== 'monster' || vis[o.y * G.W + o.x] || !fogOn())) { const th = threatOfDef(df); if (th) drawThreatBadge(px - 15, py + 11, th); } }
       if (o.t === 'town' || o.t === 'fort') {
         cx.font = 'bold 11px sans-serif'; cx.lineWidth = 3; cx.strokeStyle = '#000'; cx.fillStyle = o.owner === 0 ? '#bcd8ff' : allyOfPlayer(o.owner) ? '#c8f0c8' : o.owner ? '#ffb3a8' : '#f3e7bd';
         cx.strokeText(o.name, px, py - 27); cx.fillText(o.name, px, py - 27);

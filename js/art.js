@@ -231,10 +231,71 @@ const Art = (() => {
   const hexPt = (cx, cy, R, i) => { const a = (60 * i - 30) * Math.PI / 180; return [cx + R * Math.cos(a), cy + R * Math.sin(a)]; };
   function hexPath(g, cx, cy, R) { g.beginPath(); for (let i = 0; i < 6; i++) { const p = hexPt(cx, cy, R, i); i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); } g.closePath(); }
   function hexEdge(g, cx, cy, R, i) { const a = hexPt(cx, cy, R, i), b = hexPt(cx, cy, R, (i + 1) % 6); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
+  // ---- continuous painted ground ----
+  // One big seamless picture per ground kind is laid across the whole map in world coordinates (art/terrain/tex_<kind>), so neighbouring
+  // tiles of the same kind join with no seam and nothing is stamped hex by hex. Different kinds blend softly; shores get shallows and foam.
+  const GROUND = { grass: ['terrain/tex_grass', 150], forest: ['terrain/tex_forest', 120], mountain: ['terrain/tex_mountain', 160], water: ['terrain/tex_water', 190], sand: ['terrain/tex_sand', 170],
+    biome_desert: ['terrain/biome_desert', 130], biome_snow: ['terrain/biome_snow', 130], biome_swamp: ['terrain/biome_swamp', 130], biome_lava: ['terrain/biome_lava', 130] };
+  const patCache = {};
+  function groundPat(c, key) {
+    if (patCache[key]) return patCache[key];
+    const spec = GROUND[key], im = spec && Assets.get(spec[0]); if (!im) return null;
+    // mirrored 2x2 copies: the repeat can never show a seam, even if the picture is not perfectly tileable
+    const w = im.width, h = im.height, m = document.createElement('canvas'); m.width = w * 2; m.height = h * 2; const g = m.getContext('2d');
+    g.drawImage(im, 0, 0); g.save(); g.translate(w * 2, 0); g.scale(-1, 1); g.drawImage(im, 0, 0); g.restore();
+    g.save(); g.translate(0, h * 2); g.scale(1, -1); g.drawImage(im, 0, 0); g.restore(); g.save(); g.translate(w * 2, h * 2); g.scale(-1, -1); g.drawImage(im, 0, 0); g.restore();
+    const pat = c.createPattern(m, 'repeat'); if (pat.setTransform) pat.setTransform(new DOMMatrix().scale(spec[1] * 2 / (w * 2)));
+    return (patCache[key] = pat);
+  }
+  const sstep = (v) => v * v * (3 - 2 * v);
+  function vnoise(x, y) { const ix = Math.floor(x), iy = Math.floor(y), fx = sstep(x - ix), fy = sstep(y - iy); const a = h2(ix, iy), b = h2(ix + 1, iy), c2 = h2(ix, iy + 1), d = h2(ix + 1, iy + 1); return (a + (b - a) * fx) * (1 - fy) + (c2 + (d - c2) * fx) * fy; }
+  const KIND = { [T.GRASS]: 'grass', [T.FOREST]: 'forest', [T.MOUNT]: 'mountain', [T.WATER]: 'water', [T.SAND]: 'sand', [T.ROAD]: 'grass' };
+  function groundKey(G, x, y) {
+    const t = G.tiles[y][x], bm = G.biome && G.biome[y] ? G.biome[y][x] : 0;
+    if (bm && (t === T.GRASS || t === T.FOREST || t === T.SAND || t === T.ROAD)) { const bn = 'biome_' + ['', 'desert', 'snow', 'swamp', 'lava'][bm]; if (GROUND[bn] && Assets.get(GROUND[bn][0])) return bn; }
+    return KIND[t];
+  }
+  // soft gradient strip along one hex edge: the given picture fading out over `D` world units (made of stacked, growing strips)
+  function edgeFade(c, pat, cxp, cyp, i, D, steps, a, fill) {
+    const p0 = hexPt(cxp, cyp, HR, i), p1 = hexPt(cxp, cyp, HR, (i + 1) % 6), mx = (p0[0] + p1[0]) / 2, my = (p0[1] + p1[1]) / 2, nx = cxp - mx, ny = cyp - my, nl = Math.hypot(nx, ny) || 1, ux = nx / nl, uy = ny / nl;
+    for (let j = steps; j >= 1; j--) {
+      const d = D * j / steps; c.save(); c.beginPath(); c.moveTo(p0[0], p0[1]); c.lineTo(p1[0], p1[1]); c.lineTo(p1[0] + ux * d, p1[1] + uy * d); c.lineTo(p0[0] + ux * d, p0[1] + uy * d); c.closePath(); c.clip();
+      c.globalAlpha = a; c.fillStyle = pat || fill; c.fillRect(cxp - HR - 2, cyp - HR - 2, HR * 2 + 4, HR * 2 + 4); c.restore();
+    }
+  }
+  function bigGround(c, gk, t, x, y, cxp, cyp, G) {
+    const pat = groundPat(c, gk); if (!pat) return false;
+    c.save(); hexPath(c, cxp, cyp, HR + .9); c.clip();
+    c.fillStyle = pat; c.fillRect(cxp - HR - 2, cyp - HR - 2, HR * 2 + 4, HR * 2 + 4);
+    // slow colour drift across the map, so the repeating picture is never noticed
+    const nz = vnoise(x * 0.23 + 7, y * 0.27 + 3) - 0.5;
+    c.fillStyle = nz > 0 ? 'rgba(255,246,200,' + (nz * 0.2).toFixed(3) + ')' : 'rgba(6,16,30,' + (-nz * 0.26).toFixed(3) + ')'; c.fillRect(cxp - HR - 2, cyp - HR - 2, HR * 2 + 4, HR * 2 + 4);
+    const nb = hexNb(x, y);
+    for (let i = 0; i < 6; i++) {
+      const p = nb[i]; if (p[0] < 0 || p[1] < 0 || p[0] >= G.W || p[1] >= G.H) continue;
+      const nk = groundKey(G, p[0], p[1]); if (!nk || nk === gk) continue;
+      if (t === T.WATER) { edgeFade(c, null, cxp, cyp, i, 13, 6, 0.07, '#7fd6d8'); continue; }       // shallows
+      if (nk === 'water') continue;
+      const np = groundPat(c, nk); if (np) edgeFade(c, np, cxp, cyp, i, 11, 6, 0.085);               // land blends into land
+    }
+    c.restore();
+    if (t === T.WATER) {     // foam along the shore, a little wavy so it follows no hex edge
+      c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
+      for (let i = 0; i < 6; i++) {
+        const p = nb[i]; if (p[0] < 0 || p[1] < 0 || p[0] >= G.W || p[1] >= G.H || G.tiles[p[1]][p[0]] === T.WATER) continue;
+        const a = hexPt(cxp, cyp, HR - 0.8, i), b = hexPt(cxp, cyp, HR - 0.8, (i + 1) % 6), ex = b[0] - a[0], ey = b[1] - a[1], el = Math.hypot(ex, ey) || 1, qx = -ey / el, qy = ex / el, mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+        const pts = []; for (let k = 0; k <= 8; k++) { const f = k / 8, w = (vnoise(mx * 0.3 + f * 2.4, my * 0.3) - 0.5) * 4.2; pts.push([a[0] + ex * f + qx * w, a[1] + ey * f + qy * w]); }
+        for (const [lw, col] of [[7, 'rgba(190,232,246,.28)'], [3.2, 'rgba(236,250,255,.62)'], [1.1, 'rgba(255,255,255,.9)']]) { c.lineWidth = lw; c.strokeStyle = col; c.beginPath(); pts.forEach((q, k) => (k ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]))); c.stroke(); }
+      }
+      c.restore();
+    }
+    return true;
+  }
   function tile(c, t, x, y, G) {
     const cxp = (x + .5 + (y & 1) * .5) * 32, cyp = y * HR * 1.5 + HR, px = cxp - 16, py = cyp - 16, r = (i) => h2(x * 31 + i * 17, y * 57 + i * 11);
     if (typeof Assets !== 'undefined') {
       const tn0 = { [T.GRASS]: 'grass', [T.FOREST]: 'forest', [T.MOUNT]: 'mountain', [T.WATER]: 'water', [T.ROAD]: 'road', [T.SAND]: 'sand' }[t], tn = (t === T.ROAD && Assets.get('roads/dirt_straight')) ? 'grass' : tn0, bm = G && G.biome && G.biome[y] ? G.biome[y][x] : 0, bn = bm && (t === T.GRASS || t === T.FOREST || t === T.SAND || t === T.ROAD) ? 'biome_' + ['', 'desert', 'snow', 'swamp', 'lava'][bm] : null, ta = bn && !(t === T.ROAD && !Assets.get('roads/dirt_straight')) && Assets.get('terrain/' + bn) ? Assets.get('terrain/' + bn) : Assets.get('terrain/' + tn + '_' + (1 + Math.floor(r(0) * 4)), 'terrain/' + tn);
+      if (G && G.tiles && !(t === T.ROAD && !Assets.get('roads/dirt_straight'))) { const gk = groundKey(G, x, y); if (gk && bigGround(c, gk, t, x, y, cxp, cyp, G)) return; }
       if (ta) {
         const sw = Math.min(ta.width, 100), sh = Math.min(ta.height, Math.round(sw * (HR * 2 + 2) / 34)), sx = r(5) * (ta.width - sw), sy = r(6) * (ta.height - sh);
         c.save(); hexPath(c, cxp, cyp, HR + .7); c.clip(); c.drawImage(ta, sx, sy, sw, sh, cxp - 17, cyp - HR - 1, 34, HR * 2 + 2);
@@ -404,8 +465,8 @@ const Art = (() => {
       for (let i = 0; i < 6; i++) { const p = nb[i]; if (p[0] < 0 || p[1] < 0 || p[0] >= G.W || p[1] >= G.H) continue; const isR = (G.river[p[1]] && G.river[p[1]][p[0]]) || G.tiles[p[1]][p[0]] === T.WATER; if (!isR) continue; any = true;
         const nx = (p[0] + .5 + (p[1] & 1) * .5) * 32, ny = p[1] * HR * 1.5 + HR, mx = (cxp + nx) / 2, my = (cyp + ny) / 2;
         c.beginPath(); c.moveTo(cxp, cyp); c.lineTo(mx, my); c.lineWidth = 9.5; c.strokeStyle = 'rgba(60,48,28,.38)'; c.stroke();                    // muddy bank
-        c.lineWidth = 6.4; c.strokeStyle = '#2f6f9c'; c.stroke(); c.lineWidth = 1.8; c.strokeStyle = 'rgba(150,200,236,.3)'; c.stroke(); }   // water, with a faint glint
-      c.beginPath(); c.arc(cxp, cyp, any ? 4.2 : 5, 0, 7); c.fillStyle = '#2f6f9c'; c.fill(); c.lineWidth = 1.2; c.strokeStyle = 'rgba(60,48,28,.4)'; c.stroke();
+        c.lineWidth = 7.2; c.strokeStyle = groundPat(c, 'water') || '#2f6f9c'; c.stroke(); c.lineWidth = 1.6; c.strokeStyle = 'rgba(190,226,246,.28)'; c.stroke(); }   // water, with a faint glint
+      c.beginPath(); c.arc(cxp, cyp, any ? 4.6 : 5.4, 0, 7); c.fillStyle = groundPat(c, 'water') || '#2f6f9c'; c.fill(); c.lineWidth = 1.2; c.strokeStyle = 'rgba(60,48,28,.4)'; c.stroke();
       c.restore();
     }
     if (t === T.ROAD) {                                   // road pieces: a half-road from the centre to every connected neighbour plus a hub
@@ -428,6 +489,6 @@ const Art = (() => {
     c.save(); c.translate(cxp, cyp + 16); if (h2(x * 7, y * 3) > .5) c.scale(-1, 1); c.drawImage(im, -w / 2, -h, w, h); c.restore();
   }
   // after custom art finishes loading: forget everything painted so far and rebuild the icon strings
-  function reload() { for (const o of [resCache, resUrl, spriteCache, portCache, heroCache, urlCache]) for (const k in o) delete o[k]; for (const k of Object.keys(RES_ICON)) RES_ICON[k] = resImg(k); }
+  function reload() { for (const o of [resCache, resUrl, spriteCache, portCache, heroCache, urlCache, patCache]) for (const k in o) delete o[k]; for (const k of Object.keys(RES_ICON)) RES_ICON[k] = resImg(k); }
   return { reload, tile, tileOverlay, hexPath, hexPt, HR, cursor, rarity, portraitCanvas, heroCanvas, pic, heroPic, obj, boat: boatC, resImg, resCanvas, RES_EMOJI, fmtCostTxt, facHue };
 })();

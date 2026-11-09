@@ -115,5 +115,14 @@ sec('Map — weather and day/night (needs code)', 'Particles and colour overlays
   'anim/weather/fog_<n>.webp  — drifting fog layer, 1600×900 transparent, loops',
   'ui/tint_dawn.webp, ui/tint_day.webp, ui/tint_dusk.webp, ui/tint_night.webp  — full-screen colour overlays, transparent, 1280×720',
 ]);
+// ---- interface icons the game draws itself (js/gi.js); each is optional to replace with painted art ----
+{
+  const gi = fs.readFileSync(path.join(root, 'js/gi.js'), 'utf8'), a = gi.indexOf('const ICONS = {'), b = gi.indexOf('const MAP');
+  const ids = [...gi.slice(a, b).matchAll(/^    ([a-zA-Z0-9_]+): \(\)/gm)].map(m => m[1]);
+  const mapSrc = gi.slice(b, gi.indexOf('};', b)), by = {};
+  for (const m of mapSrc.matchAll(/'([^']+)': '([a-z0-9_]+)'/g)) (by[m[2]] = by[m[2]] || []).push(m[1].replace(/x$/, ''));
+  const all = [...new Set([...ids, ...Object.keys(by)])];
+  sec('Interface icons drawn in code — `art/icons/ui_<name>.png` (optional, not loaded by the game yet)', `${all.length} small gold-and-ink icons used in text, buttons and chips (stats, resources, buildings, status marks). They are drawn by js/gi.js today and replace emoji. 64×64, transparent. The game needs a small code change to prefer these files; the emoji each one replaces is shown after the name.`, all.map(id => `icons/ui_${id}  — replaces ${(by[id] || ['(no emoji, used directly)']).join(' ')}`));
+}
 fs.writeFileSync(path.join(root, 'ART.md'), out.join('\n') + '\n');
 console.log('ART.md written: ' + base.length + ' creatures, ' + Object.keys(HEROES).length + ' heroes, ' + Object.keys(SPELLS).length + ' spells, ' + Object.keys(PERKS).length + ' skills, ' + Object.keys(ART).length + ' artifacts');

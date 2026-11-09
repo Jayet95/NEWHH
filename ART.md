@@ -701,3 +701,123 @@ Particles and colour overlays that change with weather and time of day.
 - `anim/weather/snow_<n>.webp  — snowflake, 4 frames`
 - `anim/weather/fog_<n>.webp  — drifting fog layer, 1600×900 transparent, loops`
 - `ui/tint_dawn.webp, ui/tint_day.webp, ui/tint_dusk.webp, ui/tint_night.webp  — full-screen colour overlays, transparent, 1280×720`
+
+## Interface icons drawn in code — `art/icons/ui_<name>.png` (optional, not loaded by the game yet)
+116 small gold-and-ink icons used in text, buttons and chips (stats, resources, buildings, status marks). They are drawn by js/gi.js today and replace emoji. 64×64, transparent. The game needs a small code change to prefer these files; the emoji each one replaces is shown after the name.
+
+- `icons/ui_swords  — replaces ⚔ 🏋`
+- `icons/ui_sword  — replaces 🗡`
+- `icons/ui_town  — replaces 🏰`
+- `icons/ui_shield  — replaces 🛡`
+- `icons/ui_flame  — replaces 🔥`
+- `icons/ui_dragon  — replaces 🐲`
+- `icons/ui_skull  — replaces 💀 ☠`
+- `icons/ui_spiral  — replaces 🌀 🌌`
+- `icons/ui_coin  — replaces 🪙`
+- `icons/ui_sack  — replaces 💰`
+- `icons/ui_trophy  — replaces 🏆`
+- `icons/ui_clasp  — replaces 🤝`
+- `icons/ui_fort  — replaces 🏯`
+- `icons/ui_cart  — replaces 🚚`
+- `icons/ui_sparkle  — replaces ✨ ⭐ 💡 🧚 🪄`
+- `icons/ui_mountain  — replaces ⛰`
+- `icons/ui_warn  — replaces ⚠`
+- `icons/ui_save  — replaces 💾`
+- `icons/ui_target  — replaces 🎯 🧭`
+- `icons/ui_book  — replaces 📖 🗺`
+- `icons/ui_tent  — replaces ⛺`
+- `icons/ui_bomb  — replaces 💣`
+- `icons/ui_door  — replaces 🚪`
+- `icons/ui_burst  — replaces 💥`
+- `icons/ui_clover  — replaces 🍀`
+- `icons/ui_rock  — replaces 🪨 🧱`
+- `icons/ui_wind  — replaces 🌬 🌪`
+- `icons/ui_books  — replaces 📚`
+- `icons/ui_ring  — replaces 💍`
+- `icons/ui_speaker  — replaces 🔊`
+- `icons/ui_mute  — replaces 🔇`
+- `icons/ui_cogwheel  — replaces ⚙ 🎡`
+- `icons/ui_bow  — replaces 🏹`
+- `icons/ui_pine  — replaces 🌲`
+- `icons/ui_orb  — replaces 🔮 🧿`
+- `icons/ui_drop  — replaces 💧 🌊 ⛲`
+- `icons/ui_shrine  — replaces ⛩`
+- `icons/ui_chains  — replaces ⛓`
+- `icons/ui_skip  — replaces ⏭ ⏸`
+- `icons/ui_fast  — replaces ⏩`
+- `icons/ui_scroll  — replaces 📋 📜`
+- `icons/ui_fury  — replaces 😡 😤`
+- `icons/ui_back  — replaces ↩`
+- `icons/ui_volcano  — replaces 🌋`
+- `icons/ui_scope  — replaces 🔭 🔍`
+- `icons/ui_obelisk  — replaces 🔺 🔹`
+- `icons/ui_ship  — replaces ⛵ 🚢`
+- `icons/ui_trash  — replaces 🗑`
+- `icons/ui_up  — replaces ⬆ 👆`
+- `icons/ui_pick  — replaces ⛏`
+- `icons/ui_chart  — replaces 📊`
+- `icons/ui_chartup  — replaces 📈`
+- `icons/ui_heartbreak  — replaces 💔`
+- `icons/ui_dizzy  — replaces 💫`
+- `icons/ui_snail  — replaces 🐌`
+- `icons/ui_eyeslash  — replaces 🙈`
+- `icons/ui_dash  — replaces 💨`
+- `icons/ui_check  — replaces ✔ 🟢`
+- `icons/ui_wilt  — replaces 🥀 🧹`
+- `icons/ui_fog  — replaces 🌫`
+- `icons/ui_gemblue  — replaces 💠 💎`
+- `icons/ui_flagw  — replaces 🏳`
+- `icons/ui_log  — replaces 🪵`
+- `icons/ui_wolf  — replaces 🐺`
+- `icons/ui_ogre  — replaces 👹`
+- `icons/ui_mage  — replaces 🧙 🧞`
+- `icons/ui_horse  — replaces 🏇 🐪`
+- `icons/ui_crown  — replaces 👑`
+- `icons/ui_bolt  — replaces ⚡`
+- `icons/ui_boot  — replaces 🥾 👢 🩴`
+- `icons/ui_helm  — replaces 🪖`
+- `icons/ui_beads  — replaces 📿`
+- `icons/ui_lock  — replaces 🔒`
+- `icons/ui_pack  — replaces 🎒`
+- `icons/ui_hut  — replaces 🏚 🛖`
+- `icons/ui_zzz  — replaces 💤`
+- `icons/ui_pillars  — replaces 🏛`
+- `icons/ui_pin  — replaces 📍`
+- `icons/ui_sun  — replaces ☀`
+- `icons/ui_moon  — replaces 🌙`
+- `icons/ui_qmark  — replaces ❓`
+- `icons/ui_hands  — replaces 🙏`
+- `icons/ui_smile  — replaces 😀 😇`
+- `icons/ui_frown  — replaces 😟 😰 😨 🤒 😨`
+- `icons/ui_flask  — replaces 🧪 ⚕ ⚗`
+- `icons/ui_leaf  — replaces 🌿`
+- `icons/ui_sprout  — replaces 🌱 🌻`
+- `icons/ui_palm  — replaces 🌴 🏝`
+- `icons/ui_tree  — replaces 🌳`
+- `icons/ui_flake  — replaces ❄`
+- `icons/ui_anchor  — replaces ⚓`
+- `icons/ui_cross  — replaces ✖ 🔴`
+- `icons/ui_hourglass  — replaces ⏳ ⏰`
+- `icons/ui_diamond  — replaces 🔷`
+- `icons/ui_gold  — replaces (no emoji, used directly)`
+- `icons/ui_house  — replaces 🏠`
+- `icons/ui_globe  — replaces 🌍`
+- `icons/ui_phone  — replaces 📱`
+- `icons/ui_gift  — replaces 🎁`
+- `icons/ui_chest  — replaces 🧰 ⚰`
+- `icons/ui_hammer  — replaces 🔨 🏗 ⚒`
+- `icons/ui_bed  — replaces 🛏`
+- `icons/ui_beer  — replaces 🍺`
+- `icons/ui_scale  — replaces ⚖`
+- `icons/ui_camp  — replaces 🏕`
+- `icons/ui_flagred  — replaces 🚩`
+- `icons/ui_bubble  — replaces (no emoji, used directly)`
+- `icons/ui_virus  — replaces 🦠`
+- `icons/ui_cloud  — replaces ☁`
+- `icons/ui_lightning  — replaces 🌩 ⛈`
+- `icons/ui_horn  — replaces 📯`
+- `icons/ui_arrowdr  — replaces ↘`
+- `icons/ui_armor  — replaces 🦺`
+- `icons/ui_cape  — replaces 🧣`
+- `icons/ui_footprints  — replaces (no emoji, used directly)`
+- `icons/ui_menu  — replaces ☰`

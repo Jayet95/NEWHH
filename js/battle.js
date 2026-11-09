@@ -1048,6 +1048,18 @@ const Battle = (() => {
     const n = seq.length, i = state === 'idle' ? Math.floor(now / 125 + s.c * 3 + s.r * 5) % n : Math.min(n - 1, Math.max(0, Math.floor((now - t0) / dur * n)));
     return Assets.get(seq[i]) || null;
   }
+  // Animation frames of one creature may have any canvas size as long as they are all the same: the figure's feet (bottom centre of the
+  // first idle frame's visible pixels) are the anchor and one scale fits the creature to the field, so nothing jumps between frames.
+  const fitCache = {};
+  function animFit(t) {
+    const key = String(t); if (key in fitCache) return fitCache[key];
+    const seq = seqOf(t, 'idle'), im = seq && Assets.get(seq[0]); if (!im) return null;       // not cached while the frames are still loading
+    const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const g = c.getContext('2d'); g.drawImage(im, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height).data; let x0 = c.width, x1 = -1, y0 = c.height, y1 = -1;
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 < 0) return (fitCache[key] = null);
+    return (fitCache[key] = { k: Math.min(66 / (y1 - y0 + 1), 72 / (x1 - x0 + 1)), cx: (x0 + x1) / 2, by: y1 + 1 });
+  }
   const PROF = {};
   function profOf(t) {
     const id = String(t).replace(/_\d$/, ''); if (PROF[id]) return PROF[id];
@@ -1150,8 +1162,8 @@ const Battle = (() => {
       const k = Math.max(0, (now - s.deadAt) / 700), dfr = frameOf(s, 'death', now, s.deadAt, 600), e = k * k * (3 - 2 * k), dir = s.side === 1 ? -1 : 1, pose = dfr || poseOf(s, 'defending');
       ctx.save(); ctx.globalAlpha = dfr ? Math.min(1, Math.max(0, (1 - k) * 4)) : Math.max(0, 1 - Math.pow(k, 1.5));
       if (dfr) {
-        const wd = isWide(s), kk = Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.25 : 1), pw = pose.width * kk, ph = pose.height * kk;
-        ctx.translate(s.px + (wd ? (s.side === 0 ? -1 : 1) * HW * 0.5 : 0), s.py + 22); if (s.side === 1) ctx.scale(-1, 1); ctx.drawImage(pose, -pw / 2, -ph, pw, ph);
+        const wd = isWide(s), fit = animFit(s.t), kk = fit ? fit.k * (wd ? 1.25 : 1) : Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.25 : 1), pw = pose.width * kk, ph = pose.height * kk;
+        ctx.translate(s.px + (wd ? (s.side === 0 ? -1 : 1) * HW * 0.5 : 0), s.py + 22); if (s.side === 1) ctx.scale(-1, 1); if (fit) ctx.drawImage(pose, -fit.cx * kk, -fit.by * kk, pw, ph); else ctx.drawImage(pose, -pw / 2, -ph, pw, ph);
       } else if (pose) {
         const wd = isWide(s), kk = Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.25 : 1), pw = pose.width * kk, ph = pose.height * kk;
         ctx.translate(s.px + (wd ? (s.side === 0 ? -1 : 1) * HW * 0.5 : 0), s.py + 22 + e * 6); ctx.rotate(dir * e * 0.85); ctx.scale(1 + e * 0.1, 1 - e * 0.5); ctx.drawImage(pose, -pw / 2, -ph, pw, ph);
@@ -1175,11 +1187,11 @@ const Battle = (() => {
       brx *= off.sx; bry *= off.sy;
       if (s === B.cur && !B.over) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.55 + 0.25 * Math.sin(now / 260); glow(p.x + (pose && isWide(s) ? (s.side === 0 ? -1 : 1) * HW * 0.5 : 0), p.y + 20, 34, '#ffd24a', 0.5); ctx.restore(); }
       if (pose) {
-        const wd = isWide(s), kk = Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.25 : 1), pw = pose.width * kk, ph = pose.height * kk, fy = p.y + 22;
+        const wd = isWide(s), fit = fr ? animFit(s.t) : null, kk = fit ? fit.k * (wd ? 1.25 : 1) : Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.25 : 1), pw = pose.width * kk, ph = pose.height * kk, fy = p.y + 22;
         if (wd) p.x += (s.side === 0 ? -1 : 1) * HW * 0.5;
         ctx.beginPath(); ctx.ellipse(p.x, fy, wd ? 36 : 21, wd ? 9 : 7.5, 0, 0, 7); ctx.fillStyle = flash ? 'rgba(255,110,90,.6)' : 'rgba(0,0,0,.38)'; ctx.fill();
         ctx.lineWidth = s === B.cur ? 3 : 2; ctx.strokeStyle = s === B.cur ? '#ffd24a' : (s.side === 0 ? '#4a8bff' : '#e0504a'); ctx.stroke();
-        ctx.save(); ctx.translate(p.x, fy); ctx.rotate(off.rot * 0.4); ctx.scale(brx, bry); if (mir) ctx.scale(-1, 1); if (flash) ctx.globalAlpha = 0.88; ctx.drawImage(pose, -pw / 2, -ph, pw, ph); ctx.restore();
+        ctx.save(); ctx.translate(p.x, fy); ctx.rotate(off.rot * 0.4); ctx.scale(brx, bry); if (mir) ctx.scale(-1, 1); if (flash) ctx.globalAlpha = 0.88; if (fit) ctx.drawImage(pose, -fit.cx * kk, -fit.by * kk, pw, ph); else ctx.drawImage(pose, -pw / 2, -ph, pw, ph); ctx.restore();
       } else {
       ctx.beginPath(); ctx.arc(p.x, p.y + 4, HR * 0.72, 0, 7);
       ctx.fillStyle = flash ? '#ff8a7a' : (s.side === 0 ? '#2a4f8a' : '#8a2a2a'); ctx.fill();

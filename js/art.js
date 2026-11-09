@@ -346,8 +346,10 @@ const Art = (() => {
     });
   }
   const dataUrl = (key, cv) => urlCache[key] || (urlCache[key] = cv.toDataURL());
-  const pic = (id, px = 40) => `<img class="pic" draggable="false" width="${px}" height="${px}" alt="" src="${dataUrl('c' + id, portraitCanvas(id))}">`;
-  const heroPic = (icon, col, px = 36, pid) => `<img class="pic round" draggable="false" width="${px}" height="${px}" alt="" src="${dataUrl('h' + icon + col + (pid || ''), heroCanvas(icon, col, 72, pid))}">`;
+  // paint pictures at the size they are shown (times the screen density, x2 for sharpness), so they never look blurry
+  const qpx = (px) => Math.min(384, Math.max(96, Math.ceil(px * Math.min(2.5, window.devicePixelRatio || 1) * 2)));
+  const pic = (id, px = 40) => { const S = qpx(px); return `<img class="pic" draggable="false" width="${px}" height="${px}" alt="" src="${dataUrl('c' + id + '|' + S, portraitCanvas(id, S))}">`; };
+  const heroPic = (icon, col, px = 36, pid) => { const S = qpx(px); return `<img class="pic round" draggable="false" width="${px}" height="${px}" alt="" src="${dataUrl('h' + icon + col + (pid || '') + '|' + S, heroCanvas(icon, col, S, pid))}">`; };
 
   // swap the emoji resource icons used throughout the HTML UI for painted ones
   const RES_EMOJI = Object.assign({}, RES_ICON);

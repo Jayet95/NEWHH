@@ -3,8 +3,8 @@
 const vm = require('vm'), fs = require('fs'), path = require('path');
 const root = path.join(__dirname, '..');
 const ctx = { console, Math }; vm.createContext(ctx);
-vm.runInContext(fs.readFileSync(path.join(root, 'js/data.js'), 'utf8') + '\nthis.D = { C, FACTIONS, HEROES, SPELLS, PERKS, ART, RES, LAIR };', ctx);
-const { C, FACTIONS, HEROES, SPELLS, PERKS, ART, RES, LAIR } = ctx.D;
+vm.runInContext(fs.readFileSync(path.join(root, 'js/data.js'), 'utf8') + '\nthis.D = { C, FACTIONS, HEROES, SPELLS, PERKS, ART, RES, LAIR, MAPS, SCENARIOS };', ctx);
+const { C, FACTIONS, HEROES, SPELLS, PERKS, ART, RES, LAIR, MAPS, SCENARIOS } = ctx.D;
 const ids = Object.keys(C), base = ids.filter(k => !/_\d$/.test(k));
 const out = [];
 const sec = (t, d, list) => { out.push(`\n## ${t}\n${d}\n`); out.push(list.map(x => '- `' + x + '`').join('\n')); };
@@ -22,12 +22,98 @@ out.push([
 ].join('\n'));
 sec('Creatures — `art/creatures/<id>.png`', '256×256, the figure facing right, feet at the bottom edge, no frame (the game adds the rarity frame, stars and wings marks).', base.map(k => `creatures/${k}  — ${C[k].n}${C[k].lair ? ' (Dragon Lair)' : ''}`));
 sec('Creature upgrades (optional) — `art/creatures/<id>_<2..5>.png`', 'Only if you want a different picture for upgraded versions.', base.filter(k => C[k + '_2']).slice(0, 3).map(k => `creatures/${k}_2 … creatures/${k}_5`).concat(['… the same for every castle creature']));
-sec('Heroes — `art/heroes/<name>.png`', '256×256 bust portrait (the game crops it into a round medallion).', Object.keys(HEROES).map(k => `heroes/${k}  — ${HEROES[k].cls}, ${FACTIONS[HEROES[k].fac].name}`));
+sec('Heroes — `art/heroes/<name>.png`', '512×512 bust portrait for the sharpest result (256×256 minimum). The game crops it into a round medallion and shows it up to 150 px, so a bigger file looks cleaner.', Object.keys(HEROES).map(k => `heroes/${k}  — ${HEROES[k].cls}, ${FACTIONS[HEROES[k].fac].name}`));
 const kinds = ['hall (levels 1-5)', 'guild (1-3)', 'market', 'ship', 'fort (levels 0-3)', 'mines (levels 0-3)', 'tavern', 'garrison'];
 sec('Town buildings — `art/buildings/…`', '256×288 (a little taller than wide), building standing on the bottom edge, transparent background. Name patterns, most specific wins: `<castle>_<kind>_<level>`, `<kind>_<level>`, `<castle>_<kind>`, `<kind>`.', kinds.map(k => 'buildings/' + k.split(' ')[0] + '_<level>   e.g. buildings/' + k.split(' ')[0] + '_2, buildings/castle_' + k.split(' ')[0] + '_2').concat(['', 'Creature dwellings: `buildings/<creature id>` (e.g. `buildings/castle1`, `buildings/castle1_3`) — one per castle creature and level, or just the base.', 'Castles are: ' + Object.keys(FACTIONS).join(', ')]));
 sec('Map objects — `art/objects/<type>.png`', '128×128, transparent, standing on the bottom edge.', ['town (or `town_<castle>`)', 'fort', 'mine_gold, mine_wood, mine_ore, mine_mercury, mine_sulfur, mine_crystal, mine_gems', 'pile_gold, pile_wood, … (resource piles)', 'dwelling (or `dwelling_<castle>`)', 'lair', 'chest', 'art (artifact on the ground)', 'merchant', 'wreck', 'spring', 'resobj_windmill, resobj_waterwheel, resobj_garden', 'stone', 'shrine', 'tower', 'bank_crypt, bank_utopia, bank_stockpile', 'mono', 'seer', 'boat']);
 sec('Terrain tiles — `art/terrain/<type>.png`', '64×74 pointy-top hexagon (the corners outside the hexagon transparent). Variants `grass_1…grass_4` are picked at random per tile.', ['grass', 'forest', 'mountain', 'water', 'road', 'sand']);
 sec('Icons — `art/icons/…`', '64×64.', RES.map(k => `icons/res_${k}`).concat(Object.keys(SPELLS).map(k => `icons/spell_${k}  — ${SPELLS[k].n}`), Object.keys(PERKS).map(k => `icons/perk_${k}  — ${PERKS[k].n}`), Object.keys(ART).map(k => `icons/art_${k}  — ${ART[k].n}`)));
-sec('Screens — `art/ui/…`', '', ['ui/title  — full-screen background of the title screen (1600×900 JPG/WebP is fine)', 'ui/logo  — the game logo replacing the title text (transparent PNG, about 800 px wide)']);
+sec('Buttons and frames — `art/ui/…` (or `themes/<castle>/…`)', 'Skin pieces used when the "skin" is on (needs btn_normal and frame_scroll). Each castle theme in `themes/<castle>/` has its own copy and overrides these. Sizes are the source image size; the CSS slices the corners, so keep the same size and proportions. Current files: buttons 420×163, frames as listed.', [
+  'ui/btn_normal  — 420×163 — normal button. Sliced with 34px top/bottom and 52px left/right corners, drawn with 11px / 17px borders',
+  'ui/btn_pressed  — 420×162 — primary (highlighted) button, same slicing as btn_normal',
+  'ui/btn_disabled  — 420×163 — disabled button, same slicing as btn_normal',
+  'ui/frame_scroll  — 420×356 — dialog box frame (the #mbox window every menu and popup uses). Sliced 90px, drawn with a 22px border',
+  'ui/frame_toolbar  — 420×90 — resource bar frame (#mres). Sliced 26px, drawn with a 12px border',
+  'ui/frame_command  — 420×395 — round command-button background for the zoom buttons, stretched to fit the button',
+  'ui/topbar_day  — 1400×143 — top sky bar on the adventure map, daytime. Sliced 38px, drawn with a 16px border',
+  'ui/topbar_night  — 1400×143 — same bar at night (same slicing)',
+  'Not used by the code yet: ui/frame_portrait (420×395), ui/frame_town (420×327), ui/frame_progress (420×83), ui/adventure (1280×726). Add them to the CSS if you want them shown, or delete them.',
+]);
+sec('Screens — `art/ui/…`', 'Menu and screen backgrounds, shown dimmed behind the menu text. Use 16:9 (1280×720 or larger).', [
+  'ui/title  — full-screen background of the title screen (16:9, 1280×720 or larger; JPG/WebP)',
+  'ui/logo  — the game logo replacing the title text (transparent PNG, about 800 px wide)',
+  'ui/difficulty_select  — background of the "Choose difficulty" screen (Easy / Normal / Hard / Expert)',
+  'ui/map_select  — background of the "Choose your map" screen (map presets, size, fog, rivals, seed, flag)',
+  'ui/scenarios  — background of the "Scenarios" screen (ready-made maps with an objective)',
+  'ui/castle_select  — background of the "Choose your castle" screen',
+  'ui/hero_select  — background of the "choose your hero" screen (1920×1080 recommended, 16:9)',
+  'ui/town_<castle>  — castle picture on the castle picker and in the town screen (castle, rampart, tower, inferno, necropolis, dungeon, stronghold, fortress, conflux)',
+]);
+sec('Map previews — `art/maps/<name>.webp`', 'The preview pictures on "Choose your map" (the four map types) and on the Scenarios screen (one per scenario). Use 1040×620 (about 1.68:1, the same shape the game paints); a bigger file stays sharp. Any missing one keeps the painted preview.', [
+  ...Object.keys(MAPS).map(k => `maps/${k}  — ${MAPS[k].name} (map type)`),
+  ...SCENARIOS.map(s => `maps/scn_${s.id}  — ${s.name} (scenario)`),
+]);
+// ---- animation and effect assets (most need code to play frame sequences; the game does not load these yet) ----
+const SPELL_KEYS = Object.keys(SPELLS), CLASSES = [...new Set(Object.values(HEROES).map(h => h.cls))];
+const DIRS = ['north', 'east', 'south', 'west'], BIOMES = ['desert', 'grass', 'lava', 'ship', 'snow', 'swamp'];
+const CASTLES = ['castle', 'rampart', 'tower', 'inferno', 'necropolis', 'dungeon', 'stronghold', 'fortress', 'conflux'];
+const PLAYER_COLOURS = ['blue', 'red', 'green', 'orange', 'purple', 'teal', 'pink', 'tan'];
+const ANIM_NOTE = 'Frames are numbered from 1 with no gaps (`name_1.webp`, `name_2.webp`, …) and play in order. Use the same size and framing as the still picture they replace.';
+sec('Battle — creature animation frames (needs code)', ANIM_NOTE + ' Right-facing; the game mirrors them for the enemy side unless left-facing frames are supplied. 4–6 frames per action.', [
+  `anim/<creature id>/idle_<n>.webp  — idle loop, all ${base.length} creatures`,
+  `anim/<creature id>/attack_<n>.webp  — attack swing or shot`,
+  `anim/<creature id>/hurt_<n>.webp  — flinch when hit, 3–4 frames`,
+  `anim/<creature id>/death_<n>.webp  — fall and fade; the last frame stays as the corpse`,
+]);
+sec('Battle — background layers (needs code)', 'Each battle background split into layers that scroll at different speeds (sky slowest, foreground fastest). Same width and height as the existing battle/bg_* picture.', BIOMES.flatMap(b => ['sky', 'far', 'mid', 'fore'].map(l => `battle/bg_${b}_${l}.webp  — ${b} battlefield, ${l} layer`)));
+sec('Battle — spell effects (needs code)', ANIM_NOTE + ' One effect per spell, 6–10 frames, played once when the spell lands. Flying spells also need a projectile.', SPELL_KEYS.map(k => `anim/spell_${k}_<n>.webp  — ${SPELLS[k].n}`).concat(['anim/proj_<name>.webp  — flying projectile for ranged spells (lightning, fireball, ice bolt, …)']));
+sec('Battle — impact and death effects (needs code)', ANIM_NOTE + ' Short bursts at the point of a hit, a step or a death.', [
+  'anim/impact_hit_<n>.webp  — weapon hit sparks, 4–6 frames',
+  'anim/impact_dust_<n>.webp  — dust when a unit steps or lands',
+  'anim/impact_blood_<n>.webp  — blood splash',
+  'anim/impact_bone_<n>.webp  — bone splinters (undead)',
+  'anim/impact_explosion_<n>.webp  — explosions from mines, meteors and fireballs, 6–8 frames',
+  'anim/impact_smoke_<n>.webp  — smoke after a fire or explosion, 4–6 frames',
+]);
+sec('Battle — hero sprites (needs code)', ANIM_NOTE + ' The hero stands beside the battlefield. One set per hero class.', CLASSES.flatMap(c => [`anim/hero_${c}/idle_<n>.webp  — ${c}, idle loop`, `anim/hero_${c}/cast_<n>.webp  — ${c}, casting a spell`, `anim/hero_${c}/hit_<n>.webp  — ${c}, taking a hit`]));
+sec('Battle — siege (needs code)', 'Parts of the walls, gates and towers that animate during a siege.', [
+  'battle/gate_broken.webp  — gate after it is smashed (still picture)',
+  'battle/catapult_idle.webp  — catapult at rest',
+  'battle/catapult_fire_<n>.webp  — catapult firing, 3–4 frames',
+  'battle/flag_<n>.webp  — flag waving on walls and towers, 4–6 frames',
+  'battle/mine_explosion_<n>.webp  — mine blast, 6–8 frames',
+  'battle/trench_smoke_<n>.webp  — smoke over the trenches, 4 frames',
+]);
+sec('Battle and map — sound (needs code)', 'Short effects in `audio/sfx/` (under 1 second each, MP3 or OGG). Ambient loops in `audio/ambient/` (30–60 seconds, seamless).', [
+  ...CASTLES.flatMap(c => [`audio/sfx/hit_${c}.mp3  — ${c} unit hit`, `audio/sfx/shoot_${c}.mp3  — ${c} ranged shot`, `audio/sfx/death_${c}.mp3  — ${c} unit dies`]),
+  ...SPELL_KEYS.map(k => `audio/sfx/spell_${k}.mp3  — ${SPELLS[k].n}`),
+  ...BIOMES.map(b => `audio/ambient/${b}.mp3  — ${b} battle ambience`),
+]);
+sec('Map — animated terrain (needs code)', ANIM_NOTE + ' Looping ground that moves. 4–8 frames each, the same size as the still tile (64×74), looping seamlessly.', [
+  'terrain/anim/water_<n>.webp  — water shimmer',
+  'terrain/anim/lava_<n>.webp  — lava glow',
+  'terrain/anim/snow_<n>.webp  — snow drifting over snowy ground',
+  'terrain/anim/forest_sway_<n>.webp  — forest overlay swaying in the wind',
+  'terrain/anim/river_<n>.webp  — river ripples',
+]);
+sec('Map — hero walking (needs code)', ANIM_NOTE + ' Played while the hero moves. 4–6 frames per direction, same size as the still mounted picture.', [
+  ...DIRS.map(d => `mounted/<name>_${d}_walk_<n>.webp  — every hero (${Object.keys(HEROES).length}), walking ${d}`),
+]);
+sec('Map — animated objects (needs code)', 'Looping sprites for map objects. The still picture in objects/ stays as the first frame.', [
+  'objects/anim/windmill_<n>.webp  — sails turning',
+  'objects/anim/waterwheel_<n>.webp  — wheel turning',
+  'objects/anim/mine_smoke_<n>.webp  — smoke from working mines',
+  ...PLAYER_COLOURS.map(c => `objects/anim/flag_${c}_<n>.webp  — ${c} flag waving on towns and forts`),
+  'objects/anim/chest_glow_<n>.webp  — glow around chests',
+  'objects/anim/shrine_glow_<n>.webp  — glow around shrines and seers',
+  'objects/anim/lair_<n>.webp  — creature lairs stirring (optional)',
+  'objects/shadow.webp  — soft oval shadow under map objects, 128×64 transparent (still)',
+]);
+sec('Map — weather and day/night (needs code)', 'Particles and colour overlays that change with weather and time of day.', [
+  'anim/weather/rain_<n>.webp  — falling rain streak, 4 frames',
+  'anim/weather/snow_<n>.webp  — snowflake, 4 frames',
+  'anim/weather/fog_<n>.webp  — drifting fog layer, 1600×900 transparent, loops',
+  'ui/tint_dawn.webp, ui/tint_day.webp, ui/tint_dusk.webp, ui/tint_night.webp  — full-screen colour overlays, transparent, 1280×720',
+]);
 fs.writeFileSync(path.join(root, 'ART.md'), out.join('\n') + '\n');
 console.log('ART.md written: ' + base.length + ' creatures, ' + Object.keys(HEROES).length + ' heroes, ' + Object.keys(SPELLS).length + ' spells, ' + Object.keys(PERKS).length + ' skills, ' + Object.keys(ART).length + ' artifacts');

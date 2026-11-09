@@ -102,7 +102,7 @@ Only if you want a different picture for upgraded versions.
 - `… the same for every castle creature`
 
 ## Heroes — `art/heroes/<name>.png`
-256×256 bust portrait (the game crops it into a round medallion).
+512×512 bust portrait for the sharpest result (256×256 minimum). The game crops it into a round medallion and shows it up to 150 px, so a bigger file looks cleaner.
 
 - `heroes/Orrin  — Knight, Castle`
 - `heroes/Valeska  — Knight, Castle`
@@ -324,6 +324,20 @@ Only if you want a different picture for upgraded versions.
 - `icons/spell_bless  — Bless`
 - `icons/spell_heal  — Cure`
 - `icons/spell_frostring  — Frost Ring`
+- `icons/spell_dispel  — Clear Mind`
+- `icons/spell_icebolt  — Ice Lance`
+- `icons/spell_weakness  — Sapping Touch`
+- `icons/spell_disrupt  — Rend Armor`
+- `icons/spell_forget  — Dull Aim`
+- `icons/spell_destroyundead  — Holy Light`
+- `icons/spell_deathripple  — Grave Wave`
+- `icons/spell_prayer  — Rally`
+- `icons/spell_berserk  — Frenzy`
+- `icons/spell_hypnotize  — Mind Grip`
+- `icons/spell_summon_fire  — Call Flame Spirits`
+- `icons/spell_summon_water  — Call Tide Spirits`
+- `icons/spell_summon_air  — Call Gale Spirits`
+- `icons/spell_summon_earth  — Call Stone Spirits`
 - `icons/spell_resurrect  — Resurrection`
 - `icons/perk_offense  — Offense`
 - `icons/perk_archery  — Archery`
@@ -383,8 +397,307 @@ Only if you want a different picture for upgraded versions.
 - `icons/art_wayfarer  — Ring of the Wayfarer`
 - `icons/art_wizardry  — Ring of the Wizard's Might`
 
+## Buttons and frames — `art/ui/…` (or `themes/<castle>/…`)
+Skin pieces used when the "skin" is on (needs btn_normal and frame_scroll). Each castle theme in `themes/<castle>/` has its own copy and overrides these. Sizes are the source image size; the CSS slices the corners, so keep the same size and proportions. Current files: buttons 420×163, frames as listed.
+
+- `ui/btn_normal  — 420×163 — normal button. Sliced with 34px top/bottom and 52px left/right corners, drawn with 11px / 17px borders`
+- `ui/btn_pressed  — 420×162 — primary (highlighted) button, same slicing as btn_normal`
+- `ui/btn_disabled  — 420×163 — disabled button, same slicing as btn_normal`
+- `ui/frame_scroll  — 420×356 — dialog box frame (the #mbox window every menu and popup uses). Sliced 90px, drawn with a 22px border`
+- `ui/frame_toolbar  — 420×90 — resource bar frame (#mres). Sliced 26px, drawn with a 12px border`
+- `ui/frame_command  — 420×395 — round command-button background for the zoom buttons, stretched to fit the button`
+- `ui/topbar_day  — 1400×143 — top sky bar on the adventure map, daytime. Sliced 38px, drawn with a 16px border`
+- `ui/topbar_night  — 1400×143 — same bar at night (same slicing)`
+- `Not used by the code yet: ui/frame_portrait (420×395), ui/frame_town (420×327), ui/frame_progress (420×83), ui/adventure (1280×726). Add them to the CSS if you want them shown, or delete them.`
+
 ## Screens — `art/ui/…`
+Menu and screen backgrounds, shown dimmed behind the menu text. Use 16:9 (1280×720 or larger).
 
-
-- `ui/title  — full-screen background of the title screen (1600×900 JPG/WebP is fine)`
+- `ui/title  — full-screen background of the title screen (16:9, 1280×720 or larger; JPG/WebP)`
 - `ui/logo  — the game logo replacing the title text (transparent PNG, about 800 px wide)`
+- `ui/difficulty_select  — background of the "Choose difficulty" screen (Easy / Normal / Hard / Expert)`
+- `ui/map_select  — background of the "Choose your map" screen (map presets, size, fog, rivals, seed, flag)`
+- `ui/scenarios  — background of the "Scenarios" screen (ready-made maps with an objective)`
+- `ui/castle_select  — background of the "Choose your castle" screen`
+- `ui/hero_select  — background of the "choose your hero" screen (1920×1080 recommended, 16:9)`
+- `ui/town_<castle>  — castle picture on the castle picker and in the town screen (castle, rampart, tower, inferno, necropolis, dungeon, stronghold, fortress, conflux)`
+
+## Map previews — `art/maps/<name>.webp`
+The preview pictures on "Choose your map" (the four map types) and on the Scenarios screen (one per scenario). Use 1040×620 (about 1.68:1, the same shape the game paints); a bigger file stays sharp. Any missing one keeps the painted preview.
+
+- `maps/plains  — Emerald Plains (map type)`
+- `maps/highland  — Highland Frontier (map type)`
+- `maps/isles  — Sunken Isles (map type)`
+- `maps/steppe  — Wild Steppe (map type)`
+- `maps/scn_first  — First Steps (scenario)`
+- `maps/scn_gold  — Gold Rush (scenario)`
+- `maps/scn_sand  — Sandstorm Crossing (scenario)`
+- `maps/scn_frost  — The Frozen Frontier (scenario)`
+- `maps/scn_isles  — Island Kingdom (scenario)`
+- `maps/scn_fever  — Fever Swamp (scenario)`
+- `maps/scn_embers  — Siege of Embers (scenario)`
+- `maps/scn_warlords  — War of the Warlords (scenario)`
+
+## Battle — creature animation frames (needs code)
+Frames are numbered from 1 with no gaps (`name_1.webp`, `name_2.webp`, …) and play in order. Use the same size and framing as the still picture they replace. Right-facing; the game mirrors them for the enemy side unless left-facing frames are supplied. 4–6 frames per action.
+
+- `anim/<creature id>/idle_<n>.webp  — idle loop, all 77 creatures`
+- `anim/<creature id>/attack_<n>.webp  — attack swing or shot`
+- `anim/<creature id>/hurt_<n>.webp  — flinch when hit, 3–4 frames`
+- `anim/<creature id>/death_<n>.webp  — fall and fade; the last frame stays as the corpse`
+
+## Battle — background layers (needs code)
+Each battle background split into layers that scroll at different speeds (sky slowest, foreground fastest). Same width and height as the existing battle/bg_* picture.
+
+- `battle/bg_desert_sky.webp  — desert battlefield, sky layer`
+- `battle/bg_desert_far.webp  — desert battlefield, far layer`
+- `battle/bg_desert_mid.webp  — desert battlefield, mid layer`
+- `battle/bg_desert_fore.webp  — desert battlefield, fore layer`
+- `battle/bg_grass_sky.webp  — grass battlefield, sky layer`
+- `battle/bg_grass_far.webp  — grass battlefield, far layer`
+- `battle/bg_grass_mid.webp  — grass battlefield, mid layer`
+- `battle/bg_grass_fore.webp  — grass battlefield, fore layer`
+- `battle/bg_lava_sky.webp  — lava battlefield, sky layer`
+- `battle/bg_lava_far.webp  — lava battlefield, far layer`
+- `battle/bg_lava_mid.webp  — lava battlefield, mid layer`
+- `battle/bg_lava_fore.webp  — lava battlefield, fore layer`
+- `battle/bg_ship_sky.webp  — ship battlefield, sky layer`
+- `battle/bg_ship_far.webp  — ship battlefield, far layer`
+- `battle/bg_ship_mid.webp  — ship battlefield, mid layer`
+- `battle/bg_ship_fore.webp  — ship battlefield, fore layer`
+- `battle/bg_snow_sky.webp  — snow battlefield, sky layer`
+- `battle/bg_snow_far.webp  — snow battlefield, far layer`
+- `battle/bg_snow_mid.webp  — snow battlefield, mid layer`
+- `battle/bg_snow_fore.webp  — snow battlefield, fore layer`
+- `battle/bg_swamp_sky.webp  — swamp battlefield, sky layer`
+- `battle/bg_swamp_far.webp  — swamp battlefield, far layer`
+- `battle/bg_swamp_mid.webp  — swamp battlefield, mid layer`
+- `battle/bg_swamp_fore.webp  — swamp battlefield, fore layer`
+
+## Battle — spell effects (needs code)
+Frames are numbered from 1 with no gaps (`name_1.webp`, `name_2.webp`, …) and play in order. Use the same size and framing as the still picture they replace. One effect per spell, 6–10 frames, played once when the spell lands. Flying spells also need a projectile.
+
+- `anim/spell_arrow_<n>.webp  — Magic Arrow`
+- `anim/spell_haste_<n>.webp  — Haste`
+- `anim/spell_lightning_<n>.webp  — Lightning Bolt`
+- `anim/spell_shield_<n>.webp  — Air Shield`
+- `anim/spell_chain_<n>.webp  — Chain Lightning`
+- `anim/spell_stone_<n>.webp  — Stone Skin`
+- `anim/spell_slow_<n>.webp  — Slow`
+- `anim/spell_curse_<n>.webp  — Curse`
+- `anim/spell_meteor_<n>.webp  — Meteor Shower`
+- `anim/spell_implosion_<n>.webp  — Implosion`
+- `anim/spell_bloodlust_<n>.webp  — Bloodlust`
+- `anim/spell_blind_<n>.webp  — Blind`
+- `anim/spell_fireball_<n>.webp  — Fireball`
+- `anim/spell_armageddon_<n>.webp  — Armageddon`
+- `anim/spell_bless_<n>.webp  — Bless`
+- `anim/spell_heal_<n>.webp  — Cure`
+- `anim/spell_frostring_<n>.webp  — Frost Ring`
+- `anim/spell_dispel_<n>.webp  — Clear Mind`
+- `anim/spell_icebolt_<n>.webp  — Ice Lance`
+- `anim/spell_weakness_<n>.webp  — Sapping Touch`
+- `anim/spell_disrupt_<n>.webp  — Rend Armor`
+- `anim/spell_forget_<n>.webp  — Dull Aim`
+- `anim/spell_destroyundead_<n>.webp  — Holy Light`
+- `anim/spell_deathripple_<n>.webp  — Grave Wave`
+- `anim/spell_prayer_<n>.webp  — Rally`
+- `anim/spell_berserk_<n>.webp  — Frenzy`
+- `anim/spell_hypnotize_<n>.webp  — Mind Grip`
+- `anim/spell_summon_fire_<n>.webp  — Call Flame Spirits`
+- `anim/spell_summon_water_<n>.webp  — Call Tide Spirits`
+- `anim/spell_summon_air_<n>.webp  — Call Gale Spirits`
+- `anim/spell_summon_earth_<n>.webp  — Call Stone Spirits`
+- `anim/spell_resurrect_<n>.webp  — Resurrection`
+- `anim/proj_<name>.webp  — flying projectile for ranged spells (lightning, fireball, ice bolt, …)`
+
+## Battle — impact and death effects (needs code)
+Frames are numbered from 1 with no gaps (`name_1.webp`, `name_2.webp`, …) and play in order. Use the same size and framing as the still picture they replace. Short bursts at the point of a hit, a step or a death.
+
+- `anim/impact_hit_<n>.webp  — weapon hit sparks, 4–6 frames`
+- `anim/impact_dust_<n>.webp  — dust when a unit steps or lands`
+- `anim/impact_blood_<n>.webp  — blood splash`
+- `anim/impact_bone_<n>.webp  — bone splinters (undead)`
+- `anim/impact_explosion_<n>.webp  — explosions from mines, meteors and fireballs, 6–8 frames`
+- `anim/impact_smoke_<n>.webp  — smoke after a fire or explosion, 4–6 frames`
+
+## Battle — hero sprites (needs code)
+Frames are numbered from 1 with no gaps (`name_1.webp`, `name_2.webp`, …) and play in order. Use the same size and framing as the still picture they replace. The hero stands beside the battlefield. One set per hero class.
+
+- `anim/hero_Knight/idle_<n>.webp  — Knight, idle loop`
+- `anim/hero_Knight/cast_<n>.webp  — Knight, casting a spell`
+- `anim/hero_Knight/hit_<n>.webp  — Knight, taking a hit`
+- `anim/hero_Cleric/idle_<n>.webp  — Cleric, idle loop`
+- `anim/hero_Cleric/cast_<n>.webp  — Cleric, casting a spell`
+- `anim/hero_Cleric/hit_<n>.webp  — Cleric, taking a hit`
+- `anim/hero_Ranger/idle_<n>.webp  — Ranger, idle loop`
+- `anim/hero_Ranger/cast_<n>.webp  — Ranger, casting a spell`
+- `anim/hero_Ranger/hit_<n>.webp  — Ranger, taking a hit`
+- `anim/hero_Druid/idle_<n>.webp  — Druid, idle loop`
+- `anim/hero_Druid/cast_<n>.webp  — Druid, casting a spell`
+- `anim/hero_Druid/hit_<n>.webp  — Druid, taking a hit`
+- `anim/hero_Alchemist/idle_<n>.webp  — Alchemist, idle loop`
+- `anim/hero_Alchemist/cast_<n>.webp  — Alchemist, casting a spell`
+- `anim/hero_Alchemist/hit_<n>.webp  — Alchemist, taking a hit`
+- `anim/hero_Wizard/idle_<n>.webp  — Wizard, idle loop`
+- `anim/hero_Wizard/cast_<n>.webp  — Wizard, casting a spell`
+- `anim/hero_Wizard/hit_<n>.webp  — Wizard, taking a hit`
+- `anim/hero_Demoniac/idle_<n>.webp  — Demoniac, idle loop`
+- `anim/hero_Demoniac/cast_<n>.webp  — Demoniac, casting a spell`
+- `anim/hero_Demoniac/hit_<n>.webp  — Demoniac, taking a hit`
+- `anim/hero_Heretic/idle_<n>.webp  — Heretic, idle loop`
+- `anim/hero_Heretic/cast_<n>.webp  — Heretic, casting a spell`
+- `anim/hero_Heretic/hit_<n>.webp  — Heretic, taking a hit`
+- `anim/hero_Death Knight/idle_<n>.webp  — Death Knight, idle loop`
+- `anim/hero_Death Knight/cast_<n>.webp  — Death Knight, casting a spell`
+- `anim/hero_Death Knight/hit_<n>.webp  — Death Knight, taking a hit`
+- `anim/hero_Necromancer/idle_<n>.webp  — Necromancer, idle loop`
+- `anim/hero_Necromancer/cast_<n>.webp  — Necromancer, casting a spell`
+- `anim/hero_Necromancer/hit_<n>.webp  — Necromancer, taking a hit`
+- `anim/hero_Overlord/idle_<n>.webp  — Overlord, idle loop`
+- `anim/hero_Overlord/cast_<n>.webp  — Overlord, casting a spell`
+- `anim/hero_Overlord/hit_<n>.webp  — Overlord, taking a hit`
+- `anim/hero_Warlock/idle_<n>.webp  — Warlock, idle loop`
+- `anim/hero_Warlock/cast_<n>.webp  — Warlock, casting a spell`
+- `anim/hero_Warlock/hit_<n>.webp  — Warlock, taking a hit`
+- `anim/hero_Barbarian/idle_<n>.webp  — Barbarian, idle loop`
+- `anim/hero_Barbarian/cast_<n>.webp  — Barbarian, casting a spell`
+- `anim/hero_Barbarian/hit_<n>.webp  — Barbarian, taking a hit`
+- `anim/hero_Battle Mage/idle_<n>.webp  — Battle Mage, idle loop`
+- `anim/hero_Battle Mage/cast_<n>.webp  — Battle Mage, casting a spell`
+- `anim/hero_Battle Mage/hit_<n>.webp  — Battle Mage, taking a hit`
+- `anim/hero_Beastmaster/idle_<n>.webp  — Beastmaster, idle loop`
+- `anim/hero_Beastmaster/cast_<n>.webp  — Beastmaster, casting a spell`
+- `anim/hero_Beastmaster/hit_<n>.webp  — Beastmaster, taking a hit`
+- `anim/hero_Witch/idle_<n>.webp  — Witch, idle loop`
+- `anim/hero_Witch/cast_<n>.webp  — Witch, casting a spell`
+- `anim/hero_Witch/hit_<n>.webp  — Witch, taking a hit`
+- `anim/hero_Planeswalker/idle_<n>.webp  — Planeswalker, idle loop`
+- `anim/hero_Planeswalker/cast_<n>.webp  — Planeswalker, casting a spell`
+- `anim/hero_Planeswalker/hit_<n>.webp  — Planeswalker, taking a hit`
+- `anim/hero_Elementalist/idle_<n>.webp  — Elementalist, idle loop`
+- `anim/hero_Elementalist/cast_<n>.webp  — Elementalist, casting a spell`
+- `anim/hero_Elementalist/hit_<n>.webp  — Elementalist, taking a hit`
+
+## Battle — siege (needs code)
+Parts of the walls, gates and towers that animate during a siege.
+
+- `battle/gate_broken.webp  — gate after it is smashed (still picture)`
+- `battle/catapult_idle.webp  — catapult at rest`
+- `battle/catapult_fire_<n>.webp  — catapult firing, 3–4 frames`
+- `battle/flag_<n>.webp  — flag waving on walls and towers, 4–6 frames`
+- `battle/mine_explosion_<n>.webp  — mine blast, 6–8 frames`
+- `battle/trench_smoke_<n>.webp  — smoke over the trenches, 4 frames`
+
+## Battle and map — sound (needs code)
+Short effects in `audio/sfx/` (under 1 second each, MP3 or OGG). Ambient loops in `audio/ambient/` (30–60 seconds, seamless).
+
+- `audio/sfx/hit_castle.mp3  — castle unit hit`
+- `audio/sfx/shoot_castle.mp3  — castle ranged shot`
+- `audio/sfx/death_castle.mp3  — castle unit dies`
+- `audio/sfx/hit_rampart.mp3  — rampart unit hit`
+- `audio/sfx/shoot_rampart.mp3  — rampart ranged shot`
+- `audio/sfx/death_rampart.mp3  — rampart unit dies`
+- `audio/sfx/hit_tower.mp3  — tower unit hit`
+- `audio/sfx/shoot_tower.mp3  — tower ranged shot`
+- `audio/sfx/death_tower.mp3  — tower unit dies`
+- `audio/sfx/hit_inferno.mp3  — inferno unit hit`
+- `audio/sfx/shoot_inferno.mp3  — inferno ranged shot`
+- `audio/sfx/death_inferno.mp3  — inferno unit dies`
+- `audio/sfx/hit_necropolis.mp3  — necropolis unit hit`
+- `audio/sfx/shoot_necropolis.mp3  — necropolis ranged shot`
+- `audio/sfx/death_necropolis.mp3  — necropolis unit dies`
+- `audio/sfx/hit_dungeon.mp3  — dungeon unit hit`
+- `audio/sfx/shoot_dungeon.mp3  — dungeon ranged shot`
+- `audio/sfx/death_dungeon.mp3  — dungeon unit dies`
+- `audio/sfx/hit_stronghold.mp3  — stronghold unit hit`
+- `audio/sfx/shoot_stronghold.mp3  — stronghold ranged shot`
+- `audio/sfx/death_stronghold.mp3  — stronghold unit dies`
+- `audio/sfx/hit_fortress.mp3  — fortress unit hit`
+- `audio/sfx/shoot_fortress.mp3  — fortress ranged shot`
+- `audio/sfx/death_fortress.mp3  — fortress unit dies`
+- `audio/sfx/hit_conflux.mp3  — conflux unit hit`
+- `audio/sfx/shoot_conflux.mp3  — conflux ranged shot`
+- `audio/sfx/death_conflux.mp3  — conflux unit dies`
+- `audio/sfx/spell_arrow.mp3  — Magic Arrow`
+- `audio/sfx/spell_haste.mp3  — Haste`
+- `audio/sfx/spell_lightning.mp3  — Lightning Bolt`
+- `audio/sfx/spell_shield.mp3  — Air Shield`
+- `audio/sfx/spell_chain.mp3  — Chain Lightning`
+- `audio/sfx/spell_stone.mp3  — Stone Skin`
+- `audio/sfx/spell_slow.mp3  — Slow`
+- `audio/sfx/spell_curse.mp3  — Curse`
+- `audio/sfx/spell_meteor.mp3  — Meteor Shower`
+- `audio/sfx/spell_implosion.mp3  — Implosion`
+- `audio/sfx/spell_bloodlust.mp3  — Bloodlust`
+- `audio/sfx/spell_blind.mp3  — Blind`
+- `audio/sfx/spell_fireball.mp3  — Fireball`
+- `audio/sfx/spell_armageddon.mp3  — Armageddon`
+- `audio/sfx/spell_bless.mp3  — Bless`
+- `audio/sfx/spell_heal.mp3  — Cure`
+- `audio/sfx/spell_frostring.mp3  — Frost Ring`
+- `audio/sfx/spell_dispel.mp3  — Clear Mind`
+- `audio/sfx/spell_icebolt.mp3  — Ice Lance`
+- `audio/sfx/spell_weakness.mp3  — Sapping Touch`
+- `audio/sfx/spell_disrupt.mp3  — Rend Armor`
+- `audio/sfx/spell_forget.mp3  — Dull Aim`
+- `audio/sfx/spell_destroyundead.mp3  — Holy Light`
+- `audio/sfx/spell_deathripple.mp3  — Grave Wave`
+- `audio/sfx/spell_prayer.mp3  — Rally`
+- `audio/sfx/spell_berserk.mp3  — Frenzy`
+- `audio/sfx/spell_hypnotize.mp3  — Mind Grip`
+- `audio/sfx/spell_summon_fire.mp3  — Call Flame Spirits`
+- `audio/sfx/spell_summon_water.mp3  — Call Tide Spirits`
+- `audio/sfx/spell_summon_air.mp3  — Call Gale Spirits`
+- `audio/sfx/spell_summon_earth.mp3  — Call Stone Spirits`
+- `audio/sfx/spell_resurrect.mp3  — Resurrection`
+- `audio/ambient/desert.mp3  — desert battle ambience`
+- `audio/ambient/grass.mp3  — grass battle ambience`
+- `audio/ambient/lava.mp3  — lava battle ambience`
+- `audio/ambient/ship.mp3  — ship battle ambience`
+- `audio/ambient/snow.mp3  — snow battle ambience`
+- `audio/ambient/swamp.mp3  — swamp battle ambience`
+
+## Map — animated terrain (needs code)
+Frames are numbered from 1 with no gaps (`name_1.webp`, `name_2.webp`, …) and play in order. Use the same size and framing as the still picture they replace. Looping ground that moves. 4–8 frames each, the same size as the still tile (64×74), looping seamlessly.
+
+- `terrain/anim/water_<n>.webp  — water shimmer`
+- `terrain/anim/lava_<n>.webp  — lava glow`
+- `terrain/anim/snow_<n>.webp  — snow drifting over snowy ground`
+- `terrain/anim/forest_sway_<n>.webp  — forest overlay swaying in the wind`
+- `terrain/anim/river_<n>.webp  — river ripples`
+
+## Map — hero walking (needs code)
+Frames are numbered from 1 with no gaps (`name_1.webp`, `name_2.webp`, …) and play in order. Use the same size and framing as the still picture they replace. Played while the hero moves. 4–6 frames per direction, same size as the still mounted picture.
+
+- `mounted/<name>_north_walk_<n>.webp  — every hero (144), walking north`
+- `mounted/<name>_east_walk_<n>.webp  — every hero (144), walking east`
+- `mounted/<name>_south_walk_<n>.webp  — every hero (144), walking south`
+- `mounted/<name>_west_walk_<n>.webp  — every hero (144), walking west`
+
+## Map — animated objects (needs code)
+Looping sprites for map objects. The still picture in objects/ stays as the first frame.
+
+- `objects/anim/windmill_<n>.webp  — sails turning`
+- `objects/anim/waterwheel_<n>.webp  — wheel turning`
+- `objects/anim/mine_smoke_<n>.webp  — smoke from working mines`
+- `objects/anim/flag_blue_<n>.webp  — blue flag waving on towns and forts`
+- `objects/anim/flag_red_<n>.webp  — red flag waving on towns and forts`
+- `objects/anim/flag_green_<n>.webp  — green flag waving on towns and forts`
+- `objects/anim/flag_orange_<n>.webp  — orange flag waving on towns and forts`
+- `objects/anim/flag_purple_<n>.webp  — purple flag waving on towns and forts`
+- `objects/anim/flag_teal_<n>.webp  — teal flag waving on towns and forts`
+- `objects/anim/flag_pink_<n>.webp  — pink flag waving on towns and forts`
+- `objects/anim/flag_tan_<n>.webp  — tan flag waving on towns and forts`
+- `objects/anim/chest_glow_<n>.webp  — glow around chests`
+- `objects/anim/shrine_glow_<n>.webp  — glow around shrines and seers`
+- `objects/anim/lair_<n>.webp  — creature lairs stirring (optional)`
+- `objects/shadow.webp  — soft oval shadow under map objects, 128×64 transparent (still)`
+
+## Map — weather and day/night (needs code)
+Particles and colour overlays that change with weather and time of day.
+
+- `anim/weather/rain_<n>.webp  — falling rain streak, 4 frames`
+- `anim/weather/snow_<n>.webp  — snowflake, 4 frames`
+- `anim/weather/fog_<n>.webp  — drifting fog layer, 1600×900 transparent, loops`
+- `ui/tint_dawn.webp, ui/tint_day.webp, ui/tint_dusk.webp, ui/tint_night.webp  — full-screen colour overlays, transparent, 1280×720`

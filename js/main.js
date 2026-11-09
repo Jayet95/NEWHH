@@ -2073,15 +2073,15 @@
   function showDifficultySelect() {
     const cards = Object.entries(DIFFICULTY).map(([k, d]) => `<div class="card dif" data-d="${k}"><div class="big">${d.icon}</div><b>${d.name}</b><div class="small">${d.desc}</div>
       <div class="difstats"><div><span>Start gold</span><b>${d.gold.toLocaleString()}</b></div><div><span>Guards</span><b>×${d.neutral}</b></div><div><span>Your income</span><b>×${d.income}</b></div><div><span>Rivals march</span><b>day ${d.ehDay}</b></div><div><span>Rival armies</span><b>×${d.ehMul}</b></div><div><span>Rival income</span><b>×${d.aiInc}</b></div></div></div>`).join('');
-    $('mbox').innerHTML = `<h2>Choose difficulty</h2><div class="grid two">${cards}</div><div class="mb"><button id="sBack">Back</button></div>`;
+    $('mbox').innerHTML = `<span data-bg="difficulty_select"></span><h2>Choose difficulty</h2><div class="grid two">${cards}</div><div class="mb"><button id="sBack">Back</button></div>`;
     $('sBack').onclick = () => $('modal').classList.add('hide');
     $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => showMapSelect(c.dataset.d));
     $('modal').classList.remove('hide');
   }
   function showMapSelect(diff, st = { preset: 'plains', size: 'medium', seed: '' }) {
-    const cards = Object.entries(MAPS).map(([k, m]) => `<div class="card${st.preset === k ? ' on' : ''}" data-m="${k}"><img class="mprev" src="${mapPreview(k)}" alt="" draggable="false"><b>${m.name}</b><div class="small">${m.desc}</div></div>`).join('');
+    const cards = Object.entries(MAPS).map(([k, m]) => `<div class="card${st.preset === k ? ' on' : ''}" data-m="${k}"><img class="mprev" src="${mapPreview(k, undefined, k)}" alt="" draggable="false"><b>${m.name}</b><div class="small">${m.desc}</div></div>`).join('');
     const sizes = Object.entries(SIZES).map(([k, s]) => `<button class="${st.size === k ? 'primary' : ''}" data-s="${k}">${s.name} (${s.w}×${s.h})</button>`).join(' ');
-    $('mbox').innerHTML = `<div class="setup"><h2>Choose your map <span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid two">${cards}</div>
+    $('mbox').innerHTML = `<div class="setup"><span data-bg="map_select"></span><h2>Choose your map<span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid two">${cards}</div>
       <div class="optpanel">
         <div class="opt"><label>Map size</label><div class="optc"><div class="opts">${Object.entries(SIZES).map(([k, s]) => `<button class="${st.size === k ? 'primary' : ''}" data-s="${k}"><b>${s.name}</b><small>${s.w}×${s.h}</small></button>`).join('')}</div></div></div>
         <div class="opt"><label>Fog of war</label><div class="optc"><div class="opts">${[[true, 'On'], [false, 'Off']].map(([v, n]) => `<button class="${(st.fog !== false) === v ? 'primary' : ''}" data-fog="${v}"><b>${n}</b></button>`).join('')}</div><small>Unexplored land is hidden; scouts, towers and your heroes reveal it.</small></div></div>
@@ -2110,7 +2110,8 @@
   const flagImg = (i, px = 36) => { const u = Assets.url('flags/' + FLAGS[i]); return u ? `<img class="flagimg" src="${u}" alt="" draggable="false" style="height:${px}px">` : `<span class="zdot" style="background:${PALETTE[i][1]};width:${px * 0.5}px;height:${px * 0.5}px"></span>`; };
   const prevCache = {};
   // map previews are real maps: one is generated for each type and painted with the game's own terrain and building pictures
-  function mapPreview(kind0, biome) {
+  function mapPreview(kind0, biome, asset) {
+    const hand = asset && Assets.url('maps/' + asset); if (hand) return hand; // hand-made picture in art/maps/ wins
     const ck = kind0 + (biome || '');
     if (prevCache[ck] && prevCache[ck].full) return prevCache[ck].url;
     const full = !!(Assets.get('terrain/grass') && Assets.get('terrain/water'));
@@ -2136,13 +2137,13 @@
   const goalLine = (g) => g.type === 'gold' ? `Hold <b>${g.n.toLocaleString()}</b> gold before day ${g.days}` : g.type === 'towns' ? `Own <b>${g.n}</b> towns before day ${g.days}` : g.type === 'survive' ? `Hold a town until <b>day ${g.days}</b>` : 'Defeat every rival realm';
   function showScenarios(pick) {
     const cur = SCENARIOS.find(s => s.id === pick) || SCENARIOS[0];
-    const tiles = SCENARIOS.map(s => `<div class="card scn${s === cur ? ' on' : ''}" data-sc="${s.id}"><img class="mprev" src="${mapPreview(s.map.preset, s.map.biome)}" alt="" draggable="false"><b>${s.icon} ${s.name}</b><div class="small">${DIFFICULTY[s.diff].icon} ${DIFFICULTY[s.diff].name} · ${SIZES[s.map.size].name} · ${s.map.ais} rival${s.map.ais > 1 ? 's' : ''}</div></div>`).join('');
+    const tiles = SCENARIOS.map(s => `<div class="card scn${s === cur ? ' on' : ''}" data-sc="${s.id}"><img class="mprev" src="${mapPreview(s.map.preset, s.map.biome, 'scn_' + s.id)}" alt="" draggable="false"><b>${s.icon} ${s.name}</b><div class="small">${DIFFICULTY[s.diff].icon} ${DIFFICULTY[s.diff].name} · ${SIZES[s.map.size].name} · ${s.map.ais} rival${s.map.ais > 1 ? 's' : ''}</div></div>`).join('');
     const tm = (cur.map.teams || []).filter(Boolean), ally = tm.filter(t => t === 'ally').length, bloc = tm.filter(t => t === 'bloc').length;
-    const panel = `<div class="hspan scnpan"><img class="mprev" src="${mapPreview(cur.map.preset, cur.map.biome)}" alt="" draggable="false"><h3>${cur.icon} ${cur.name}</h3><div class="hscls">${DIFFICULTY[cur.diff].icon} ${DIFFICULTY[cur.diff].name}</div><p class="scnb">${cur.blurb}</p>
+    const panel = `<div class="hspan scnpan"><img class="mprev" src="${mapPreview(cur.map.preset, cur.map.biome, 'scn_' + cur.id)}" alt="" draggable="false"><h3>${cur.icon} ${cur.name}</h3><div class="hscls">${DIFFICULTY[cur.diff].icon} ${DIFFICULTY[cur.diff].name}</div><p class="scnb">${cur.blurb}</p>
       <h4>Objective</h4><div class="scngoal">🎯 ${goalLine(cur.goal)}</div>
       <h4>Setup</h4><div class="hsspells"><span>${MAPS[cur.map.preset].name}</span><span>${SIZES[cur.map.size].name} ${SIZES[cur.map.size].w}×${SIZES[cur.map.size].h}</span><span>${cur.map.ais} rival${cur.map.ais > 1 ? 's' : ''}</span>${ally ? '<span>🤝 ally</span>' : ''}${bloc ? '<span>⚔⚔ allied rivals</span>' : ''}<span>Fog ${cur.map.fog === false ? 'off' : 'on'}</span>${cur.map.biome && cur.map.biome !== 'mixed' && cur.map.biome !== 'none' ? `<span>${cur.map.biome} lands</span>` : ''}${cur.bonus ? `<span>+${cur.bonus.gold} gold</span>` : ''}</div>
       <button class="primary hsgo" id="scGo">Choose your castle →</button></div>`;
-    $('mbox').innerHTML = `<div class="setup"><h2>Scenarios <span class="small">ready-made maps with an objective</span></h2><div class="hsbody"><div class="grid scngrid">${tiles}</div>${panel}</div><div class="mb"><button id="sBack">Back</button></div></div>`;
+    $('mbox').innerHTML = `<div class="setup"><span data-bg="scenarios"></span><h2>Scenarios<span class="small">ready-made maps with an objective</span></h2><div class="hsbody"><div class="grid scngrid">${tiles}</div>${panel}</div><div class="mb"><button id="sBack">Back</button></div></div>`;
     $('sBack').onclick = () => $('modal').classList.add('hide');
     $('mbox').querySelectorAll('[data-sc]').forEach(c => { c.onclick = () => showScenarios(c.dataset.sc); c.ondblclick = () => go(); });
     const go = () => showFactionSelect(cur.diff, { ...cur.map, color: 0, scn: cur });

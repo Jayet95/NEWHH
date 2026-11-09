@@ -1019,6 +1019,66 @@ const Battle = (() => {
     return c;
   }
   function hexPath2(g, x, y, r) { g.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 180 * (60 * i - 30); i ? g.lineTo(x + r * Math.cos(a), y + r * Math.sin(a)) : g.moveTo(x + r * Math.cos(a), y + r * Math.sin(a)); } g.closePath(); }
+  // ---- battlefield obstacles: painted from the map's terrain textures (forest clumps, rock outcrops, a fallen log), cached per hex ----
+  function obsBlob(g, cx, cy, rx, ry, seed, n = 14) {
+    const pts = []; for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2, w = 0.86 + 0.28 * rnd(seed + i, 1.7); pts.push([cx + Math.cos(a) * rx * w, cy + Math.sin(a) * ry * w]); }
+    const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], m0 = mid(pts[n - 1], pts[0]);
+    g.beginPath(); g.moveTo(m0[0], m0[1]); for (let i = 0; i < n; i++) { const q = mid(pts[i], pts[(i + 1) % n]); g.quadraticCurveTo(pts[i][0], pts[i][1], q[0], q[1]); } g.closePath();
+  }
+  function obsTex(g, name, scale, ox, oy) {
+    const im = typeof Assets !== 'undefined' ? Assets.get('terrain/' + name) : null; if (!im) return null;
+    const pat = g.createPattern(im, 'repeat'); if (pat.setTransform) pat.setTransform(new DOMMatrix().translate(ox, oy).scale(scale / im.width)); return pat;
+  }
+  function obsSmooth(g, P) { g.beginPath(); g.moveTo(P[0][0], P[0][1]); for (let i = 1; i < P.length - 1; i++) { const m = [(P[i][0] + P[i + 1][0]) / 2, (P[i][1] + P[i + 1][1]) / 2]; g.quadraticCurveTo(P[i][0], P[i][1], m[0], m[1]); } g.lineTo(P[P.length - 1][0], P[P.length - 1][1]); g.closePath(); }
+  function obsShadow(g, x, y, rx, ry) { g.save(); g.translate(x, y); g.scale(1, ry / rx); const rg = g.createRadialGradient(0, 0, 2, 0, 0, rx); rg.addColorStop(0, 'rgba(0,0,0,.5)'); rg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = rg; g.beginPath(); g.arc(0, 0, rx, 0, 7); g.fill(); g.restore(); }
+  function buildObstacle(oe, seed) {
+    const S = Math.max(2, DPR), W = 96, H = 96, cx = 48, cy = 62, cv = document.createElement('canvas'); cv.width = W * S; cv.height = H * S; const g = cv.getContext('2d'); g.scale(S, S);
+    if (oe === '🌲') {
+      const fp = obsTex(g, 'tex_forest', 96, -rnd(seed, 3.3) * 260, -rnd(seed, 4.4) * 260); if (!fp) return null;
+      obsShadow(g, cx + 2, cy + 15, 31, 11);
+      const cl = [[-13, 5, 15, 16], [12, 6, 14, 15], [-1, 8, 16, 15], [-9, -7, 14, 15], [10, -6, 13, 14], [0, -17, 13, 14]];
+      cl.forEach(([dx, dy, rx, ry], i) => {
+        const x = cx + dx, y = cy + dy; obsBlob(g, x, y, rx, ry, seed * 7 + i * 5);
+        g.save(); g.clip(); g.fillStyle = fp; g.fillRect(x - rx - 4, y - ry - 4, rx * 2 + 8, ry * 2 + 8); g.fillStyle = 'rgba(132,190,70,.2)'; g.fillRect(x - rx - 4, y - ry - 4, rx * 2 + 8, ry * 2 + 8);
+        const lg = g.createLinearGradient(x - rx * 0.6, y - ry, x + rx * 0.6, y + ry); lg.addColorStop(0, 'rgba(255,255,170,.4)'); lg.addColorStop(0.55, 'rgba(0,0,0,0)'); lg.addColorStop(1, 'rgba(0,12,4,.36)'); g.fillStyle = lg; g.fillRect(x - rx - 4, y - ry - 4, rx * 2 + 8, ry * 2 + 8); g.restore();
+        obsBlob(g, x, y, rx, ry, seed * 7 + i * 5); g.lineWidth = 1.3; g.strokeStyle = 'rgba(6,26,10,.7)'; g.stroke();
+      });
+      return { cv, ox: cx, oy: cy, w: W, h: H };
+    }
+    if (oe === '🪨' || oe === '⛰️') {
+      const rp = obsTex(g, 'tex_mountain', 120, -rnd(seed, 5.5) * 300, -rnd(seed, 6.6) * 300); if (!rp) return null;
+      obsShadow(g, cx + 3, cy + 15, 34, 10);
+      const n = 7, base = cy + 15, pts = []; for (let i = 0; i < n; i++) { const t = i / (n - 1), x = cx - 29 + 58 * t, bell = 1 - Math.pow((t - 0.5) * 2, 2) * 0.72, h = (i % 2 === 0 ? 27 + 15 * rnd(seed + i, 2.2) : 12 + 6 * rnd(seed + i, 2.9)) * (0.66 + bell * 0.6); pts.push([x, base - 2 - h]); }
+      obsSmooth(g, [[cx - 31, base + 1], ...pts, [cx + 31, base + 1]]);
+      g.save(); g.clip(); g.fillStyle = rp; g.fillRect(cx - 34, cy - 40, 68, 60); g.fillStyle = 'rgba(205,194,172,.2)'; g.fillRect(cx - 34, cy - 40, 68, 60);
+      const lg = g.createLinearGradient(cx - 30, cy - 36, cx + 30, cy + 16); lg.addColorStop(0, 'rgba(255,255,255,.30)'); lg.addColorStop(0.5, 'rgba(0,0,0,0)'); lg.addColorStop(1, 'rgba(8,6,22,.55)'); g.fillStyle = lg; g.fillRect(cx - 34, cy - 40, 68, 60);
+      for (let i = 0; i < n; i += 2) { const pk = pts[i], r2 = pts[Math.min(n - 1, i + 1)]; g.beginPath(); g.moveTo(pk[0], pk[1]); g.lineTo(r2[0] + 3, r2[1]); g.lineTo(pk[0] + 7, base + 1); g.lineTo(pk[0], base + 1); g.closePath(); g.fillStyle = 'rgba(0,0,0,.2)'; g.fill(); }
+      const top = pts.filter((q, i) => i % 2 === 0).sort((a, b) => a[1] - b[1]).slice(0, 2);
+      for (const q of top) { const sg = g.createLinearGradient(0, q[1], 0, q[1] + 12); sg.addColorStop(0, 'rgba(255,255,255,.95)'); sg.addColorStop(1, 'rgba(235,242,255,0)'); g.beginPath(); g.moveTo(q[0], q[1]); g.lineTo(q[0] + 7, q[1] + 11); g.lineTo(q[0] + 2, q[1] + 8); g.lineTo(q[0] - 2, q[1] + 12); g.lineTo(q[0] - 7, q[1] + 9); g.closePath(); g.fillStyle = sg; g.fill(); }
+      g.restore();
+      obsSmooth(g, [[cx - 31, base + 1], ...pts, [cx + 31, base + 1]]); g.lineJoin = 'round'; g.lineWidth = 1.4; g.strokeStyle = 'rgba(24,18,14,.75)'; g.stroke();
+      return { cv, ox: cx, oy: cy, w: W, h: H };
+    }
+    if (oe === '🪵') {
+      obsShadow(g, cx, cy + 13, 27, 7);
+      g.save(); g.translate(cx, cy + 5); g.rotate(-0.1 + rnd(seed, 8.8) * 0.2);
+      const bg = g.createLinearGradient(0, -8, 0, 8); bg.addColorStop(0, '#d2a86a'); bg.addColorStop(0.35, '#a87a44'); bg.addColorStop(1, '#4a2f16');
+      g.beginPath(); if (g.roundRect) g.roundRect(-24, -8, 48, 16, 7); else g.rect(-24, -8, 48, 16); g.fillStyle = bg; g.fill(); g.lineWidth = 1.2; g.strokeStyle = 'rgba(30,18,8,.85)'; g.stroke();
+      g.strokeStyle = 'rgba(40,24,10,.5)'; g.lineWidth = 0.9; for (let i = 0; i < 7; i++) { const y = -6 + i * 2.1, x0 = -20 + rnd(seed + i, 1.1) * 14, x1 = x0 + 10 + rnd(seed + i, 2.1) * 18; g.beginPath(); g.moveTo(x0, y); g.lineTo(Math.min(22, x1), y + (rnd(seed + i, 3.1) - 0.5) * 1.2); g.stroke(); }
+      g.fillStyle = 'rgba(30,16,6,.55)'; for (const [kx, ky] of [[6, -2], [-8, 3]]) { g.beginPath(); g.ellipse(kx, ky, 2.4, 1.6, 0, 0, 7); g.fill(); }
+      const ec = g.createRadialGradient(-24, 0, 1, -24, 0, 8); ec.addColorStop(0, '#e8cc92'); ec.addColorStop(1, '#b88c52'); g.beginPath(); g.ellipse(-24, 0, 5.5, 8, 0, 0, 7); g.fillStyle = ec; g.fill(); g.strokeStyle = 'rgba(70,40,14,.8)'; g.lineWidth = 1; g.stroke();
+      g.strokeStyle = 'rgba(110,70,30,.55)'; g.lineWidth = 0.7; for (const k of [0.62, 0.34]) { g.beginPath(); g.ellipse(-24, 0, 5.5 * k, 8 * k, 0, 0, 7); g.stroke(); }
+      g.fillStyle = 'rgba(96,140,56,.85)'; for (let i = 0; i < 4; i++) { obsBlob(g, -8 + i * 8 + rnd(seed + i, 4.1) * 3, -7.2, 4.5, 2.2, seed + i * 3, 8); g.fill(); }
+      g.restore();
+      g.strokeStyle = 'rgba(60,110,40,.85)'; g.lineWidth = 1.2; g.lineCap = 'round'; for (const [tx, ty] of [[-28, 14], [-25, 15], [26, 15], [29, 14]]) { g.beginPath(); g.moveTo(cx + tx, cy + ty); g.lineTo(cx + tx + (tx < 0 ? -2 : 2), cy + ty - 5); g.stroke(); }
+      return { cv, ox: cx, oy: cy, w: W, h: H };
+    }
+    return null;
+  }
+  function obstacleSprite(oe, c, r) {
+    const cache = B._obsSpr || (B._obsSpr = new Map()), k = oe + c + ',' + r; if (cache.has(k)) return cache.get(k);
+    const spr = buildObstacle(oe, c * 17 + r * 31 + 3); if (spr) cache.set(k, spr); return spr;
+  }
   const sprite = (img, x, y, w) => { const h = img.height * w / img.width; ctx.drawImage(img, x - w / 2, y - h + 24, w, h); };
   // resolution for the small painted portraits: enough pixels for sharp edges on dense screens
   const PS = () => (DPR > 1 ? 144 : 96);
@@ -1097,7 +1157,7 @@ const Battle = (() => {
     for (let r = 0; r < BH; r++) for (let c = 0; c < BW; c++) {
       const p = hexPx(c, r), k = key(c, r);
       hexPath(p.x, p.y, HR - 1);
-      ctx.fillStyle = (c + r) % 2 ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.08)'; ctx.fill();
+      ctx.fillStyle = (c + r) % 2 ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.05)'; ctx.fill();
       if (B.siege && (!B._board || B._bg)) {
         const inside = B.siege.dside === 1 ? c > B.cw : c < B.cw;
         if (inside) { ctx.fillStyle = 'rgba(170,130,80,.30)'; ctx.fill(); }
@@ -1105,8 +1165,8 @@ const Battle = (() => {
       }
       const walk = input && B.reach.has(k) && !B.spell && B.reach.get(k).d > 0;
       if (walk) { ctx.fillStyle = 'rgba(255, 236, 150, .30)'; ctx.fill(); }
-      ctx.strokeStyle = walk ? 'rgba(255, 224, 110, .95)' : B._board ? 'rgba(0,0,0,.22)' : 'rgba(0,0,0,.35)'; ctx.lineWidth = walk ? 2 : 1; ctx.stroke();
-      if (B.obs.has(k)) { const oe = B.obs.get(k), oi = typeof Assets !== 'undefined' ? Assets.get(oe === '🌲' ? 'terrain/forest_overlay' : (oe === '🪨' || oe === '⛰️') ? 'terrain/mountain_overlay' : '') : null; if (oi) sprite(oi, p.x, p.y, oe === '🌲' ? 44 : 40); else { ctx.fillStyle = '#fff'; emoji(oe, p.x, p.y, 30); } }
+      ctx.strokeStyle = walk ? 'rgba(255, 224, 110, .95)' : B._board ? 'rgba(0,0,0,.16)' : 'rgba(0,0,0,.26)'; ctx.lineWidth = walk ? 2 : 1; ctx.stroke();
+      if (B.obs.has(k)) { const oe = B.obs.get(k), ob = obstacleSprite(oe, c, r); if (ob) ctx.drawImage(ob.cv, p.x - ob.ox, p.y - ob.oy, ob.w, ob.h); else { const oi = typeof Assets !== 'undefined' ? Assets.get(oe === '🌲' ? 'terrain/forest_overlay' : (oe === '🪨' || oe === '⛰️') ? 'terrain/mountain_overlay' : '') : null; if (oi) sprite(oi, p.x, p.y, oe === '🌲' ? 44 : 40); else { ctx.fillStyle = '#fff'; emoji(oe, p.x, p.y, 30); } } }
       if (B.siege && B.moat.has(k) && (!B._board || B._bg)) { ctx.fillStyle = 'rgba(255,255,255,.5)'; emoji('≈', p.x, p.y, 20); }
       if (B.siege && B.mines && B.mines.has(k) && B.siege.dside === 0) { const mi = typeof Assets !== 'undefined' ? Assets.get('battle/mine_dormant') : null; if (mi) sprite(mi, p.x, p.y + 6, 34); else { ctx.fillStyle = '#fff'; emoji('💣', p.x, p.y + 2, 18); } }
       if (B.siege && c === B.cw && !structAt(c, r) && typeof Assets !== 'undefined') { const kk = SIEGE_LAYOUT[r], di = Assets.get(kk === 'gate' ? 'battle/gate_open' : kk === 'tower' ? 'battle/tower_damaged' : 'battle/wall_breached'); if (di) sprite(di, p.x, p.y, kk === 'tower' ? 52 : 70); }

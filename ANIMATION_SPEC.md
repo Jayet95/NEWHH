@@ -2,6 +2,8 @@
 
 What the game needs from you to animate every creature and hero. Creature animations already work in battle the moment the files are in `art/anim/` (run `npm run art` after adding files); creatures without frames keep their still picture with a different code-made motion for each. Hero frames need a small code change that I make when the first samples arrive.
 
+> **Delivered so far:** the 7 Castle creatures and their 7 upgrades (14 creatures, 252 frames) at 640×512. 640×512 is a good size to keep sending: `tools/import_anim.js` stores each frame at 320×256 in the game (still twice the size it is shown), so a battle downloads about 3 MB instead of 23 MB.
+
 ## 1. Creatures — 77 creatures (63 also have an upgraded form)
 
 Four animations per creature, as numbered frames:

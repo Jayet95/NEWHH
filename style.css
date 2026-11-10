@@ -1175,3 +1175,14 @@ body #top #res { gap: 8px !important; flex-wrap: wrap !important; overflow: visi
   #mbox.art-split .hspan { position: sticky; top: 0; font-size: 12px; }
 }
 @media (min-width: 1000px) and (min-height: 560px) { #mbox.art-split .hsgo2 { display: inline-flex !important; } #mbox.art-split .hspan .hsgo { display: none !important; } }
+
+/* ---------- map options on a phone: roomy buttons, three to a row ---------- */
+body.skin .opts button.primary b, body.skin .opts button.primary small { color: #2a1a06 !important; opacity: 1; text-shadow: 0 1px 0 rgba(255, 240, 190, .5); }
+@media (max-width: 620px) {
+  .opts { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  body.skin .opts button, body.skin .seedrow button { border-width: 9px 12px !important; min-height: 58px !important; padding: 2px 2px !important; }
+  .opts button b { font-size: 15px; } .opts button small { font-size: 12px; opacity: .9; }
+  .opt { gap: 8px; }
+}
+body.skin .opts button.primary, body.skin .opts button.on, body.skin .seg button.on, body.skin .ttab.on { background: none !important; box-shadow: none !important; }
+@media (max-width: 620px) { .opts button b { font-size: 13px; letter-spacing: 0; } }

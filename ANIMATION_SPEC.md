@@ -14,6 +14,7 @@ Four animations per creature, as numbered frames:
 | Attack | 5 | wind-up, strike (the hit lands on frame 3), follow-through. Shooters: draw and release; the arrow, bolt or spell itself is drawn by the game | `anim/<id>/attack_1.webp` … `attack_5.webp` |
 | Defend | 3 | flinch or guard when hit | `anim/<id>/defend_1.webp` … `defend_3.webp` |
 | Death | 4 | falling or collapsing; the last frame fades out | `anim/<id>/death_1.webp` … `death_4.webp` |
+| Walk (optional) | 6 (loops) | moving between hexes: a real walking or flying cycle. Plays at 110 ms per frame while the creature moves. Without it the idle frames play faster with a stepping bob | `anim/<id>/walk_1.webp` … `walk_6.webp` |
 
 That is 18 images per creature, **1386** for all 77. Minimum that still looks good: idle 4, attack 4, defend 2, death 3 (13 per creature, 1001 in all).
 

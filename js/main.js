@@ -2576,14 +2576,27 @@
     $('mbox').querySelectorAll('[data-ld]').forEach(b => b.onclick = () => { if (load(b.dataset.ld)) { $('modal').classList.add('hide'); $('title').classList.add('hide'); toast('Game loaded.'); } else toast('Could not load that save.'); });
   }
 
-  // Android (Capacitor) hardware back button: close the open dialog, else ask to leave the game, else exit the app
+  // ---- the Back button (browser back, phone swipe-back, Android hardware back) ----
+  // Inside a running game it never leaves silently: an open dialog is closed first, a battle asks to be finished, and otherwise a box asks
+  // "Save & exit / Exit without saving / Cancel". On the title screen Back leaves the page (web) or the app (Android) as usual.
   const CapApp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
-  if (CapApp && CapApp.addListener) CapApp.addListener('backButton', () => {
-    if (!$('modal').classList.contains('hide')) { const b = [...$('mbox').querySelectorAll('button')].find(x => /^(close|cancel|back|leave|ok|not now|leave town)/i.test(x.textContent.replace(/^[^A-Za-z]+/, '').trim())); if (b) b.click(); else $('modal').classList.add('hide'); return; }
-    if (document.body.classList.contains('inbattle')) return;
-    if (!$('title').classList.contains('hide')) return CapApp.exitApp();
-    if (G) openMenu();
-  });
+  let backAsking = false;
+  async function onBack() {            // true = the press was handled here
+    const closeBtn = () => [...$('mbox').querySelectorAll('button')].find(x => /^(close|cancel|back|leave|ok|not now|leave town|keep fighting)/i.test(x.textContent.replace(/^[^A-Za-z]+/, '').trim()));
+    if (backAsking) { const c = [...$('mbox').querySelectorAll('button')].find(x => /cancel/i.test(x.textContent)); if (c) c.click(); return true; }
+    if (!$('modal').classList.contains('hide')) { const b = closeBtn(); if (b) b.click(); else $('modal').classList.add('hide'); return true; }
+    if (document.body.classList.contains('inbattle')) { toast('Finish the battle first, or use Retreat.'); return true; }
+    if (G && !G.over && $('title').classList.contains('hide')) {
+      if (busy) { toast('Please wait a moment…'); return true; }
+      backAsking = true; try { await exitToMenu(); } finally { backAsking = false; }
+      return true;
+    }
+    return false;
+  }
+  const guardHistory = () => { try { history.pushState({ guard: 1 }, '', location.href); } catch (e) { /* ignore */ } };
+  guardHistory();
+  window.addEventListener('popstate', async () => { guardHistory(); if (!(await onBack())) history.go(-2); });   // put the guard back first, so a second Back while the box is open just cancels it
+  if (CapApp && CapApp.addListener) CapApp.addListener('backButton', async () => { if (!(await onBack()) && CapApp.exitApp) CapApp.exitApp(); });
 
   // menu music while the title screen is up
   const syncMood = () => { if (document.body.classList.contains('inbattle')) return; Sfx.mood($('title').classList.contains('hide') ? 'map' : 'menu'); };

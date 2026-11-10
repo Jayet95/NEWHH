@@ -2,7 +2,7 @@
 // Player preferences (stored in the browser): animation speed, volumes, UI size, left-handed layout, haptics, hints.
 const Settings = (() => {
   const KEY = 'h3js_settings_v1';
-  const def = { animSpeed: 1, sfxVol: 0.8, musicVol: 0.35, uiScale: 1, leftHand: false, haptics: true, confirmEnd: true, confirmDanger: true, showReach: false, hints: true, hintsSeen: {} };
+  const def = { mem: {}, animSpeed: 1, sfxVol: 0.8, musicVol: 0.35, uiScale: 1, leftHand: false, haptics: true, confirmEnd: true, confirmDanger: true, showReach: false, hints: true, hintsSeen: {} };
   let s = Object.assign({}, def);
   try { Object.assign(s, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { /* ignore */ }
   const S = {
@@ -10,6 +10,8 @@ const Settings = (() => {
     get uiScale() { return s.uiScale; }, get leftHand() { return s.leftHand; }, get haptics() { return s.haptics; },
     get confirmEnd() { return s.confirmEnd; }, get confirmDanger() { return s.confirmDanger; }, get showReach() { return s.showReach; }, get hints() { return s.hints; }, get hintsSeen() { return s.hintsSeen; },
     all: () => Object.assign({}, s),
+    // remembered choices (last difficulty, map options, castle, hero ...): mem(key) reads, mem(key, value) stores
+    mem(k, v) { if (!s.mem) s.mem = {}; if (arguments.length < 2) return s.mem[k]; s.mem[k] = v; try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* ignore */ } },
     set(k, v) { s[k] = v; try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* ignore */ } S.apply(); },
     seen(id) { if (!s.hintsSeen[id]) { s.hintsSeen[id] = 1; try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* ignore */ } } },
     resetHints() { s.hintsSeen = {}; s.hints = true; try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { /* ignore */ } },

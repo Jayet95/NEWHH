@@ -2211,14 +2211,15 @@
     <p><b>Battle:</b> click a green hex to move, click an enemy to attack (archers shoot — +25% at close range, weaker the farther the target, and <b>half damage beyond 10 hexes: the broken arrow 💔</b>; flyers ignore obstacles). Your hero stands beside the field: cast one spell per round and make one Hero Strike per round. Castle assaults are <b>sieges</b>: break the gate or walls (your catapult helps), beware arrow towers and the moat; flyers can cross the walls. Level-ups let you pick one of two perks.</p>`;
   function refreshTitle() { $('tCont').disabled = !localStorage.getItem(SAVE); $('tLoad').disabled = !['h3js_save_v7', 'h3js_slot_1', 'h3js_slot_2', 'h3js_slot_3'].some(k => localStorage.getItem(k)); }
   function showDifficultySelect() {
-    const cards = Object.entries(DIFFICULTY).map(([k, d]) => `<div class="card dif" data-d="${k}"><div class="big">${d.icon}</div><b>${d.name}</b><div class="small">${d.desc}</div>
+    const cards = Object.entries(DIFFICULTY).map(([k, d]) => `<div class="card dif${Settings.mem('lastDiff') === k ? ' on' : ''}" data-d="${k}"><div class="big">${d.icon}</div><b>${d.name}</b><div class="small">${d.desc}</div>
       <div class="difstats"><div><span>Start gold</span><b>${d.gold.toLocaleString()}</b></div><div><span>Guards</span><b>×${d.neutral}</b></div><div><span>Your income</span><b>×${d.income}</b></div><div><span>Rivals march</span><b>day ${d.ehDay}</b></div><div><span>Rival armies</span><b>×${d.ehMul}</b></div><div><span>Rival income</span><b>×${d.aiInc}</b></div></div></div>`).join('');
     $('mbox').innerHTML = `<span data-bg="difficulty_select"></span><h2>Choose difficulty</h2><div class="grid two">${cards}</div><div class="mb"><button id="sBack">Back</button></div>`;
     $('sBack').onclick = () => $('modal').classList.add('hide');
-    $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => showMapSelect(c.dataset.d));
+    $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => { Settings.mem('lastDiff', c.dataset.d); showMapSelect(c.dataset.d); });
     $('modal').classList.remove('hide');
   }
-  function showMapSelect(diff, st = { preset: 'plains', size: 'medium', seed: '' }) {
+  function showMapSelect(diff, st = Object.assign({ preset: 'plains', size: 'medium', seed: '' }, Settings.mem('lastMap') || {})) {
+    Settings.mem('lastMap', { preset: st.preset, size: st.size, fog: st.fog, ais: st.ais, color: st.color });     // the next game starts with the same options
     const cards = Object.entries(MAPS).map(([k, m]) => `<div class="card${st.preset === k ? ' on' : ''}" data-m="${k}"><img class="mprev" src="${mapPreview(k, undefined, k)}" alt="" draggable="false"><b>${m.name}</b><div class="small">${m.desc}</div></div>`).join('');
     const sizes = Object.entries(SIZES).map(([k, s]) => `<button class="${st.size === k ? 'primary' : ''}" data-s="${k}">${s.name} (${s.w}×${s.h})</button>`).join(' ');
     $('mbox').innerHTML = `<div class="setup"><span data-bg="map_select"></span><h2>Choose your map<span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid two">${cards}</div>
@@ -2292,7 +2293,7 @@
   function showFactionSelect(diff = 'normal', map = {}) {
     const need = Object.keys(FACTIONS).map(k => 'ui/town_' + k);
     const draw = () => {
-      const cards = Object.entries(FACTIONS).map(([k, f]) => `<div class="card fac" data-f="${k}" style="--ban:${facBanner(k)}"><div class="facpic">${Assets.url('ui/town_' + k) ? `<img src="${Assets.url('ui/town_' + k)}" alt="" draggable="false">` : `<span class="facicon">${f.icon}</span>`}<div class="ribbon">${f.icon} ${f.name}</div></div>
+      const cards = Object.entries(FACTIONS).map(([k, f]) => `<div class="card fac${Settings.mem('lastFac') === k ? ' on' : ''}" data-f="${k}" style="--ban:${facBanner(k)}"><div class="facpic">${Assets.url('ui/town_' + k) ? `<img src="${Assets.url('ui/town_' + k)}" alt="" draggable="false">` : `<span class="facicon">${f.icon}</span>`}<div class="ribbon">${f.icon} ${f.name}</div></div>
         <div class="small blurb">${f.blurb}</div>
         <div class="crow">${factionTiers(k).map(id => `<span title="${C[id].n} → ${C[lineType(id, 2)].n}">${Art.pic(id, 44)}</span>`).join('')}</div></div>`).join('');
       $('mbox').innerHTML = `<div class="setup"><span data-bg="castle_select"></span><h2>Choose your castle <span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid facgrid">${cards}</div><div class="mb"><button id="sBack">Back</button></div></div>`;
@@ -2303,7 +2304,7 @@
     Assets.need(need).then(() => { if ($('mbox').querySelector('.facgrid')) draw(); });
   }
   function showHeroSelect(f, diff = 'normal', map = {}, pick) {
-    const ti = factionTiers(f), list = FACTIONS[f].heroes.map(([n]) => Object.assign({ key: n }, HEROES[n])); pick = pick || list[0].key;
+    const ti = factionTiers(f), list = FACTIONS[f].heroes.map(([n]) => Object.assign({ key: n }, HEROES[n])); pick = pick || Settings.mem('lastHero:' + f) || list[0].key;
     const cur = list.find(d => d.key === pick) || list[0];
     const tiles = list.map(d => `<button class="htile${d === cur ? ' on' : ''}" data-hid="${d.key}">${Art.heroPic(d.i, ownCol(0), 84, d.id)}<span>${d.name}</span><small>${clsLabel(d.cls)}</small></button>`).join('');
     const army = startArmy(cur, f).filter(Boolean).map(a => [a.t, a.n]);
@@ -2315,7 +2316,7 @@
     $('mbox').innerHTML = `<div class="setup"><span data-bg="hero_select"></span><h2>${FACTIONS[f].icon} ${FACTIONS[f].name} — choose your hero</h2><div class="hsbody"><div class="hsgrid">${tiles}</div>${panel}</div>
       <div class="small">Your rival will command a different castle. Fight them across zones, forts and sieges.</div><div class="mb"><button id="sBack">Back</button><button class="primary hsgo2" id="hsGo2">Play as ${cur.name}</button></div></div>`;
     $('sBack').onclick = () => showFactionSelect(diff, map);
-    const go = (id) => { $('modal').classList.add('hide'); $('title').classList.add('hide'); newGame(f, id, diff, map); };
+    const go = (id) => { Settings.mem('lastFac', f); Settings.mem('lastHero:' + f, id); $('modal').classList.add('hide'); $('title').classList.add('hide'); newGame(f, id, diff, map); };
     $('mbox').querySelectorAll('.htile').forEach(b => { b.onclick = () => showHeroSelect(f, diff, map, b.dataset.hid); b.ondblclick = () => go(b.dataset.hid); });
     $('hsGo').onclick = () => go(cur.key); $('hsGo2').onclick = () => go(cur.key);
   }

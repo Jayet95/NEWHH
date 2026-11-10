@@ -429,7 +429,7 @@ const Battle = (() => {
 
   async function tweenTo(s, x, y, ms) {
     if (typeof document !== 'undefined' && document.hidden) { s.px = x; s.py = y; return; }
-    ms /= spd();
+    ms /= spd(); faceTo(s, x, ms + 350);      // face the way it walks
     const x0 = s.px, y0 = s.py, t0 = performance.now();
     for (;;) {
       const k = Math.min(1, (performance.now() - t0) / ms);
@@ -501,16 +501,16 @@ const Battle = (() => {
   };
   async function strike(s, t) {
     const a = hexPx(s.c, s.r), p = hexPx(t.c, t.r), now = performance.now();
-    const ad = animDur(s.t, 'attack'), hitAt = ad ? 2.5 * ANIM_MS.attack : 120;    // with its own frames the blow lands on the impact frame
-    s.anim = { kind: 'lunge', t0: now, dur: ad || 300 / spd(), dx: p.x - a.x, dy: p.y - a.y }; csfx(s.t, 'attack');
+    const ad = animDur(s.t, 'attack'), hitAt = ad ? (2.5 - atkSkip(s.t)) * ANIM_MS.attack : 120;    // with its own frames the blow lands on the impact frame
+    s.anim = { kind: 'lunge', t0: now, dur: ad || 300 / spd(), dx: p.x - a.x, dy: p.y - a.y }; csfx(s.t, 'attack'); faceTo(s, p.x, (ad || 300) + 400);
     push((a.x + p.x) / 2, (a.y + p.y) / 2, 0.026, 560);
-    (B.slashes = B.slashes || []).push({ x: p.x, y: p.y, t0: now + (ad ? 2 * ANIM_MS.attack : 110) / spd(), dur: 340 / spd(), style: styleOf(s).melee, mc: styleOf(s).mc, ang: Math.atan2(p.y - a.y, p.x - a.x) });
+    (B.slashes = B.slashes || []).push({ x: p.x, y: p.y, t0: now + (ad ? (2 - atkSkip(s.t)) * ANIM_MS.attack : 110) / spd(), dur: 340 / spd(), style: styleOf(s).melee, mc: styleOf(s).mc, ang: Math.atan2(p.y - a.y, p.x - a.x) });
     await sleep(hitAt);
   }
   // quick = the second arrow of a double shot: a shorter draw and flight, so the pair reads as one quick volley
   async function fireProj(s, tg, quick) {
-    const a = hexPx(s.c, s.r), p = hexPx(tg.c, tg.r), now = performance.now(), st = styleOf(s), dur = Math.max(220, Math.min(520, Math.hypot(p.x - a.x, p.y - a.y) * 1.1)) * (quick ? 0.85 : 1) / spd(), ad = animDur(s.t, 'attack'), lead = ad ? (quick ? 0.9 : 2.2) * ANIM_MS.attack : quick ? 40 : 130;
-    s.anim = { kind: 'shoot', t0: now, dur: ad || (quick ? 240 : 320) / spd(), dx: p.x - a.x, dy: p.y - a.y };
+    const a = hexPx(s.c, s.r), p = hexPx(tg.c, tg.r), now = performance.now(), st = styleOf(s), dur = Math.max(220, Math.min(520, Math.hypot(p.x - a.x, p.y - a.y) * 1.1)) * (quick ? 0.85 : 1) / spd(), ad = animDur(s.t, 'attack'), lead = ad ? (quick ? 0.9 : 2.2 - atkSkip(s.t)) * ANIM_MS.attack : quick ? 40 : 130;
+    s.anim = { kind: 'shoot', t0: now, dur: ad || (quick ? 240 : 320) / spd(), dx: p.x - a.x, dy: p.y - a.y }; faceTo(s, p.x, (ad || 320) + lead + 500);
     push((a.x + p.x) / 2, (a.y + p.y) / 2, 0.02, Math.min(900, 520 + dur * spd()));
     (B.proj = B.proj || []).push({ ax: a.x, ay: a.y - 6, bx: p.x, by: p.y - 6, t0: now + lead / spd(), dur, style: st.shoot, col: st.col });
     await sleep(lead + dur * spd());
@@ -1115,12 +1115,37 @@ const Battle = (() => {
   // Frames face right; the enemy side is mirrored. Any state without frames keeps the still picture, moved by a motion style that is
   // different for each creature (see profOf), so every creature already animates before its frames exist.
   const ANIM_STATES = ['idle', 'attack', 'defend', 'death'], seqCache = {};
-  const ANIM_MS = { idle: 160, attack: 110, defend: 120, death: 180 };    // milliseconds per frame; the blow lands on attack frame 3
-  const animDur = (t, state) => { const q = seqOf(t, state); return q ? q.length * ANIM_MS[state] / spd() : 0; };
+  // neutral creatures that are the same creature as a town one share its animation (until they get their own folder)
+  const ANIM_ALIAS = { goblin: 'stronghold1', wolf: 'stronghold2', orc: 'stronghold3', ogre: 'stronghold4', golem: 'tower3', naga: 'tower6', dragon: 'rampart7' };
+  const ANIM_MS = { idle: 300, attack: 110, defend: 120, death: 180 };    // milliseconds per frame; the blow lands on attack frame 3
+  const skipCache = {};
+  function atkSkip(t) {     // 1 when attack_1 is just the idle pose again (then the attack starts on frame 2)
+    const key = String(t); if (key in skipCache) return skipCache[key];
+    const a = seqOf(t, 'attack'), i = seqOf(t, 'idle'), A = a && Assets.get(a[0]), I = i && Assets.get(i[0]); if (!A || !I) return 0;
+    const px = (im) => { const c = document.createElement('canvas'); c.width = 32; c.height = 24; const g = c.getContext('2d'); g.drawImage(im, 0, 0, 32, 24); return g.getImageData(0, 0, 32, 24).data; };
+    const da = px(A), di = px(I); let d = 0; for (let k = 0; k < da.length; k++) d += Math.abs(da[k] - di[k]);
+    return (skipCache[key] = d / da.length < 2.5 && a.length >= 4 ? 1 : 0);
+  }
+  const atkFrames = (t) => { const q = seqOf(t, 'attack'); return q ? q.slice(atkSkip(t)) : null; };
+  const animDur = (t, state) => { const q = state === 'attack' ? atkFrames(t) : seqOf(t, state); return q && q.length ? q.length * ANIM_MS[state] / spd() : 0; };
+  // ---- facing: a creature turns toward what it attacks and the way it walks (a quick flip), then turns back to face the enemy side ----
+  const defFace = (s) => (s.side === 0 ? 1 : -1);
+  function faceTo(s, x, hold) {
+    const sx = s.px !== undefined ? s.px : hexPx(s.c, s.r).x; if (Math.abs(x - sx) > 6) s.faceT = x > sx ? 1 : -1;
+    s.faceUntil = performance.now() + (hold || 0);
+  }
+  function faceStep(s, now) {
+    if (s.fx === undefined) { s.fx = defFace(s); s.faceT = s.fx; }
+    if (s.faceUntil !== undefined && now > s.faceUntil && !s.anim && s.faceT !== defFace(s)) s.faceT = defFace(s);
+    const dt = Math.min(60, now - (s._ft || now)), d = s.faceT - s.fx, st = dt / 150 * 2; s._ft = now;
+    s.fx = Math.abs(d) <= st ? s.faceT : s.fx + Math.sign(d) * st; return s.fx;
+  }
   function seqOf(t, state) {
     const key = t + '|' + state; if (key in seqCache) return seqCache[key];
     let out = null;
-    if (typeof Assets !== 'undefined') for (const id of [String(t), String(t).replace(/_\d$/, '')]) for (const nm of (state === 'defend' ? ['defend', 'hurt'] : [state])) {
+    const base0 = String(t).replace(/_\d$/, '');
+    if (typeof Assets !== 'undefined') for (const id of [String(t), base0, ANIM_ALIAS[base0]]) for (const nm of (state === 'defend' ? ['defend', 'hurt'] : [state])) {
+      if (!id) continue;
       if (out) break;
       const list = []; for (let n = 1; n <= 24 && Assets.has('anim/' + id + '/' + nm + '_' + n); n++) list.push('anim/' + id + '/' + nm + '_' + n);
       if (list.length) out = list;
@@ -1129,8 +1154,8 @@ const Battle = (() => {
   }
   // the frame to show now, or null when this creature has no frames for the state (or they have not loaded)
   function frameOf(s, state, now, t0, dur) {
-    const seq = seqOf(s.t, state); if (!seq) return null;
-    const n = seq.length, i = state === 'idle' ? Math.floor(now / (ANIM_MS.idle / spd()) + s.c * 3 + s.r * 5) % n : Math.min(n - 1, Math.max(0, Math.floor((now - t0) / dur * n)));
+    const seq = state === 'attack' ? atkFrames(s.t) : seqOf(s.t, state); if (!seq || !seq.length) return null;
+    const n = seq.length, i = state === 'idle' ? Math.floor((now - (s.idleT0 || 0)) / ANIM_MS.idle + (s.idleT0 ? 0 : s.c * 3 + s.r * 5)) % n : Math.min(n - 1, Math.max(0, Math.floor((now - t0) / dur * n)));
     return Assets.get(seq[i]) || null;
   }
   // Animation frames of one creature may have any canvas size as long as they are all the same: the figure's feet (bottom centre of the
@@ -1245,10 +1270,10 @@ const Battle = (() => {
       ctx.save(); ctx.globalAlpha = dfr ? Math.min(1, Math.max(0, (1 - k) * 4)) : Math.max(0, 1 - Math.pow(k, 1.5));
       if (dfr) {
         const wd = isWide(s), fit = animFit(s.t), kk = fit ? fit.k * (wd ? 1.25 : 1) : Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.25 : 1), pw = pose.width * kk, ph = pose.height * kk;
-        ctx.translate(s.px + (wd ? (s.side === 0 ? -1 : 1) * HW * 0.5 : 0), s.py + 22); if (s.side === 1) ctx.scale(-1, 1); if (fit) ctx.drawImage(pose, -fit.cx * kk, -fit.by * kk, pw, ph); else ctx.drawImage(pose, -pw / 2, -ph, pw, ph);
+        ctx.translate(s.px + (wd ? (s.side === 0 ? -1 : 1) * HW * 0.5 : 0), s.py + 22); ctx.scale(s.fx !== undefined ? s.fx : defFace(s), 1); if (fit) ctx.drawImage(pose, -fit.cx * kk, -fit.by * kk, pw, ph); else ctx.drawImage(pose, -pw / 2, -ph, pw, ph);
       } else if (pose) {
         const wd = isWide(s), kk = Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.25 : 1), pw = pose.width * kk, ph = pose.height * kk;
-        ctx.translate(s.px + (wd ? (s.side === 0 ? -1 : 1) * HW * 0.5 : 0), s.py + 22 + e * 6); ctx.rotate(dir * e * 0.85); ctx.scale(1 + e * 0.1, 1 - e * 0.5); ctx.drawImage(pose, -pw / 2, -ph, pw, ph);
+        ctx.translate(s.px + (wd ? (s.side === 0 ? -1 : 1) * HW * 0.5 : 0), s.py + 22 + e * 6); ctx.rotate(dir * e * 0.85); ctx.scale(1 + e * 0.1, 1 - e * 0.5); if (s.fx !== undefined && s.fx !== defFace(s)) ctx.scale(-1, 1); ctx.drawImage(pose, -pw / 2, -ph, pw, ph);
       } else {
         const sz = HR * 1.28; ctx.translate(s.px, s.py + 3 + e * 14); ctx.rotate(dir * e * 0.85); ctx.scale(1 + e * 0.1, 1 - e * 0.45); ctx.drawImage(Art.portraitCanvas(s.t, PS()), -sz / 2, -sz / 2, sz, sz);
       }
@@ -1260,8 +1285,11 @@ const Battle = (() => {
       const fighting = !!(s.anim && now - s.anim.t0 < s.anim.dur), defending = hd >= 0 && hd < (animDur(s.t, 'defend') || 320);
       const off = animOff(s, now), p = { x: s.px + off.x, y: s.py + off.y }, flash = fa >= 0 && fa < 220;
       const pst = fighting ? 'fighting' : defending ? 'defending' : 'idle';
-      const fr = fighting ? frameOf(s, 'attack', now, s.anim.t0, s.anim.dur) : defending ? frameOf(s, 'defend', now, s.hurt, animDur(s.t, 'defend') || 320) : frameOf(s, 'idle', now), mir = !!fr && s.side === 1;
-      const pose = fr || poseOf(s, pst), pf = profOf(s.t);
+      // a change of state starts a short cross-fade from the last picture, and the idle cycle restarts at its first frame (it matches the rest pose)
+      if (s._fst !== pst) { if (s._fimg) s._xf = { img: s._fimg, t0: now }; if (pst === 'idle') s.idleT0 = now; s._fst = pst; }
+      const fxv = faceStep(s, now);
+      const fr = fighting ? frameOf(s, 'attack', now, s.anim.t0, s.anim.dur) : defending ? frameOf(s, 'defend', now, s.hurt, animDur(s.t, 'defend') || 320) : frameOf(s, 'idle', now), fsx = fr ? fxv : fxv * (s.side === 0 ? 1 : -1);
+      const pose = fr || poseOf(s, pst), pf = profOf(s.t); s._fimg = fr || null;
       // idle breathing: a tiny squash and stretch about the feet (own speed per creature, out of step between stacks); flyers also flap
       const bph = now / (pf.fly ? 330 : pf.spd) + pf.ph + s.c * 1.7 + s.r * 0.9, breathing = !fighting && !defending && !reduced();
       const ba = pf.amp * (fr ? 0.6 : 1); let bry = breathing ? 1 + ba * Math.sin(bph) : 1, brx = breathing ? 1 - ba * 0.55 * Math.sin(bph) : 1;   // a creature with its own frames only gets a gentle extra breath
@@ -1272,12 +1300,14 @@ const Battle = (() => {
         const wd = isWide(s), fit = fr ? animFit(s.t) : null, kk = fit ? fit.k * (wd ? 1.25 : 1) : Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.25 : 1), pw = pose.width * kk, ph = pose.height * kk, fy = p.y + 22;
         if (wd) p.x += (s.side === 0 ? -1 : 1) * HW * 0.5;
         unitBase(p.x, fy, wd ? 36 : 21, wd ? 9 : 7.5, s.side, s === B.cur, flash, now);
-        ctx.save(); ctx.translate(p.x, fy); ctx.rotate(off.rot * 0.4); ctx.scale(brx, bry); if (mir) ctx.scale(-1, 1); if (flash) ctx.globalAlpha = 0.88; if (fit) ctx.drawImage(pose, -fit.cx * kk, -fit.by * kk, pw, ph); else ctx.drawImage(pose, -pw / 2, -ph, pw, ph); ctx.restore();
+        ctx.save(); ctx.translate(p.x, fy); ctx.rotate(off.rot * 0.4); ctx.scale(brx, bry); if (fsx !== 1) ctx.scale(fsx, 1); if (flash) ctx.globalAlpha = 0.88;
+        if (s._xf && fit) { const xk = (now - s._xf.t0) / 90; if (xk < 1) { ctx.save(); ctx.globalAlpha *= 1 - xk; ctx.drawImage(s._xf.img, -fit.cx * kk, -fit.by * kk, s._xf.img.width * kk, s._xf.img.height * kk); ctx.restore(); } else s._xf = null; }
+        if (fit) ctx.drawImage(pose, -fit.cx * kk, -fit.by * kk, pw, ph); else ctx.drawImage(pose, -pw / 2, -ph, pw, ph); ctx.restore();
       } else {
       ctx.beginPath(); ctx.arc(p.x, p.y + 4, HR * 0.72, 0, 7);
       ctx.fillStyle = flash ? '#ff8a7a' : (s.side === 0 ? '#2a4f8a' : '#8a2a2a'); ctx.fill();
       ctx.lineWidth = s === B.cur ? 4 : 2; ctx.strokeStyle = s === B.cur ? '#ffd24a' : '#111'; ctx.stroke();
-      { const sz = HR * 1.28; ctx.save(); ctx.translate(p.x, p.y + 3); ctx.rotate(off.rot); ctx.scale(brx, bry); if (s.side === 1) ctx.scale(-1, 1); ctx.drawImage(Art.portraitCanvas(s.t, PS()), -sz / 2, -sz / 2, sz, sz); ctx.restore(); }
+      { const sz = HR * 1.28; ctx.save(); ctx.translate(p.x, p.y + 3); ctx.rotate(off.rot); ctx.scale(brx, bry); ctx.scale(fxv, 1); ctx.drawImage(Art.portraitCanvas(s.t, PS()), -sz / 2, -sz / 2, sz, sz); ctx.restore(); }
       }
       { // stack-size plate: rounded, team-coloured, bold outlined numerals
         const n = s.n, lab = n >= 100000 ? Math.round(n / 1000) + 'k' : n >= 10000 ? (n / 1000).toFixed(1).replace(/.0$/, '') + 'k' : String(n);

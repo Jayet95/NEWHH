@@ -1007,7 +1007,7 @@
         if (bt) { h.boat = bt.id; Ach.event('sail'); toast(`${h.name} sets sail!`); }
       }
       h.dir = dirOf(h.x, h.y, s.x, s.y); h.x = s.x; h.y = s.y; (G.flags = G.flags || {}).moved = true; centerOn(h.x, h.y); renderAll(); sfx('step');
-      await sleep(70);
+      await sleep(Math.round(90 + s.cost * 0.6));      // a step takes longer on rough ground and the hero no longer races across the map
       const last = i === path.length - 1, o = objAt(G, s.x, s.y);
       const eh = aiHeroAt(s.x, s.y);
       if (eh && allyOfPlayer(eh.ai)) { openExchange(`🤝 ${eh.name}`, `Allied hero of the ${FACTIONS[aiById(eh.ai).fac].name} realm — swap troops freely.`, h.army, h.name, eh.army, eh.name, null); break; }

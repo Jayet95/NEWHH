@@ -78,10 +78,16 @@ const Battle = (() => {
     for (let i = 0; i < k; i++) sum += c.lo + Math.floor(Math.random() * (c.hi - c.lo + 1));
     return sum * a.n / k;
   }
-  function calcDmg(a, d, melee, avg, joust) {
+  // striking a creature from behind (from the hexes on the side opposite to the way it faces) is worth extra attack points
+  const REAR_BONUS = 3;
+  function isRear(a, d, from) {
+    const p = hexPx(from ? from.c : a.c, from ? from.r : a.r), q = hexPx(d.c, d.r), face = d.side === 0 ? 1 : -1;
+    return (p.x - q.x) * face < -1;
+  }
+  function calcDmg(a, d, melee, avg, joust, from) {
     const c = C[a.t];
     const base = baseDmg(a, avg);
-    const A = attackOf(a); let D = defenceOf(d);
+    const A = attackOf(a) + (melee && isRear(a, d, from) ? REAR_BONUS : 0); let D = defenceOf(d);
     const pr = abil(a, 'pierce'); if (pr) D = Math.floor(D * (1 - pr));
     let m = A >= D ? 1 + 0.05 * Math.min(A - D, 60) : 1 - 0.025 * Math.min(D - A, 28);
     if (melee && c.shoot && !abil(a, 'nopen')) m *= 0.5;
@@ -421,6 +427,22 @@ const Battle = (() => {
     }
     return best;
   }
+  // every hex from which e can be struck, nearest first; the player chooses by pointing at the side of the target he wants to strike from
+  function meleeSpots(s, e, reach) {
+    const eh = occHexes(e), out = [];
+    for (const h of reach.values()) if (occHexes(s, h.c, h.r).some(([c, r]) => eh.some(([ec, er]) => hexDist({ c, r }, { c: ec, r: er }) === 1))) out.push(h);
+    return out;
+  }
+  function pickSpot(s, e, reach, pt) {
+    const sp = meleeSpots(s, e, reach); if (!sp.length) return null;
+    if (!pt) return meleeSpot(s, e, reach);
+    let best = null, bd = 1e9; for (const h of sp) { const q = hexPx(h.c, h.r), d = Math.hypot(q.x - pt.x, q.y - pt.y); if (d < bd) { bd = d; best = h; } }
+    return best;
+  }
+  function aiSpot(s, e, reach) {       // the computer also likes to strike from behind when it costs little extra movement
+    let best = null, bv = 1e9; for (const h of meleeSpots(s, e, reach)) { const v = h.d - (isRear(s, e, h) ? 2 : 0); if (v < bv) { bv = v; best = h; } }
+    return best;
+  }
   function pathTo(reach, hex) {
     const p = []; let h = hex;
     while (h) { p.push(h); h = h.prev ? reach.get(h.prev) : null; }
@@ -710,9 +732,9 @@ const Battle = (() => {
     }
     let best = null;
     for (const e of foes) {
-      const spot = meleeSpot(s, e, B.reach);
+      const spot = aiSpot(s, e, B.reach);
       if (!spot) continue;
-      const v = value(e, calcDmg(s, e, true, true)) * (e.ret ? 1 : 1.1) - 0.3 * value(s, calcDmg(e, s, true, true));
+      const v = value(e, calcDmg(s, e, true, true, 0, spot)) * (e.ret ? 1 : 1.1) - 0.3 * value(s, calcDmg(e, s, true, true));
       if (!best || v > best.v) best = { e, spot, v };
     }
     if (best) { await doMelee(s, best.e, best.spot); return; }
@@ -752,7 +774,7 @@ const Battle = (() => {
   }
   function onClick(ev) {
     if (!B || B.over || !B.input || B.busy) return;
-    const h = mouseHex(ev); if (!h) return;
+    const h = mouseHex(ev); if (!h) return; B.hoverPt = mousePt(ev);
     if (COARSE) { // touch: first tap previews, second tap on the same hex confirms
       if (!(B.pend && B.pend.c === h.c && B.pend.r === h.r)) { B.pend = h; B.hover = h; if (!B.tapHint) { B.tapHint = true; toast('Tap the same hex again to confirm'); } return; }
       B.pend = null;
@@ -773,19 +795,20 @@ const Battle = (() => {
     }
     if (t && t.side !== s.side) {
       if (canShoot(s)) return playerAct(() => doShoot(s, t));
-      const spot = meleeSpot(s, t, B.reach);
+      const spot = pickSpot(s, t, B.reach, B.hoverPt);
       if (spot) return playerAct(() => doMelee(s, t, spot));
       return toast('Too far away.');
     }
     const r = B.reach.get(key(h.c, h.r));
     if (!t && r && r.d > 0) return playerAct(() => doMove(s, r));
   }
-  function mouseHex(ev) {
+  function mousePt(ev) {
     const rc = cv.getBoundingClientRect();
     let x = (ev.clientX - rc.left) * 960 / rc.width, y = (ev.clientY - rc.top) * 640 / rc.height;
     const cm = B && camNow(performance.now()); if (cm) { x = cm.x + (x - cm.x) / cm.z; y = cm.y + (y - cm.y) / cm.z; } // undo the brief camera push so clicks land on the hex you see
-    return hexAt(x, y);
+    return { x, y };
   }
+  function mouseHex(ev) { const q = mousePt(ev); return hexAt(q.x, q.y); }
   // mouse pointer in battle: bow when you can shoot, sword when you can strike, wand for spells, boots to move, a red sign otherwise
   function battleCursor(h) {
     if (!B || B.over || !B.input || B.busy || !B.cur || B.cur.side !== 0 || !h || typeof Art === 'undefined' || !Art.cursor) return '';
@@ -801,7 +824,7 @@ const Battle = (() => {
     const r = B.reach.get(key(h.c, h.r));
     return r && r.d > 0 ? Art.cursor('boot') : Art.cursor('no');
   }
-  function onMove(ev) { if (!B) return; B.hover = mouseHex(ev); if (!COARSE) { try { cv.style.cursor = battleCursor(B.hover) || ''; } catch (e) { /* ignore */ } } }
+  function onMove(ev) { if (!B) return; B.hoverPt = mousePt(ev); B.hover = mouseHex(ev); if (!COARSE) { try { cv.style.cursor = battleCursor(B.hover) || ''; } catch (e) { /* ignore */ } } }
   // spell school rank (0 = untrained) and Insight gate: spell level <= 2 + Insight rank
   const spellRank = (sp) => perk(SCHOOL_SKILL[sp.school]);
   const spellOk = (sp) => sp.lv <= 2 + perk('wisdom');
@@ -1562,11 +1585,12 @@ const Battle = (() => {
     ctx.fillText(`${c.i} ${s.n} ${c.n}${'★'.repeat((c.lv || 1) - 1)}   Att ${attackOf(s)}  Def ${defenceOf(s)}  Dmg ${c.lo}-${c.hi}  HP ${s.hp}/${c.hp}  Spd ${speedOf(s)}${c.shoot ? `  Archer · Ammo ${s.ammo}` : ''}${c.fly ? '  Flying' : ''}`, 14, 612);
     if (B.cur && B.cur.side === 0 && h && stackAt(h.c, h.r) && stackAt(h.c, h.r).side === 1 && B.input) {
       const e = stackAt(h.c, h.r), a = B.cur;
-      const shoot = canShoot(a), d = calcDmg(a, e, !shoot, true) * (abil(a, 'dstrike') && !shoot ? 2 : 1), th = totalHp(e), kills = d >= th ? e.n : Math.max(0, e.n - Math.ceil((th - d) / C[e.t].hp));
+      const shoot = canShoot(a), spot = !shoot ? pickSpot(a, e, B.reach, B.hoverPt) : null, rear = !!spot && isRear(a, e, spot), d = calcDmg(a, e, !shoot, true, 0, spot || undefined) * (abil(a, 'dstrike') && !shoot ? 2 : 1), th = totalHp(e), kills = d >= th ? e.n : Math.max(0, e.n - Math.ceil((th - d) / C[e.t].hp));
       let ret = 0; if (!shoot && d < th && !abil(a, 'noRet') && (abil(e, 'unlimRet') || e.ret)) ret = calcDmg(e, a, true, true);
       const rk = ret ? Math.min(a.n, Math.floor(ret / C[a.t].hp)) : 0;
-      ctx.fillStyle = '#ffb3a8'; ctx.fillText(`${shoot ? 'Shoot' : 'Attack'}: ~${d} dmg (~${kills} kills)${ret ? `   ↩ retaliation ~${ret} (~${rk} lost)` : ''}${shoot ? rangeNote(a, e) : ''}`, 14, 630);
+      ctx.fillStyle = '#ffb3a8'; ctx.fillText(`${shoot ? 'Shoot' : 'Attack'}${rear ? ' from behind (+' + REAR_BONUS + ' Att)' : ''}: ~${d} dmg (~${kills} kills)${ret ? `   ↩ retaliation ~${ret} (~${rk} lost)` : ''}${shoot ? rangeNote(a, e) : ''}`, 14, 630);
       { const bp = hexPx(e.c, e.r), txt = `-${d}  ☠${kills}${ret ? '  ↩' + rk : ''}`; ctx.font = 'bold 13px sans-serif'; const tw = ctx.measureText(txt).width + 14; ctx.fillStyle = 'rgba(20,8,4,.88)'; ctx.fillRect(bp.x - tw / 2, bp.y - 52, tw, 20); ctx.strokeStyle = kills >= e.n ? '#6fd36f' : '#ffb3a8'; ctx.lineWidth = 1.5; ctx.strokeRect(bp.x - tw / 2, bp.y - 52, tw, 20); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText(txt, bp.x, bp.y - 41); ctx.textAlign = 'left'; ctx.font = '14px sans-serif'; }
+      if (spot && (spot.c !== a.c || spot.r !== a.r)) { const sp0 = hexPx(spot.c, spot.r), ep0 = hexPx(e.c, e.r); ctx.save(); ctx.strokeStyle = rear ? '#ffd86a' : '#ffffff'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.arc(sp0.x, sp0.y, 13, 0, 7); ctx.moveTo(sp0.x, sp0.y); ctx.lineTo(ep0.x, ep0.y); ctx.stroke(); ctx.restore(); }      // where he will stand to strike
       if (canShoot(a) && hexDist(a, e) > 10) { const ep = hexPx(e.c, e.r); ctx.font = '22px ' + FONT; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText('💔', ep.x + 18, ep.y - 22); ctx.textAlign = 'left'; ctx.font = '14px sans-serif'; }
     } else {
       const at = abilityText(s.t);

@@ -143,7 +143,7 @@ const TownArt = (() => {
   const ROW_BACK = 0.62, ROW_FRONT = 0.925, ROW_FRONT_ART = 0.90, SLOT_NAMES = ['hall', 'guild', 'market', 'ship', 'tavern', 'smithy', 'garrison', 'fort', 'mines'], NSLOTS = 16;
   // where slot i stands: x centre, y of the ground under it, picture width/height (the back row is smaller, so it reads as further away)
   function slotBox(i, W, H) {
-    const back = i < 7, n = back ? 7 : 9, j = back ? i : i - 7, ws = scn ? (back ? W * 0.15 : W * 0.126) : back ? Math.min(84, W / 12.4) : Math.min(92, W / 11.2);
+    const back = i < 7, n = back ? 7 : 9, j = back ? i : i - 7, ws = scn ? (back ? W * 0.118 : W * 0.116) : back ? Math.min(84, W / 12.4) : Math.min(92, W / 11.2);
     return { x: W * (j + 0.5) / n, base: H * (back ? ROW_BACK : scn ? ROW_FRONT_ART : ROW_FRONT), ws, hs: ws * 1.125, back };
   }
   // which slot is under the pointer (canvas units), or -1
@@ -209,7 +209,7 @@ const TownArt = (() => {
       // the building (a faint grey ghost while it is not built yet)
       const hgt = an && an.kind === 'build' ? Math.min(1, p * 1.5) : 1;
       let sc = 1; if (an && an.kind === 'upgrade') sc = 1 + 0.18 * Math.sin(p * Math.PI);
-      g.save(); g.translate(x, base + (sceneImg ? 10 : 3) + lift); g.scale(sc, sc);
+      g.save(); g.translate(x, base + (sceneImg ? 17 : 3) + lift); g.scale(sc, sc);
       if (sceneImg) {
         const ghost = !s.built && !(an && an.kind === 'build'), im = ghost ? ghostOf(spr) : spr, bb = bboxOf(spr);
         let dw = ws, dh = bb[3] * ws / bb[2]; if (dh > hs * 1.9) { dh = hs * 1.9; dw = bb[2] * dh / bb[3]; }   // as wide as the plot, but never taller than the scene allows
@@ -226,7 +226,7 @@ const TownArt = (() => {
       if (!s.built && !(an && an.kind === 'build')) hammerBadge(g, x + ws * 0.36, base - hs * 0.86, !!(s.locked || s.na), 0.5 + 0.5 * Math.sin(now / 420 + i));
       if (s.built && s.av > 0) { const bx = x - ws * 0.36, by = base - hs * 0.86; g.beginPath(); g.arc(bx, by, 10, 0, 7); g.fillStyle = '#d9a52a'; g.fill(); g.lineWidth = 1.6; g.strokeStyle = '#140a04'; g.stroke(); g.fillStyle = '#1c1204'; g.font = 'bold 11px Cinzel, Georgia, serif'; g.fillText(s.av > 99 ? '99+' : s.av, bx, by + 1); }
       // name plate and level stars
-      const nm = s.name || '', pw = Math.max(62, nm.length * 6.6 + 16), py = base + (sceneImg ? 17 : 8);
+      const nm = s.name || '', pw = Math.max(62, nm.length * 6.6 + 16), py = base + (sceneImg ? 24 : 8);
       g.font = 'bold 11px Cinzel, Georgia, serif'; roundRect(g, x - pw / 2, py, pw, 17, 5); g.fillStyle = hov ? 'rgba(48,32,10,.95)' : 'rgba(14,9,5,.84)'; g.fill(); g.lineWidth = 1.2; g.strokeStyle = s.built ? (hov ? '#ffd766' : '#c9a24a') : 'rgba(255,255,255,.28)'; g.stroke();
       g.fillStyle = s.built ? '#f6ebc8' : '#aaa59a'; g.fillText(nm, x, py + 9);
       if (s.max > 1 && s.built) { g.font = 'bold 11px sans-serif'; g.lineWidth = 3; g.strokeStyle = '#000'; g.fillStyle = '#ffd24a'; const st = '★'.repeat(s.lv) + '☆'.repeat(Math.max(0, s.max - s.lv)); g.strokeText(st, x, py + 25); g.fillText(st, x, py + 25); }

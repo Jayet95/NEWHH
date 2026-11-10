@@ -1553,8 +1553,9 @@
   const starStr = (lv, max = MAX_LV) => '★'.repeat(lv) + '☆'.repeat(max - lv);
   function startTownAnim(kind, slot) { townAnim = { kind, slot, t0: performance.now() }; sfx(kind === 'upgrade' ? 'level' : 'build'); }
   // what each of the 16 plots in the castle picture shows: 0-6 the dwellings, 7-15 the town buildings
+  const DWELL_NAMES = ['Guardhouse', 'Training Grounds', 'Barracks', 'War Hall', 'Citadel', 'Great Keep', 'Royal Lair'];   // what the creature buildings are called in the town picture
   function slotInfo(t, i) {
-    if (i < 7) { const tier = i + 1, id = tierType(t, tier); return { built: !!t.b[tier], lv: t.up[tier] || 1, max: MAX_LV, id, name: C[id].n, av: t.avail[tier] || 0, locked: !t.b[tier] && t.b.hall < TIER_HALL[tier] }; }
+    if (i < 7) { const tier = i + 1, id = tierType(t, tier); return { built: !!t.b[tier], lv: t.up[tier] || 1, max: MAX_LV, id, name: DWELL_NAMES[tier - 1], tip: C[id].n + ' dwelling', av: t.avail[tier] || 0, locked: !t.b[tier] && t.b.hall < TIER_HALL[tier] }; }
     switch (i) {
       case 7: return { built: t.b.hall > 0, lv: t.b.hall, max: 5, name: t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Town Hall' };
       case 8: return { built: t.b.guild > 0, lv: t.b.guild, max: 3, name: 'Arcane Lodge' };

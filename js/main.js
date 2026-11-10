@@ -94,6 +94,14 @@
   document.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('button') && !e.target.closest('#bat')) sfx('click'); });
   $('bSnd').onclick = () => { const on = Sfx.toggle(); $('bSnd').textContent = on ? '🔊' : '🔇'; };
   $('bSnd').textContent = Sfx.on ? '🔊' : '🔇';
+  // full screen (web): the map and battles get the whole display; hidden where the browser has no Fullscreen API (e.g. iPhone) or the app is installed
+  const fsEl = document.documentElement, fsOn = () => document.fullscreenElement || document.webkitFullscreenElement;
+  function toggleFs() { try { if (fsOn()) (document.exitFullscreen || document.webkitExitFullscreen).call(document); else (fsEl.requestFullscreen || fsEl.webkitRequestFullscreen).call(fsEl); } catch (e) { /* ignore */ } }
+  if (!(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen) || window.Capacitor || matchMedia('(display-mode: standalone)').matches) $('bFs').style.display = 'none';
+  $('bFs').onclick = toggleFs;
+  const fsSync = () => { $('bFs').textContent = fsOn() ? '🗗' : '⛶'; $('bFs').title = fsOn() ? 'Exit full screen (F)' : 'Full screen (F)'; };
+  document.addEventListener('fullscreenchange', fsSync); document.addEventListener('webkitfullscreenchange', fsSync);
+  document.addEventListener('keydown', (e) => { if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey && !/^(INPUT|TEXTAREA|SELECT)$/.test((e.target || {}).tagName || '')) toggleFs(); });
   const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
   function addToArmy(h, t, n) {

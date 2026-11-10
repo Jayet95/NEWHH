@@ -213,11 +213,11 @@ const TownArt = (() => {
       if (sceneImg) {
         const ghost = !s.built && !(an && an.kind === 'build'), im = ghost ? ghostOf(spr) : spr, bb = bboxOf(spr);
         // scale each picture on its own so its footing is at least as wide as the painted pad (never too tall for the scene), centred on the pad, standing on its front edge
-        const padW = W * (b.back ? 0.1 : 0.105), kk = Math.min(Math.max(padW / Math.max(bb[4], bb[2] * 0.5), 0.3), 2.2 * hs / bb[3]);
+        const padW = W * (b.back ? 0.1 : 0.105), kk = Math.min(padW / bb[2], 2.2 * hs / bb[3]);   // the painted grass base is as wide as the whole picture
         let dw = bb[2] * kk, dh = bb[3] * kk;
         if (ghost) g.globalAlpha = 0.72;
         const kh = ghost ? 1 : hgt, sy = (1 - kh) * bb[3];
-        g.drawImage(im, bb[0], bb[1] + sy, bb[2], bb[3] - sy, -(bb[5] || bb[2] / 2) * kk, -dh * kh, dw, dh * kh);
+        g.drawImage(im, bb[0], bb[1] + sy, bb[2], bb[3] - sy, -dw / 2, -dh * kh, dw, dh * kh);
       }
       else if (!s.built && !(an && an.kind === 'build')) { g.globalAlpha = 0.72; g.drawImage(ghostOf(spr), -ws / 2, -hs, ws, hs); }
       else { const sy = (1 - hgt) * spr.height; g.drawImage(spr, 0, sy, spr.width, spr.height - sy, -ws / 2, -hs * hgt, ws, hs * hgt); }

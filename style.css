@@ -1225,3 +1225,5 @@ body.skin #quick .qx, #quick .qx { width: 34px; height: 54px; border-radius: 8px
 .hsbig .hart { width: 100%; max-width: 190px; height: auto; aspect-ratio: 1; margin: 0 auto; border-radius: 6px; }
 @media (max-width: 860px) { .hsbig .hart { width: 110px; } .htile .hart { max-width: 72px; } }
 @media (max-width: 860px) { body.fr-portrait .hsbig .hart { border: 0; } }
+.garrow .slot { width: 68px; height: 78px; }
+.ttab small { background: rgba(0, 0, 0, .35); border-radius: 8px; padding: 0 5px; margin-left: 4px; font-size: 11px; }

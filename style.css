@@ -1227,3 +1227,16 @@ body.skin #quick .qx, #quick .qx { width: 34px; height: 54px; border-radius: 8px
 @media (max-width: 860px) { body.fr-portrait .hsbig .hart { border: 0; } }
 .garrow .slot { width: 68px; height: 78px; }
 .ttab small { background: rgba(0, 0, 0, .35); border-radius: 8px; padding: 0 5px; margin-left: 4px; font-size: 11px; }
+
+/* phone: the three town tabs (Warriors / Garrison / Buildings) always fit on one row */
+@media (max-width: 620px) {
+  .ttabs { gap: 3px !important; }
+  body.skin .ttab { border-width: 7px 8px !important; border-image-width: 7px 8px !important; padding: 2px 0 !important; font-size: 11.5px !important; min-width: 0 !important; white-space: nowrap; overflow: hidden; text-overflow: clip; letter-spacing: 0; }
+  .ttab small { margin-left: 2px; padding: 0 3px; font-size: 10px; }
+}
+@media (max-width: 620px) {
+  .garrow { gap: 3px !important; flex-wrap: nowrap; }
+  .garrow .slot { width: 11vw; height: 13.2vw; min-width: 0; flex: none; }
+  .garrow .slot img { width: 92%; height: auto; max-width: none; }
+  .garrow .slot small { font-size: 10px; margin-top: 1px; }
+}

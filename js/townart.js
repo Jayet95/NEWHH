@@ -143,7 +143,7 @@ const TownArt = (() => {
   const ROW_BACK = 0.62, ROW_FRONT = 0.925, ROW_FRONT_ART = 0.90, SLOT_NAMES = ['hall', 'guild', 'market', 'ship', 'tavern', 'smithy', 'garrison', 'fort', 'mines'], NSLOTS = 16;
   // where slot i stands: x centre, y of the ground under it, picture width/height (the back row is smaller, so it reads as further away)
   function slotBox(i, W, H) {
-    const back = i < 7, n = back ? 7 : 9, j = back ? i : i - 7, ws = back ? Math.min(84, W / 12.4) : Math.min(92, W / 11.2);
+    const back = i < 7, n = back ? 7 : 9, j = back ? i : i - 7, ws = scn ? (back ? W * 0.118 : W * 0.116) : back ? Math.min(84, W / 12.4) : Math.min(92, W / 11.2);
     return { x: W * (j + 0.5) / n, base: H * (back ? ROW_BACK : scn ? ROW_FRONT_ART : ROW_FRONT), ws, hs: ws * 1.125, back };
   }
   // which slot is under the pointer (canvas units), or -1

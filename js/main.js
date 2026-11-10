@@ -2325,6 +2325,8 @@
     draw(); $('modal').classList.remove('hide');
     Assets.need(need).then(() => { if ($('mbox').querySelector('.facgrid')) draw(); });
   }
+  // each castle can have its own hero-selection picture (art/ui/hero_select_<castle>.webp); without one the Castle picture is used for Castle and the castle's town scene for the others
+  const heroBg = (f) => typeof Assets !== 'undefined' && Assets.has('ui/hero_select_' + f) ? 'hero_select_' + f : f === 'castle' ? 'hero_select' : 'town_' + f;
   function showHeroSelect(f, diff = 'normal', map = {}, pick) {
     const ti = factionTiers(f), list = FACTIONS[f].heroes.map(([n]) => Object.assign({ key: n }, HEROES[n])); pick = pick || Settings.mem('lastHero:' + f) || list[0].key;
     const cur = list.find(d => d.key === pick) || list[0];
@@ -2335,7 +2337,7 @@
       <h4>Spells</h4><div class="hsspells">${[...START_SPELLS, ...cur.spells].map(k => `<span>${SPELLS[k].i} ${SPELLS[k].n}</span>`).join('')}</div>
       <h4>Starting army</h4><div class="hsarmy">${army.map(([id, n]) => `<div>${Art.pic(id, 60)}<small>${n} ${C[id].n}</small></div>`).join('')}</div>
       <button class="primary hsgo" id="hsGo">Play as ${cur.name}</button></div>`;
-    $('mbox').innerHTML = `<div class="setup"><span data-bg="hero_select"></span><h2>${FACTIONS[f].icon} ${FACTIONS[f].name} — choose your hero</h2><div class="hsbody"><div class="hsgrid">${tiles}</div>${panel}</div>
+    $('mbox').innerHTML = `<div class="setup"><span data-bg="${heroBg(f)}"></span><h2>${FACTIONS[f].icon} ${FACTIONS[f].name} — choose your hero</h2><div class="hsbody"><div class="hsgrid">${tiles}</div>${panel}</div>
       <div class="small">Your rival will command a different castle. Fight them across zones, forts and sieges.</div><div class="mb"><button id="sBack">Back</button><button class="primary hsgo2" id="hsGo2">Play as ${cur.name}</button></div></div>`;
     $('sBack').onclick = () => showFactionSelect(diff, map);
     const go = (id) => { Settings.mem('lastFac', f); Settings.mem('lastHero:' + f, id); $('modal').classList.add('hide'); $('title').classList.add('hide'); newGame(f, id, diff, map); };
@@ -2395,7 +2397,14 @@
   });
   document.addEventListener('assets-progress', (e) => { const d = e.detail, el = $('loadmsg'); if (el) el.textContent = d.done >= d.total ? '' : 'Loading art… ' + Math.round(100 * d.done / d.total) + '%'; });
   // some screens carry a data-bg marker: the picture behind the dialog comes from art/ui/<name>
-  new MutationObserver(() => { const mk = $('mbox').querySelector('[data-bg]'), u = mk && Assets.url('ui/' + mk.dataset.bg); $('mbox').style.backgroundImage = u ? 'linear-gradient(rgba(14,9,4,.72), rgba(14,9,4,.86)), url(' + u + ')' : ''; $('mbox').style.backgroundSize = 'cover'; $('mbox').style.backgroundPosition = 'center'; }).observe($('mbox'), { childList: true });
+  // some screens carry a data-bg marker: the picture behind the dialog comes from art/ui/<name>.
+  // castle and hero selection (on a wide screen) show the picture undimmed: the menu sits in its dark left panel and the painted scene stays visible on the right
+  const SPLIT_SCREENS = ['castle_select', 'hero_select'], wide = () => matchMedia('(min-width: 1000px) and (min-height: 560px)').matches;
+  new MutationObserver(() => {
+    const mk = $('mbox').querySelector('[data-bg]'), u = mk && Assets.url('ui/' + mk.dataset.bg), split = !!(mk && u && SPLIT_SCREENS.some(n => mk.dataset.bg.indexOf(n) === 0) && wide());
+    $('mbox').classList.toggle('art-split', split);
+    $('mbox').style.backgroundImage = u ? (split ? '' : 'linear-gradient(rgba(14,9,4,.72), rgba(14,9,4,.86)), ') + 'url(' + u + ')' : ''; $('mbox').style.backgroundSize = 'cover'; $('mbox').style.backgroundPosition = 'center';
+  }).observe($('mbox'), { childList: true });
   // ==== UI SCREENS ====
   const modalOpen = (html) => { $('mbox').innerHTML = html; $('modal').classList.remove('hide'); };
   const closeModal = () => { $('modal').classList.add('hide'); renderAll(); };

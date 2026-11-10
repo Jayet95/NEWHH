@@ -566,7 +566,8 @@
       cx.fillStyle = days ? 'rgba(120,30,20,.9)' : 'rgba(20,80,30,.9)'; cx.fillRect(lx - tw / 2, ly - 9, tw, 18);
       cx.fillStyle = '#fff'; cx.fillText(txt, lx, ly);
     }
-    for (const o of G.objs) {
+    // back to front: an object further down the map is drawn after the one above it, so a tall creature never hides behind a neighbour's pickup
+    for (const o of G.objs.filter(q => q.x >= x0 - 1 && q.x <= x0 + vx && q.y >= y0 - 1 && q.y <= y0 + vy).sort((p, q) => p.y - q.y || p.x - q.x)) {
       if (o.x < x0 - 1 || o.x > x0 + vx || o.y < y0 - 1 || o.y > y0 + vy) continue;
       if (fogOn()) { const fi = o.y * G.W + o.x; if (!G.expl[fi] || (o.t === 'monster' && !vis[fi])) continue; }
       const px = hcx(o.x, o.y) - cam.x, py = hcy(o.y) - cam.y;

@@ -329,7 +329,7 @@ function reachMap(G, sx, sy, budget, sail, caps) {
     const t = G.tiles[ny][nx], c = TCOST[t];
     let v;
     if (sail) v = t === T.WATER ? 100 - 10 * ((caps && caps.nav) || 0) : 0;
-    else if (t === T.WATER) v = caps && caps.water ? WATERWALK_COST[caps.water] : 0;
+    else if (t === T.WATER) v = lakeAt(G, nx, ny) ? 100 : caps && caps.water ? WATERWALK_COST[caps.water] : 0;
     else if (t === T.FOREST) v = caps && caps.forest ? FOREST_COST[caps.forest] : 0;
     else if (t === T.MOUNT) v = caps && caps.mount ? MOUNT_COST[caps.mount] : 0;
     else v = c || 0;
@@ -353,6 +353,22 @@ function reachMap(G, sx, sy, budget, sail, caps) {
   return dist;
 }
 
+// small lakes inside the land (water that does not reach the map edge and is at most 30 tiles) are shallow: heroes wade through them for 100 movement
+// without a boat or skill. Computed once per map and cached on G, so saved games get it too.
+function lakeAt(G, x, y) {
+  if (!G.lakeMask) {
+    const W = G.W, H = G.H, m = new Uint8Array(W * H), seen = new Uint8Array(W * H);
+    for (let s0 = 0; s0 < W * H; s0++) {
+      if (seen[s0] || G.tiles[(s0 / W) | 0][s0 % W] !== T.WATER) continue;
+      const comp = [], st = [s0]; seen[s0] = 1; let edge = false;
+      while (st.length) { const p = st.pop(); comp.push(p); const px = p % W, py = (p / W) | 0; if (px === 0 || py === 0 || px === W - 1 || py === H - 1) edge = true;
+        for (const [nx, ny] of hexNb(px, py)) { if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue; const q = ny * W + nx; if (!seen[q] && G.tiles[ny][nx] === T.WATER) { seen[q] = 1; st.push(q); } } }
+      if (!edge && comp.length <= 30) for (const p of comp) m[p] = 1;
+    }
+    G.lakeMask = m;
+  }
+  return G.lakeMask[y * G.W + x] === 1;
+}
 // perk-based terrain costs per rank (index = rank): forests, mountains, walking on water
 const FOREST_COST = [0, 200, 150, 100], MOUNT_COST = [0, 300, 250, 200], WATERWALK_COST = [0, 160, 130, 100];
 // sail: the hero travels by boat (water tiles; a land tile only as the final step to disembark)
@@ -365,6 +381,7 @@ function findPath(G, sx, sy, tx, ty, ignoreObjs, sail, caps) {
     const t = G.tiles[ny][nx], c = TCOST[t];
     if (sail) return t === T.WATER ? 100 - 10 * ((caps && caps.nav) || 0) : (c && nk === target ? c : 0);
     if (t === T.WATER) {
+      if (lakeAt(G, nx, ny)) return 100;
       if (!ignoreObjs && nk === target && G.boats && G.boats.some(b => b.x === nx && b.y === ny)) return 100;
       return caps && caps.water ? WATERWALK_COST[caps.water] : 0;
     }

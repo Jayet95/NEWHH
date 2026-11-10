@@ -828,7 +828,7 @@
     if (G.boats.some(b => b.x === x && b.y === y)) return '<b>⛵ Your boat</b><br>Walk onto it from the shore to set sail.';
     let o = objAt(G, x, y);
     if (o && o.t === 'monster' && !seen) o = null;
-    if (!o) { const tt = G.tiles[y][x], bm = G.biome && G.biome[y] ? G.biome[y][x] : 0, cpt = G.hero ? capsOf(G.hero) : {}, base = ['Grass', cpt.forest ? 'Forest' : 'Forest (needs Woodcraft)', cpt.mount ? 'Mountains' : 'Mountains (needs Cragwalking)', cpt.water ? 'Water' : 'Water (needs a boat or Wave Treading)', 'Road (half the movement cost)', 'Sand (slow)'][tt]; return bm && tt !== T.ROAD && tt !== T.WATER ? `${BIOME_NAME[bm]} — ${base.replace(/ (.*)/, '')} (slower: ×${BIOME_COST[bm]} movement)` : base; }
+    if (!o) { const tt = G.tiles[y][x], bm = G.biome && G.biome[y] ? G.biome[y][x] : 0, cpt = G.hero ? capsOf(G.hero) : {}, base = ['Grass', cpt.forest ? 'Forest' : 'Forest (needs Woodcraft)', cpt.mount ? 'Mountains' : 'Mountains (needs Cragwalking)', lakeAt(G, x, y) ? 'Shallow lake (wade through)' : cpt.water ? 'Water' : 'Water (needs a boat or Wave Treading)', 'Road (half the movement cost)', 'Sand (slow)'][tt]; return bm && tt !== T.ROAD && tt !== T.WATER ? `${BIOME_NAME[bm]} — ${base.replace(/ (.*)/, '')} (slower: ×${BIOME_COST[bm]} movement)` : base; }
     const g = o.guard && o.guard.length ? `<br>Guarded by: ${armyList(o.guard, true)}` : '';
     switch (o.t) {
       case 'town': {
@@ -877,10 +877,10 @@
     else {
       const o = objAt(G, hover.x, hover.y), tt = G.tiles[hover.y][hover.x];
       const cp = capsOf(G.hero);
-      const blocked = (tt === T.FOREST && !cp.forest) || (tt === T.MOUNT && !cp.mount) || (tt === T.WATER && !cp.water && G.hero.boat == null && !G.boats.some(b => b.x === hover.x && b.y === hover.y));
+      const blocked = (tt === T.FOREST && !cp.forest) || (tt === T.MOUNT && !cp.mount) || (tt === T.WATER && !cp.water && !lakeAt(G, hover.x, hover.y) && G.hero.boat == null && !G.boats.some(b => b.x === hover.x && b.y === hover.y));
       const ah = isVis(hover.x, hover.y) ? aiHeroAt(hover.x, hover.y) : null, mine = heroesAt(hover.x, hover.y).length > 0;
       const hostile = (ah && !allyOfPlayer(ah.ai)) || (o && isExpl(hover.x, hover.y) && ((o.t === 'monster' && isVis(hover.x, hover.y)) || (o.guard && o.guard.some(Boolean) && o.owner !== 0 && !allyOfPlayer(o.owner)) || ((o.t === 'town' || o.t === 'fort') && o.owner !== 0 && !allyOfPlayer(o.owner))));
-      const sailing = G.hero.boat != null || (tt === T.WATER && !blocked);
+      const sailing = G.hero.boat != null || (tt === T.WATER && !blocked && !lakeAt(G, hover.x, hover.y));
       cmap.style.cursor = !isExpl(hover.x, hover.y) ? Art.cursor('pointer') : mine ? Art.cursor('pointer') : hostile ? Art.cursor('sword') : blocked ? Art.cursor('no') : sailing ? Art.cursor('boat') : Art.cursor('horse');
     }
     const tip = $('tip');
@@ -1321,7 +1321,7 @@
     await showModal(`<h2>💰 Spoils of war</h2><p>${who} searches the battlefield and claims:</p><div style="line-height:1.8">${lines.join('<br>')}</div>${sp.arts.length ? '<p class="small">Captured artifacts were added to the hero (equipped if a slot was free, otherwise in the backpack).</p>' : ''}`, ['Collect']);
   }
   // ground type under the fighting hero, used to pick the battle backdrop
-  const battleTerrainAt = (x, y, boat) => { if (boat) return 'water'; const t = G.tiles && G.tiles[y] && G.tiles[y][x]; if (t === T.WATER) return 'water'; const b = G.biome && G.biome[y] && G.biome[y][x]; return ['grass', 'desert', 'snow', 'swamp', 'lava'][b || 0] === 'grass' && t === T.SAND ? 'desert' : ['grass', 'desert', 'snow', 'swamp', 'lava'][b || 0]; };
+  const battleTerrainAt = (x, y, boat) => { if (boat) return 'water'; const t = G.tiles && G.tiles[y] && G.tiles[y][x]; if (t === T.WATER && !lakeAt(G, x, y)) return 'water'; const b = G.biome && G.biome[y] && G.biome[y][x]; return ['grass', 'desert', 'snow', 'swamp', 'lava'][b || 0] === 'grass' && t === T.SAND ? 'desert' : ['grass', 'desert', 'snow', 'swamp', 'lava'][b || 0]; };
   const battleTerrain = (h) => battleTerrainAt(h.x, h.y, h.boat != null);
   let fightFromAi = false, fightCancelled = false;
   async function fight(h, guard, eStats, title, siege, eHero) {

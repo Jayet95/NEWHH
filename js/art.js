@@ -461,12 +461,17 @@ const Art = (() => {
     const cxp = (x + .5 + (y & 1) * .5) * 32, cyp = y * HR * 1.5 + HR;
     if (G && G.river && G.river[y] && G.river[y][x] && t !== T.WATER && t !== T.MOUNT) {      // a stream: water-coloured strokes to every neighbour that is also river or sea
       const nb = hexNb(x, y); let any = false;
-      c.save(); c.lineCap = 'round';
+      // every river tile's centre is nudged by a fixed pseudo-random offset and the banks vary in width, so the stream meanders and is never a regular zigzag;
+      // neighbours share the same offsets, so the pieces still meet exactly
+      const jit = (px, py) => { const h = Math.sin(px * 127.1 + py * 311.7) * 43758.5453, h2 = Math.sin(px * 269.5 + py * 183.3) * 24634.6345; return [((h - Math.floor(h)) - .5) * 14, ((h2 - Math.floor(h2)) - .5) * 12]; };
+      const jw = (px, py) => 0.82 + 0.4 * (Math.abs(Math.sin(px * 12.9 + py * 78.2) * 43758.5453) % 1);
+      const j0 = jit(x, y), wv = jw(x, y); const cxj = cxp + j0[0], cyj = cyp + j0[1];
+      c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
       for (let i = 0; i < 6; i++) { const p = nb[i]; if (p[0] < 0 || p[1] < 0 || p[0] >= G.W || p[1] >= G.H) continue; const rv = G.river[y][x], isR = rv > 1 ? (rv & (1 << i)) : ((G.river[p[1]] && G.river[p[1]][p[0]]) || G.tiles[p[1]][p[0]] === T.WATER); if (!isR) continue; any = true;      // new maps link only the real stream; old saves (value 1) keep the old look
-        const nx = (p[0] + .5 + (p[1] & 1) * .5) * 32, ny = p[1] * HR * 1.5 + HR, mx = (cxp + nx) / 2, my = (cyp + ny) / 2;
-        c.beginPath(); c.moveTo(cxp, cyp); c.lineTo(mx, my); c.lineWidth = 8; c.strokeStyle = 'rgba(60,48,28,.3)'; c.stroke();                    // muddy bank
-        c.lineWidth = 5.8; c.strokeStyle = groundPat(c, 'water') || '#2f6f9c'; c.stroke(); c.lineWidth = 1.6; c.strokeStyle = 'rgba(190,226,246,.28)'; c.stroke(); }   // water, with a faint glint
-      c.beginPath(); c.arc(cxp, cyp, any ? 3.8 : 4.8, 0, 7); c.fillStyle = groundPat(c, 'water') || '#2f6f9c'; c.fill(); c.lineWidth = 1.2; c.strokeStyle = 'rgba(60,48,28,.4)'; c.stroke();
+        const nx = (p[0] + .5 + (p[1] & 1) * .5) * 32, ny = p[1] * HR * 1.5 + HR, jn = G.tiles[p[1]][p[0]] === T.WATER ? [0, 0] : jit(p[0], p[1]), mx = (cxj + nx + jn[0]) / 2, my = (cyj + ny + jn[1]) / 2;
+        c.beginPath(); c.moveTo(cxj, cyj); c.quadraticCurveTo((cxj + mx) / 2 + (j0[1] * .35), (cyj + my) / 2 - (j0[0] * .35), mx, my); c.lineWidth = 8 * wv; c.strokeStyle = 'rgba(60,48,28,.3)'; c.stroke();                    // muddy bank
+        c.lineWidth = 5.8 * wv; c.strokeStyle = groundPat(c, 'water') || '#2f6f9c'; c.stroke(); c.lineWidth = 1.6; c.strokeStyle = 'rgba(190,226,246,.28)'; c.stroke(); }   // water, with a faint glint
+      c.beginPath(); c.arc(cxj, cyj, (any ? 3.8 : 4.8) * wv, 0, 7); c.fillStyle = groundPat(c, 'water') || '#2f6f9c'; c.fill(); c.lineWidth = 1.2; c.strokeStyle = 'rgba(60,48,28,.4)'; c.stroke();
       c.restore();
     }
     if (t === T.ROAD) {                                   // road pieces: a half-road from the centre to every connected neighbour plus a hub

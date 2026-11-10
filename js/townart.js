@@ -143,7 +143,7 @@ const TownArt = (() => {
   const ROW_BACK = 0.62, ROW_FRONT = 0.925, ROW_FRONT_ART = 0.90, SLOT_NAMES = ['hall', 'guild', 'market', 'ship', 'tavern', 'smithy', 'garrison', 'fort', 'mines'], NSLOTS = 16;
   // where slot i stands: x centre, y of the ground under it, picture width/height (the back row is smaller, so it reads as further away)
   function slotBox(i, W, H) {
-    const back = i < 7, n = back ? 7 : 9, j = back ? i : i - 7, ws = scn ? (back ? W * 0.118 : W * 0.116) : back ? Math.min(84, W / 12.4) : Math.min(92, W / 11.2);
+    const back = i < 7, n = back ? 7 : 9, j = back ? i : i - 7, ws = scn ? (back ? W * 0.15 : W * 0.126) : back ? Math.min(84, W / 12.4) : Math.min(92, W / 11.2);
     return { x: W * (j + 0.5) / n, base: H * (back ? ROW_BACK : scn ? ROW_FRONT_ART : ROW_FRONT), ws, hs: ws * 1.125, back };
   }
   // which slot is under the pointer (canvas units), or -1
@@ -157,6 +157,14 @@ const TownArt = (() => {
     let c = ghosts.get(spr); if (c) return c;
     c = mk(spr.width, spr.height, (g) => { g.drawImage(spr, 0, 0); g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(70,86,128,.5)'; g.fillRect(0, 0, spr.width, spr.height); });
     ghosts.set(spr, c); return c;
+  }
+  // the painted part of a building picture (its transparent margins trimmed), so it can be sized to the plot it stands on
+  const boxes = new WeakMap();
+  function bboxOf(c) {
+    let b = boxes.get(c); if (b) return b;
+    b = [0, 0, c.width, c.height];
+    try { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1; for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } if (x1 >= 0) b = [x0, y0, x1 - x0 + 1, y1 - y0 + 1]; } catch (e) { /* keep the whole picture */ }
+    boxes.set(c, b); return b;
   }
   const roundRect = (g, x, y, w, h, r) => { g.beginPath(); if (g.roundRect) g.roundRect(x, y, w, h, r); else g.rect(x, y, w, h); };
   function hammerBadge(g, x, y, locked, pulse) {
@@ -202,7 +210,14 @@ const TownArt = (() => {
       const hgt = an && an.kind === 'build' ? Math.min(1, p * 1.5) : 1;
       let sc = 1; if (an && an.kind === 'upgrade') sc = 1 + 0.18 * Math.sin(p * Math.PI);
       g.save(); g.translate(x, base + (sceneImg ? 10 : 3) + lift); g.scale(sc, sc);
-      if (!s.built && !(an && an.kind === 'build')) { g.globalAlpha = 0.72; g.drawImage(ghostOf(spr), -ws / 2, -hs, ws, hs); }
+      if (sceneImg) {
+        const ghost = !s.built && !(an && an.kind === 'build'), im = ghost ? ghostOf(spr) : spr, bb = bboxOf(spr);
+        let dw = ws, dh = bb[3] * ws / bb[2]; if (dh > hs * 1.9) { dh = hs * 1.9; dw = bb[2] * dh / bb[3]; }   // as wide as the plot, but never taller than the scene allows
+        if (ghost) g.globalAlpha = 0.72;
+        const kh = ghost ? 1 : hgt, sy = (1 - kh) * bb[3];
+        g.drawImage(im, bb[0], bb[1] + sy, bb[2], bb[3] - sy, -dw / 2, -dh * kh, dw, dh * kh);
+      }
+      else if (!s.built && !(an && an.kind === 'build')) { g.globalAlpha = 0.72; g.drawImage(ghostOf(spr), -ws / 2, -hs, ws, hs); }
       else { const sy = (1 - hgt) * spr.height; g.drawImage(spr, 0, sy, spr.width, spr.height - sy, -ws / 2, -hs * hgt, ws, hs * hgt); }
       g.restore();
       if (an && an.kind === 'upgrade') { const rg = g.createRadialGradient(x, base - hs * 0.45, 2, x, base - hs * 0.45, 14 + p * 70); rg.addColorStop(0, `rgba(255,240,150,${0.9 * (1 - p)})`); rg.addColorStop(1, 'rgba(255,200,60,0)'); g.fillStyle = rg; g.beginPath(); g.arc(x, base - hs * 0.45, 14 + p * 70, 0, 7); g.fill(); g.fillStyle = '#ffe680'; for (let k = 0; k < 8; k++) { g.globalAlpha = 1 - p; const sx = x + Math.cos(k * 0.8) * 36 * p, sy2 = base - hs * 0.45 - p * 50 + Math.sin(k * 2.3) * 12; poly(g, [[sx, sy2 - 4], [sx + 1.2, sy2 - 1.2], [sx + 4, sy2], [sx + 1.2, sy2 + 1.2], [sx, sy2 + 4], [sx - 1.2, sy2 + 1.2], [sx - 4, sy2], [sx - 1.2, sy2 - 1.2]], '#ffe680', null); } g.globalAlpha = 1; }

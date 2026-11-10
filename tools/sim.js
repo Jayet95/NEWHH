@@ -20,7 +20,7 @@ function makeEnv() {
     requestAnimationFrame: (cb) => { if (cb.name === 'draw') return; setImmediate(() => cb(vt)); },
     document: { getElementById: (id) => els[id] || (els[id] = mkEl()), createElement: () => mkEl(), addEventListener() {}, body: { classList: { add() {}, remove() {} } } },
   };
-  sb.window = sb; sb.showModal = () => Promise.resolve(0); sb.toast = () => {};
+  sb.Art = new Proxy({}, { get: () => () => '' }); sb.window = sb; sb.showModal = () => Promise.resolve(0); sb.toast = () => {};
   vm.createContext(sb);
   const src = ['data.js', 'map.js', 'battle.js'].map(f => fs.readFileSync(path.join(root, 'js', f), 'utf8')).join('\n');
   vm.runInContext(src, sb);

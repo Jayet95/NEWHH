@@ -2403,7 +2403,8 @@
   new MutationObserver(() => {
     const mk = $('mbox').querySelector('[data-bg]'), u = mk && Assets.url('ui/' + mk.dataset.bg), split = !!(mk && u && SPLIT_SCREENS.some(n => mk.dataset.bg.indexOf(n) === 0) && wide());
     $('mbox').classList.toggle('art-split', split);
-    $('mbox').style.backgroundImage = u ? (split ? '' : 'linear-gradient(rgba(14,9,4,.72), rgba(14,9,4,.86)), ') + 'url(' + u + ')' : ''; $('mbox').style.backgroundSize = 'cover'; $('mbox').style.backgroundPosition = 'center';
+    const banner = !split && matchMedia('(max-width: 700px) and (orientation: portrait)').matches && !!(mk && u && SPLIT_SCREENS.some(n => mk.dataset.bg.indexOf(n) === 0)); $('mbox').classList.toggle('art-banner', banner); if (banner) $('mbox').style.setProperty('--scr-art', 'url(' + u + ')');      // on a phone held upright the painted scene is a banner above the menu
+    $('mbox').style.backgroundImage = banner ? '' : u ? (split ? '' : 'linear-gradient(rgba(14,9,4,.72), rgba(14,9,4,.86)), ') + 'url(' + u + ')' : ''; $('mbox').style.backgroundSize = 'cover'; $('mbox').style.backgroundPosition = 'center';
   }).observe($('mbox'), { childList: true });
   // ==== UI SCREENS ====
   const modalOpen = (html) => { $('mbox').innerHTML = html; $('modal').classList.remove('hide'); };

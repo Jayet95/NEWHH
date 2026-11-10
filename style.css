@@ -1186,3 +1186,10 @@ body.skin .opts button.primary b, body.skin .opts button.primary small { color: 
 }
 body.skin .opts button.primary, body.skin .opts button.on, body.skin .seg button.on, body.skin .ttab.on { background: none !important; box-shadow: none !important; }
 @media (max-width: 620px) { .opts button b { font-size: 13px; letter-spacing: 0; } }
+
+/* ---------- castle / hero selection on a phone held upright: the painted scene is a banner above the menu ---------- */
+@media (max-width: 700px) and (orientation: portrait) {
+  #mbox.art-banner > .setup { position: relative; }
+  #mbox.art-banner > .setup::before { content: ''; display: block; height: 200px; margin: -4px -4px 8px; border-radius: 8px; background: linear-gradient(180deg, transparent 60%, rgba(14, 9, 4, .95)), var(--scr-art) right 28% / auto 235% no-repeat; box-shadow: inset 0 0 0 1px rgba(230, 191, 85, .35); }
+  #mbox.art-banner h2 { margin-top: -34px; position: relative; text-shadow: 0 2px 6px #000, 0 0 14px #000; }
+}

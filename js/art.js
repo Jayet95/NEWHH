@@ -388,7 +388,11 @@ const Art = (() => {
       g.restore();
       const ai = stand || (typeof Assets !== 'undefined' ? Assets.get('creatures/' + id, 'creatures/' + String(id).replace(/_\d$/, '')) : null);
       const fig = ai || (typeof Figures !== 'undefined' ? Figures.sprite(id) : null);
-      if (fig) { const z = stand ? 1.22 : .82, kk = Math.min(S * z / fig.width, S * z / fig.height); g.save(); rr(g, i0, i0, S - 2 * i0, S - 2 * i0, S * .12); g.clip(); g.drawImage(fig, S * .5 - fig.width * kk / 2, S * .9 - fig.height * kk, fig.width * kk, fig.height * kk); g.restore(); }
+      if (fig) {
+        let bb = null; if (stand) { try { const t = document.createElement('canvas'); t.width = fig.width; t.height = fig.height; const tg = t.getContext('2d'); tg.drawImage(fig, 0, 0); const d = tg.getImageData(0, 0, t.width, t.height).data; let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1; for (let y = 0; y < t.height; y++) for (let x = 0; x < t.width; x++) if (d[(y * t.width + x) * 4 + 3] > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } if (x1 >= 0) bb = [x0, y0, x1 - x0 + 1, y1 - y0 + 1]; } catch (e) { /* no pixel access */ } }
+        if (bb) { const iw = S - 2 * i0, kk = Math.min(iw * .92 / bb[2], iw * .9 / bb[3]); g.save(); rr(g, i0, i0, iw, iw, S * .12); g.clip(); g.drawImage(fig, bb[0], bb[1], bb[2], bb[3], S * .5 - bb[2] * kk / 2, S * .93 - bb[3] * kk, bb[2] * kk, bb[3] * kk); g.restore(); }
+        else { const kk = Math.min(S * .82 / fig.width, S * .82 / fig.height); g.drawImage(fig, S * .5 - fig.width * kk / 2, S * .87 - fig.height * kk, fig.width * kk, fig.height * kk); }
+      }
       else { g.font = Math.round(S * .56) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = 'rgba(0,0,0,.65)'; g.shadowBlur = S * .06; g.shadowOffsetY = S * .03; g.fillStyle = '#fff'; g.fillText(c.i, S * .5, S * .47); g.shadowColor = 'transparent'; }
       }
       for (const [x, y] of [[S * .13, S * .13], [S * .87, S * .13], [S * .13, S * .87], [S * .87, S * .87]]) { g.beginPath(); g.arc(x, y, S * .028, 0, 7); g.fillStyle = m[0]; g.fill(); }

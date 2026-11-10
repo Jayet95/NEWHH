@@ -794,6 +794,16 @@
     }
     renderAll();
   }
+  // click on a hero on the map: his full sheet (stats, troops, skills), with the equipment one button away
+  async function openHeroInfo(h) {
+    const ab = artBonus(h), plus = (v) => v ? ` <span class="bonus">(${v > 0 ? '+' : ''}${v})</span>` : '';
+    const perkTxt = Object.keys(PERKS).filter(k => perk(h, k) > 0).map(k => `<span title="${PERKS[k].d}">${PERKS[k].i}${PERKS[k].n} ${RANK_NAMES[perk(h, k)]}</span>`).join(' · ') || 'No skills yet';
+    const army = h.army.map((a, i) => a ? `<div class="chip" title="${C[a.t].n}">${C[a.t].i || ''} <b>${a.n}</b> ${C[a.t].n}</div>` : '').join('') || '<div class="small">No troops</div>';
+    const i = await showModal(`<h2>${h.name}</h2><div class="small">${clsLabel(h.cls)} · Level ${h.lvl} · XP ${h.xp}/${need(h.lvl)}</div>
+      <div style="display:flex;gap:12px;align-items:center;margin:8px 0">${Art.heroPic(h.icon, ownCol(0), 84, h.pid)}<div class="small" style="line-height:1.7">⚔️ Attack ${h.att}${plus(ab.att)} · 🛡 Defense ${h.def}${plus(ab.def)}<br>✨ Spell power ${h.sp}${plus(ab.sp)} · 📚 Knowledge ${h.kn}${plus(ab.kn)}<br>👢 Movement ${h.move}/${maxMove(h)} · 🔷 Mana ${h.mana}/${maxMana(h)}<br>😀 Morale ${sgn(heroMorale(h))} · 🍀 Luck ${sgn(heroLuck(h))}</div></div>
+      <h4>Troops</h4><div style="display:flex;flex-wrap:wrap;gap:6px">${army}</div><h4>Skills</h4><div class="small">${perkTxt}</div>`, ['Close', '🎒 Equipment']);
+    if (i === 1) openEquip(h);
+  }
   function nextHero() {
     const n = G.heroes.length; if (n < 2) return toast('You have only one hero.');
     for (let k = 1; k <= n; k++) { const i = (G.sel + k) % n; if (!G.heroes[i].sleep || k === n) { setActive(i); G.path = null; centerOn(G.hero.x, G.hero.y); renderAll(); return; } }
@@ -824,7 +834,7 @@
     if (!isExpl(x, y)) return 'Unexplored territory';
     const seen = isVis(x, y);
     const ah = seen ? aiHeroAt(x, y) : null; if (ah) return `<b>${ah.name}</b> (${allyOfPlayer(ah.ai) ? 'allied' : 'rival'} ${FACTIONS[aiById(ah.ai).fac].name} hero, L${ah.lvl})<br>${armyList(ah.army, true)}`;
-    const hs = heroesAt(x, y); if (hs.length) return hs.map(h => `<b>${h.name}</b> (${clsLabel(h.cls)} L${h.lvl})${h.boat != null ? ' ⛵ sailing' : ''}`).join('<br>');
+    const hs = heroesAt(x, y); if (hs.length) return hs.map(h => `<b>${h.name}</b> (${clsLabel(h.cls)} L${h.lvl})${h.boat != null ? ' ⛵ sailing' : ''}<br>⚔ ${h.att} 🛡 ${h.def} ✨ ${h.sp} 📚 ${h.kn} · 👢 ${h.move}/${maxMove(h)} · 🔷 ${h.mana}/${maxMana(h)}<br>${h.army.filter(Boolean).map(x => `${x.n} ${C[x.t].n}`).join('<br>') || 'No troops'}`).join('<hr style="border:0;border-top:1px solid #6b4f18;margin:4px 0">');
     if (G.boats.some(b => b.x === x && b.y === y)) return '<b>⛵ Your boat</b><br>Walk onto it from the shore to set sail.';
     let o = objAt(G, x, y);
     if (o && o.t === 'monster' && !seen) o = null;
@@ -900,13 +910,13 @@
   cmap.addEventListener('mousemove', updateHover);
   cmap.addEventListener('mouseleave', () => { hover = null; $('tip').classList.add('hide'); });
   // drag to pan, pinch / wheel / buttons to zoom
-  const ptrs = new Map(); let drag = null, pinch = null, suppress = false;
+  const ptrs = new Map(); let drag = null, pinch = null, suppress = false; let lp = 0;
   const pdist = () => { const a = [...ptrs.values()]; return Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); };
   cmap.addEventListener('pointerdown', (e) => {
     if (!G) return;
     try { cmap.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (e.pointerType !== 'mouse') updateHover(e);
+    if (e.pointerType !== 'mouse') { clearTimeout(lp); const pe = { clientX: e.clientX, clientY: e.clientY }; lp = setTimeout(() => { if (drag && !drag.moved && ptrs.size === 1) { updateHover(pe); suppress = true; } }, 450); }      // long press = hover
     if (ptrs.size === 1) drag = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, moved: false };
     else if (ptrs.size === 2) { pinch = { d: pdist(), z: Z }; drag = null; suppress = true; }
   });
@@ -918,11 +928,12 @@
       setZoom(pinch.z * pdist() / pinch.d, (a[0].x + a[1].x) / 2 - r.left, (a[0].y + a[1].y) / 2 - r.top); suppress = true;
     } else if (drag) {
       const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-      if (!drag.moved && Math.hypot(dx, dy) > 7) { drag.moved = true; $('tip').classList.add('hide'); }
+      if (!drag.moved && Math.hypot(dx, dy) > 7) { drag.moved = true; clearTimeout(lp); $('tip').classList.add('hide'); }
       if (drag.moved) { cam.x = drag.cx - dx / Z; cam.y = drag.cy - dy / Z; clampCam(); suppress = true; }
     }
   });
   const endPtr = (e) => {
+    clearTimeout(lp);
     ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null;
     if (ptrs.size === 0) { drag = null; setTimeout(() => { suppress = false; }, 0); }
     else if (ptrs.size === 1) { const p = [...ptrs.values()][0]; drag = { x: p.x, y: p.y, cx: cam.x, cy: cam.y, moved: true }; }
@@ -945,7 +956,7 @@
     if (here.length) {
       if (!here.includes(G.hero)) { setActive(G.heroes.indexOf(here[0])); G.path = null; renderAll(); return; }
       const o = objAt(G, t.x, t.y);
-      if (heroAtTown(G.hero)) openTown(townAt(G.hero.x, G.hero.y)); else if (o && o.t === 'fort' && o.owner === 0) openFort(o, G.hero);
+      if (heroAtTown(G.hero)) openTown(townAt(G.hero.x, G.hero.y)); else if (o && o.t === 'fort' && o.owner === 0) openFort(o, G.hero); else openHeroInfo(G.hero);
       return;
     }
     const last = G.path && G.path[G.path.length - 1];

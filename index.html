@@ -14,10 +14,9 @@
 </head>
 <body>
 <div id="boot" style="position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:radial-gradient(ellipse at center,#2a1d10 0,#0e0905 75%);color:#e6bf55;font-family:Cinzel,Georgia,serif;transition:opacity .5s">
-  <div style="font-size:15px;letter-spacing:.35em;opacity:.7">DAY &amp; NIGHT</div>
-  <div style="font-size:30px;font-weight:700;letter-spacing:.12em;text-shadow:0 2px 10px #000">HEX KINGDOMS</div>
+  <img src="art/ui/logo.png" alt="Day &amp; Night — Hex Kingdoms" style="width:min(460px,78vw);max-height:38vh;object-fit:contain;filter:drop-shadow(0 4px 14px #000)">
   <div style="width:min(260px,60vw);height:6px;border:1px solid #6b4f18;border-radius:4px;overflow:hidden;background:#150f09"><i style="display:block;width:40%;height:100%;background:linear-gradient(90deg,#8a5f14,#f0cf70);animation:bootbar 1.1s ease-in-out infinite alternate"></i></div>
-  <div style="font-size:12px;opacity:.6;letter-spacing:.2em">LOADING…</div>
+  <div id="bootq" style="max-width:min(520px,86vw);min-height:54px;text-align:center;font-style:italic;font-size:15px;line-height:1.4;color:#e8d8b0;transition:opacity .4s"></div>
 </div>
 <style>@keyframes bootbar{from{margin-left:0}to{margin-left:60%}}</style>
 <div id="app">
@@ -156,9 +155,13 @@
 <script>
   // the splash is up from the first paint; remove it once the game scripts have run and the page has loaded
   (function () {
+    var Q = ["“May the Force be with you.” — Star Wars", "“I’ll be back.” — The Terminator", "“There’s no place like home.” — The Wizard of Oz", "“You shall not pass!” — The Lord of the Rings", "“Winter is coming.” — Game of Thrones", "“It’s dangerous to go alone! Take this.” — The Legend of Zelda", "“The cake is a lie.” — Portal", "“Do. Or do not. There is no try.” — Star Wars", "“Why so serious?” — The Dark Knight", "“Nothing is true, everything is permitted.” — Assassin’s Creed", "“Stay a while and listen.” — Diablo", "“Just keep swimming.” — Finding Nemo", "“Hello there!” — Star Wars"];
+    var qe = document.getElementById('bootq'), qi = Math.floor(Math.random() * Q.length);
+    function q() { if (!qe || !qe.parentNode) return; qe.style.opacity = '0'; setTimeout(function () { qe.textContent = Q[qi++ % Q.length]; qe.style.opacity = '1'; }, 400); setTimeout(q, 3200); }
+    if (qe) { qe.textContent = Q[qi++ % Q.length]; setTimeout(q, 3200); }
     var t0 = Date.now(), gone = false;
     function hide() { if (gone) return; gone = true; var b = document.getElementById('boot'); if (!b) return; b.style.opacity = '0'; setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 550); }
-    function go() { setTimeout(hide, Math.max(0, 500 - (Date.now() - t0))); }
+    function go() { setTimeout(hide, Math.max(0, 2200 - (Date.now() - t0))); }
     if (document.readyState === 'complete') go(); else window.addEventListener('load', go);
     setTimeout(hide, 12000);
   })();

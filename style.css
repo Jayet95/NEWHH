@@ -1139,3 +1139,13 @@ body.fr-town .facpic .ribbon { z-index: 2; }
   button, button:hover:not(:disabled), button:active:not(:disabled) { transform: none !important; }
 }
 @media (max-width: 620px) { .setup .grid.two { grid-template-columns: 1fr 1fr !important; gap: 8px !important; } .setup .grid.two .card { padding: 6px !important; } .setup .grid.two .card > .small { font-size: 11px; -webkit-line-clamp: 3; } .scngrid { grid-template-columns: 1fr 1fr !important; } }
+
+/* ---------- every remaining button uses the painted button art (normal / selected = pressed / disabled) ---------- */
+body.skin .opts button, body.skin .seedrow button, body.skin #mDice, body.skin .seg button, body.skin .ttab {
+  border: 11px solid transparent !important; border-image: var(--b-n, url(art/ui/btn_normal.png)) 34 52 fill / 11px 17px stretch !important;
+  border-radius: 0 !important; background: none !important; box-shadow: none !important; color: #f3e7c6 !important; text-shadow: 0 1px 2px #000; }
+body.skin .opts button.primary, body.skin .opts button.on, body.skin .seg button.on, body.skin .ttab.on, body.skin .seedrow button.on {
+  border-image-source: var(--b-p, url(art/ui/btn_pressed.png)) !important; color: #2a1a06 !important; text-shadow: 0 1px 0 rgba(255, 240, 190, .5); font-weight: bold; }
+body.skin .opts button:disabled, body.skin .seg button:disabled, body.skin .ttab:disabled, body.skin .seedrow button:disabled { border-image-source: var(--b-d, url(art/ui/btn_disabled.png)) !important; color: #9a9a9a !important; }
+body.skin .opts button:hover:not(:disabled), body.skin .seg button:hover:not(:disabled), body.skin .ttab:hover:not(:disabled), body.skin .seedrow button:hover:not(:disabled) { filter: brightness(1.18); }
+body.skin .opts button.primary small { color: #3a2506; }

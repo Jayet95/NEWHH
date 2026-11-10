@@ -178,14 +178,17 @@ const Battle = (() => {
     for (let b = 0; b < 2; b++) { const q = main[2 + ((Math.random() * 5) | 0)]; br.push(boltPts(q[0], q[1], q[0] + R(-60, 60), q[1] + R(10, 60), 10)); }
     addFx(Object.assign({ k: 'bolt', pts: main, br, col, w: 3, dur: 380 }, o));
   }
+  // The battlefield never moves: no screen shake and no camera push (they made some players feel sick). Set to true to bring them back.
+  const CAMERA_FX = false;
   function shake(amp, dur) {
+    if (!CAMERA_FX) return;
     if (!B || reduced() || !amp) return;
     const now = performance.now(), s = B.shake;
     if (s && s.amp * Math.max(0, 1 - (now - s.t0) / s.dur) > amp) return;
     B.shake = { t0: now, dur: (dur || 260) / spd(), amp: Math.min(7, amp) };
   }
   // a brief, small zoom toward a point of interest; only used while the player cannot click (so aiming is never off)
-  function push(x, y, amt, dur) { if (!B || reduced() || x === undefined) return; B.cam = { t0: performance.now(), dur: (dur || 520) / spd(), x, y, amt }; }
+  function push(x, y, amt, dur) { if (!CAMERA_FX || !B || reduced() || x === undefined) return; B.cam = { t0: performance.now(), dur: (dur || 520) / spd(), x, y, amt }; }
   function shakeOff(now) {
     const s = B.shake; if (!s) return null;
     const k = (now - s.t0) / s.dur; if (k >= 1) { B.shake = null; return null; }

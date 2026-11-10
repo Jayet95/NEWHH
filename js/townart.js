@@ -162,8 +162,8 @@ const TownArt = (() => {
   const boxes = new WeakMap();
   function bboxOf(c) {
     let b = boxes.get(c); if (b) return b;
-    b = [0, 0, c.width, c.height];
-    try { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1; for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } if (x1 >= 0) b = [x0, y0, x1 - x0 + 1, y1 - y0 + 1]; } catch (e) { /* keep the whole picture */ }
+    b = [0, 0, c.width, c.height, c.width];
+    try { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1; for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } if (x1 >= 0) { b = [x0, y0, x1 - x0 + 1, y1 - y0 + 1, 0]; const yb = Math.max(y0, y1 - Math.max(3, Math.round((y1 - y0) * 0.16))); let f0 = 1e9, f1 = -1; for (let y = yb; y <= y1; y++) for (let x = x0; x <= x1; x++) if (d[(y * c.width + x) * 4 + 3] > 40) { if (x < f0) f0 = x; if (x > f1) f1 = x; } b[4] = f1 - f0 + 1; b[5] = (f0 + f1) / 2 - x0; } } catch (e) { /* keep the whole picture */ }
     boxes.set(c, b); return b;
   }
   const roundRect = (g, x, y, w, h, r) => { g.beginPath(); if (g.roundRect) g.roundRect(x, y, w, h, r); else g.rect(x, y, w, h); };
@@ -209,13 +209,15 @@ const TownArt = (() => {
       // the building (a faint grey ghost while it is not built yet)
       const hgt = an && an.kind === 'build' ? Math.min(1, p * 1.5) : 1;
       let sc = 1; if (an && an.kind === 'upgrade') sc = 1 + 0.18 * Math.sin(p * Math.PI);
-      g.save(); g.translate(x, base + (sceneImg ? 17 : 3) + lift); g.scale(sc, sc);
+      g.save(); g.translate(x, base + (sceneImg ? 0.03 * H : 3) + lift); g.scale(sc, sc);
       if (sceneImg) {
         const ghost = !s.built && !(an && an.kind === 'build'), im = ghost ? ghostOf(spr) : spr, bb = bboxOf(spr);
-        let dw = ws, dh = bb[3] * ws / bb[2]; if (dh > hs * 1.9) { dh = hs * 1.9; dw = bb[2] * dh / bb[3]; }   // as wide as the plot, but never taller than the scene allows
+        // scale each picture on its own so its footing is at least as wide as the painted pad (never too tall for the scene), centred on the pad, standing on its front edge
+        const padW = W * (b.back ? 0.1 : 0.105), kk = Math.min(Math.max(padW / Math.max(bb[4], bb[2] * 0.5), 0.3), 2.2 * hs / bb[3]);
+        let dw = bb[2] * kk, dh = bb[3] * kk;
         if (ghost) g.globalAlpha = 0.72;
         const kh = ghost ? 1 : hgt, sy = (1 - kh) * bb[3];
-        g.drawImage(im, bb[0], bb[1] + sy, bb[2], bb[3] - sy, -dw / 2, -dh * kh, dw, dh * kh);
+        g.drawImage(im, bb[0], bb[1] + sy, bb[2], bb[3] - sy, -(bb[5] || bb[2] / 2) * kk, -dh * kh, dw, dh * kh);
       }
       else if (!s.built && !(an && an.kind === 'build')) { g.globalAlpha = 0.72; g.drawImage(ghostOf(spr), -ws / 2, -hs, ws, hs); }
       else { const sy = (1 - hgt) * spr.height; g.drawImage(spr, 0, sy, spr.width, spr.height - sy, -ws / 2, -hs * hgt, ws, hs * hgt); }

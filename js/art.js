@@ -369,8 +369,8 @@ const Art = (() => {
   const rarity = (id) => RARITY[rarityIdx(id)];
   const star = (g, x, y, r) => { g.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? r * .45 : r; g.lineTo(x + Math.cos(a) * rad, y + Math.sin(a) * rad); } g.closePath(); g.fillStyle = '#ffe27a'; g.fill(); g.strokeStyle = '#5c430b'; g.lineWidth = .8; g.stroke(); };
   const portCache = {}, heroCache = {}, urlCache = {};
-  function portraitCanvas(id, S = 72) {
-    const key = id + '|' + S; if (portCache[key]) return portCache[key];
+  function portraitCanvas(id, S = 72, full) {
+    const key = id + '|' + S + (full ? 'f' : ''); if (portCache[key]) return portCache[key];
     const c = C[id] || { i: '❓', lv: 1 };
     return portCache[key] = mk(S, S, (g) => {
       const fac = String(id).replace(/\d.*$/, ''), hue = facHue(fac), lv = c.lv || 1, m = RARITY[rarityIdx(id)].m, hh = hue === null ? 28 : hue, sat = hue === null ? 14 : 48;
@@ -378,16 +378,17 @@ const Art = (() => {
       const i0 = S * .075; rr(g, i0, i0, S - 2 * i0, S - 2 * i0, S * .12);
       const bg = g.createRadialGradient(S * .38, S * .3, 2, S * .5, S * .55, S * .68); bg.addColorStop(0, hsl(hh, sat, 46)); bg.addColorStop(1, hsl(hh, sat + 6, 13)); g.fillStyle = bg; g.fill();
       const isUp = /_\d$/.test(String(id)), baseId = String(id).replace(/_\d$/, ''), pimg = typeof Assets !== 'undefined' ? Assets.get('portraits/' + baseId + (isUp ? '_up' : ''), 'portraits/' + baseId) : null;
-      if (pimg) { g.save(); rr(g, i0, i0, S - 2 * i0, S - 2 * i0, S * .12); g.clip(); g.drawImage(pimg, i0, i0, S - 2 * i0, S - 2 * i0); g.restore(); }
-      if (!pimg) {
+      const stand = full && typeof Assets !== 'undefined' ? Assets.get('creatures/' + id, 'creatures/' + baseId) : null;   // the full standing figure (256px) for big pictures
+      if (pimg && !stand) { g.save(); rr(g, i0, i0, S - 2 * i0, S - 2 * i0, S * .12); g.clip(); g.drawImage(pimg, i0, i0, S - 2 * i0, S - 2 * i0); g.restore(); }
+      if (!pimg || stand) {
       g.save(); rr(g, i0, i0, S - 2 * i0, S - 2 * i0, S * .12); g.clip();
       g.fillStyle = 'rgba(255,255,255,.07)'; g.beginPath(); g.moveTo(0, 0); g.lineTo(S, 0); g.lineTo(0, S * .75); g.fill();
       ell(g, S * .5, S * .8, S * .3, S * .07, 'rgba(0,0,0,.45)');
       if (c.fly) { g.strokeStyle = 'rgba(255,255,255,.28)'; g.lineWidth = S * .035; g.beginPath(); g.arc(S * .2, S * .45, S * .22, -1.2, 1.0); g.moveTo(S * .8 + S * .22 * Math.cos(2.1), S * .45); g.arc(S * .8, S * .45, S * .22, Math.PI - 1.0, Math.PI + 1.2); g.stroke(); }
       g.restore();
-      const ai = typeof Assets !== 'undefined' ? Assets.get('creatures/' + id, 'creatures/' + String(id).replace(/_\d$/, '')) : null;
+      const ai = stand || (typeof Assets !== 'undefined' ? Assets.get('creatures/' + id, 'creatures/' + String(id).replace(/_\d$/, '')) : null);
       const fig = ai || (typeof Figures !== 'undefined' ? Figures.sprite(id) : null);
-      if (fig) { const kk = Math.min(S * .82 / fig.width, S * .82 / fig.height); g.drawImage(fig, S * .5 - fig.width * kk / 2, S * .87 - fig.height * kk, fig.width * kk, fig.height * kk); }
+      if (fig) { const z = stand ? 1.22 : .82, kk = Math.min(S * z / fig.width, S * z / fig.height); g.save(); rr(g, i0, i0, S - 2 * i0, S - 2 * i0, S * .12); g.clip(); g.drawImage(fig, S * .5 - fig.width * kk / 2, S * .9 - fig.height * kk, fig.width * kk, fig.height * kk); g.restore(); }
       else { g.font = Math.round(S * .56) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = 'rgba(0,0,0,.65)'; g.shadowBlur = S * .06; g.shadowOffsetY = S * .03; g.fillStyle = '#fff'; g.fillText(c.i, S * .5, S * .47); g.shadowColor = 'transparent'; }
       }
       for (const [x, y] of [[S * .13, S * .13], [S * .87, S * .13], [S * .13, S * .87], [S * .87, S * .87]]) { g.beginPath(); g.arc(x, y, S * .028, 0, 7); g.fillStyle = m[0]; g.fill(); }
@@ -409,7 +410,7 @@ const Art = (() => {
   const dataUrl = (key, cv) => urlCache[key] || (urlCache[key] = cv.toDataURL());
   // paint pictures at the size they are shown (times the screen density, x2 for sharpness), so they never look blurry
   const qpx = (px) => Math.min(384, Math.max(96, Math.ceil(px * Math.min(2.5, window.devicePixelRatio || 1) * 2)));
-  const pic = (id, px = 40) => { const S = qpx(px); return `<img class="pic" draggable="false" width="${px}" height="${px}" alt="" src="${dataUrl('c' + id + '|' + S, portraitCanvas(id, S))}">`; };
+  const pic = (id, px = 40) => { const full = px >= 48, S = qpx(px); return `<img class="pic" draggable="false" width="${px}" height="${px}" alt="" src="${dataUrl('c' + id + '|' + S + (full ? 'f' : ''), portraitCanvas(id, S, full))}">`; };
   const heroPic = (icon, col, px = 36, pid) => { const S = qpx(px); return `<img class="pic round" draggable="false" width="${px}" height="${px}" alt="" src="${dataUrl('h' + icon + col + (pid || '') + '|' + S, heroCanvas(icon, col, S, pid))}">`; };
 
   // swap the emoji resource icons used throughout the HTML UI for painted ones

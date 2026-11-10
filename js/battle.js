@@ -1092,6 +1092,14 @@ const Battle = (() => {
     for (let k = 0; k < 4; k++) { const a = now / 1100 + k * Math.PI / 2; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * (rx + 3), y + Math.sin(a) * (ry + 1.2)); ctx.lineTo(x + Math.cos(a) * (rx + 9), y + Math.sin(a) * (ry + 3.5)); ctx.stroke(); }
     ctx.restore();
   }
+  // whose turn it is: a bobbing arrow above the creature (gold for yours, red for the enemy's)
+  function turnMarker(x, y, mine, now) {
+    const b = reduced() ? 0 : Math.sin(now / 240) * 3, c0 = mine ? '#fff2b0' : '#ffd0c0', c1 = mine ? '#e6a82a' : '#e0503a';
+    ctx.save(); ctx.translate(x, y + b); ctx.scale(1.5, 1.5); ctx.beginPath(); ctx.moveTo(-9, -8); ctx.lineTo(9, -8); ctx.lineTo(0, 6); ctx.closePath();
+    const g = ctx.createLinearGradient(0, -8, 0, 6); g.addColorStop(0, c0); g.addColorStop(1, c1);
+    ctx.shadowColor = 'rgba(0,0,0,.65)'; ctx.shadowBlur = 5; ctx.fillStyle = g; ctx.fill(); ctx.shadowBlur = 0; ctx.lineJoin = 'round'; ctx.lineWidth = 1.8; ctx.strokeStyle = '#2a1604'; ctx.stroke();
+    ctx.restore();
+  }
   function unitBase(x, y, rx, ry, side, cur, flash, now) {
     const tc = side === 0 ? '96,156,255' : '238,90,74';
     ctx.save(); ctx.translate(x, y); ctx.scale(1, ry / rx);
@@ -1168,7 +1176,7 @@ const Battle = (() => {
     const d = g.getImageData(0, 0, c.width, c.height).data; let x0 = c.width, x1 = -1, y0 = c.height, y1 = -1;
     for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
     if (x1 < 0) return (fitCache[key] = null);
-    return (fitCache[key] = { k: Math.min(66 / (y1 - y0 + 1), 72 / (x1 - x0 + 1)), cx: (x0 + x1) / 2, by: y1 + 1 });
+    return (fitCache[key] = { k: Math.min(66 / (y1 - y0 + 1), 72 / (x1 - x0 + 1)), cx: (x0 + x1) / 2, by: y1 + 1, ty: y0 });
   }
   const PROF = {};
   function profOf(t) {
@@ -1302,7 +1310,9 @@ const Battle = (() => {
         unitBase(p.x, fy, wd ? 36 : 21, wd ? 9 : 7.5, s.side, s === B.cur, flash, now);
         ctx.save(); ctx.translate(p.x, fy); ctx.rotate(off.rot * 0.4); ctx.scale(brx, bry); if (fsx !== 1) ctx.scale(fsx, 1); if (flash) ctx.globalAlpha = 0.88;
         if (s._xf && fit) { const xk = (now - s._xf.t0) / 90; if (xk < 1) { ctx.save(); ctx.globalAlpha *= 1 - xk; ctx.drawImage(s._xf.img, -fit.cx * kk, -fit.by * kk, s._xf.img.width * kk, s._xf.img.height * kk); ctx.restore(); } else s._xf = null; }
+        if (s === B.cur && !B.over) { ctx.shadowColor = s.side === 0 ? 'rgba(255,214,90,.95)' : 'rgba(255,120,90,.95)'; ctx.shadowBlur = 16 + (reduced() ? 0 : 5 * Math.sin(now / 260)); }
         if (fit) ctx.drawImage(pose, -fit.cx * kk, -fit.by * kk, pw, ph); else ctx.drawImage(pose, -pw / 2, -ph, pw, ph); ctx.restore();
+        if (s === B.cur && !B.over) turnMarker(p.x, fy - (fit ? (fit.by - fit.ty) * kk : ph) - 12, s.side === 0, now);
       } else {
       ctx.beginPath(); ctx.arc(p.x, p.y + 4, HR * 0.72, 0, 7);
       ctx.fillStyle = flash ? '#ff8a7a' : (s.side === 0 ? '#2a4f8a' : '#8a2a2a'); ctx.fill();

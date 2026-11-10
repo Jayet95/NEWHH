@@ -1176,7 +1176,7 @@ const Battle = (() => {
     const d = g.getImageData(0, 0, c.width, c.height).data; let x0 = c.width, x1 = -1, y0 = c.height, y1 = -1;
     for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
     if (x1 < 0) return (fitCache[key] = null);
-    return (fitCache[key] = { k: Math.min(66 / (y1 - y0 + 1), 72 / (x1 - x0 + 1)), cx: (x0 + x1) / 2, by: y1 + 1, ty: y0 });
+    return (fitCache[key] = { k: Math.min(66 / (y1 - y0 + 1), 72 / (x1 - x0 + 1)), cx: (x0 + x1) / 2, by: y1 + 1, ty: y0, bw: x1 - x0 + 1, bh: y1 - y0 + 1 });
   }
   const PROF = {};
   function profOf(t) {
@@ -1648,5 +1648,14 @@ const Battle = (() => {
       nextTurn();
     });
   }
-  return { run };
+  // an idle frame for a creature standing on the adventure map (null until its frames have loaded, or when it has none): { img, cx, by, bw, bh }
+  const mapNeed = {};
+  function mapIdle(t, now, seed, still) {
+    const seq = seqOf(t, 'idle'); if (!seq || typeof Assets === 'undefined') return null;
+    if (!mapNeed[t]) { mapNeed[t] = 1; Assets.need(seq); }
+    const fit = animFit(t); if (!fit) return null;
+    const img = Assets.get(seq[still ? 0 : (Math.floor(now / ANIM_MS.idle + seed)) % seq.length]); if (!img) return null;
+    return { img, cx: fit.cx, by: fit.by, bw: fit.bw, bh: fit.bh };
+  }
+  return { run, mapIdle };
 })();

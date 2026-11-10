@@ -574,7 +574,9 @@
       if (o.t === 'monster') {
         const mt = o.guard[0].t, mb = mt.replace(/_\d$/, ''), mu = /_\d$/.test(mt) ? '_up' : '', ms = 'poses/left/idle/' + mb + mu;
         const pimg = typeof Assets !== 'undefined' ? Assets.get(ms, 'poses/left/idle/' + mb) : null;
-        if (pimg) { const k = Math.min(41 / pimg.height, 44 / pimg.width), w = pimg.width * k, h = pimg.height * k, bob = RM() ? 0 : Math.sin(now / 700 + o.x * 2.1 + o.y * 1.3) * 1.1; cx.save(); cx.shadowColor = 'rgba(0,0,0,.6)'; cx.shadowBlur = 5; cx.shadowOffsetY = 2; cx.drawImage(pimg, px - w / 2, py + 14 - h + bob, w, h); cx.restore(); }
+        const ma = typeof Battle !== 'undefined' && Battle.mapIdle ? Battle.mapIdle(mt, now, o.x * 3 + o.y * 5, RM()) : null;     // the creature's own idle animation
+        if (ma) { const k = Math.min(41 / ma.bh, 44 / ma.bw); cx.save(); cx.shadowColor = 'rgba(0,0,0,.6)'; cx.shadowBlur = 5; cx.shadowOffsetY = 2; cx.translate(px, py + 14); cx.scale(-1, 1); cx.drawImage(ma.img, -ma.cx * k, -ma.by * k, ma.img.width * k, ma.img.height * k); cx.restore(); }
+        else if (pimg) { const k = Math.min(41 / pimg.height, 44 / pimg.width), w = pimg.width * k, h = pimg.height * k, bob = RM() ? 0 : Math.sin(now / 700 + o.x * 2.1 + o.y * 1.3) * 1.1; cx.save(); cx.shadowColor = 'rgba(0,0,0,.6)'; cx.shadowBlur = 5; cx.shadowOffsetY = 2; cx.drawImage(pimg, px - w / 2, py + 14 - h + bob, w, h); cx.restore(); }
         else {
           cx.drawImage(Art.portraitCanvas(mt), px - 15, py - 15, 30, 30);
           if (typeof Assets !== 'undefined' && Assets.has(ms) && !monNeed.has(ms)) { monNeed.add(ms); Assets.need([ms, 'poses/left/idle/' + mb]).then(() => draw()); }

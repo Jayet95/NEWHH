@@ -139,11 +139,12 @@ const TownArt = (() => {
     castle: ['#6a9a42', '#2e5226'], rampart: ['#5c9a48', '#1f4426'], tower: ['#6c7c8c', '#2c3646'], inferno: ['#5a2012', '#1c0a06'], necropolis: ['#40404c', '#16161e'],
     dungeon: ['#3e3048', '#171020'], stronghold: ['#82703c', '#3a2c16'], fortress: ['#5e8248', '#223c1a'], conflux: ['#6e8cac', '#2a405c'],
   };
-  const ROW_BACK = 0.62, ROW_FRONT = 0.925, SLOT_NAMES = ['hall', 'guild', 'market', 'ship', 'tavern', 'smithy', 'garrison', 'fort', 'mines'], NSLOTS = 16;
+  let scn = false;   // a painted scene is showing: its plots sit a little higher in the front row
+  const ROW_BACK = 0.62, ROW_FRONT = 0.925, ROW_FRONT_ART = 0.90, SLOT_NAMES = ['hall', 'guild', 'market', 'ship', 'tavern', 'smithy', 'garrison', 'fort', 'mines'], NSLOTS = 16;
   // where slot i stands: x centre, y of the ground under it, picture width/height (the back row is smaller, so it reads as further away)
   function slotBox(i, W, H) {
     const back = i < 7, n = back ? 7 : 9, j = back ? i : i - 7, ws = back ? Math.min(84, W / 12.4) : Math.min(92, W / 11.2);
-    return { x: W * (j + 0.5) / n, base: H * (back ? ROW_BACK : ROW_FRONT), ws, hs: ws * 1.125, back };
+    return { x: W * (j + 0.5) / n, base: H * (back ? ROW_BACK : scn ? ROW_FRONT_ART : ROW_FRONT), ws, hs: ws * 1.125, back };
   }
   // which slot is under the pointer (canvas units), or -1
   function slotAt(mx, my, W, H) {
@@ -166,8 +167,10 @@ const TownArt = (() => {
     g.restore();
   }
   function scene(g, t, now, anim, info, W, H, hover = -1) {
+    const sceneImg = typeof Assets !== 'undefined' ? (innerWidth < 700 && Assets.get('ui/town_scene_' + t.fac + '_s')) || Assets.get('ui/town_scene_' + t.fac) : null; scn = !!sceneImg;
     const hue = hueOf(t.fac), fort = t.fort || 0, sky = SKY[t.fac] || [hsl(hue, 40, 22), hsl(hue, 45, 62)], mea = MEADOW[t.fac] || [hsl(hue, 30, 38), hsl(hue, 34, 16)];
     const hy = H * 0.5;
+    if (sceneImg) g.drawImage(sceneImg, 0, 0, W, H); else {
     // sky, a low sun glow, drifting clouds
     g.fillStyle = (() => { const q = g.createLinearGradient(0, 0, 0, hy + 30); q.addColorStop(0, sky[0]); q.addColorStop(1, sky[1]); return q; })(); g.fillRect(0, 0, W, hy + 30);
     { const sg = g.createRadialGradient(W * 0.16, hy - 10, 4, W * 0.16, hy - 10, 190); sg.addColorStop(0, 'rgba(255,236,170,.55)'); sg.addColorStop(1, 'rgba(255,220,140,0)'); g.fillStyle = sg; g.fillRect(0, 0, W, hy + 30); }
@@ -187,12 +190,13 @@ const TownArt = (() => {
     else { const hallLv = (t.b && t.b.hall) || 0, ks = 120 + hallLv * 22; g.drawImage(Art.obj({ t: 'town', owner: 0 }, t.fac), W / 2 - ks / 2, cb - ks - 10, ks, ks); }
     // the walls grow with the fortifications and stand between the castle and the dwellings
     drawFort(g, W, cb - 30, fort);
+    }
     g.textAlign = 'center'; g.textBaseline = 'middle';
     for (let i = 0; i < NSLOTS; i++) {
       const b = slotBox(i, W, H), x = b.x, base = b.base, ws = b.ws, hs = b.hs, s = info(t, i), an = anim && anim.slot === i ? anim : null, p = an ? Math.min(1, (now - an.t0) / 1500) : 1, hov = hover === i;
       const kind = i < 7 ? 'dwell' : SLOT_NAMES[i - 7], spr = sprite(kind, s.built ? s.lv : Math.max(1, s.lv || 1), t.fac, s.id), lift = hov ? -3 : 0;
       // the stone pad every plot stands on
-      g.beginPath(); g.ellipse(x, base - 1, ws * 0.62, ws * 0.17, 0, 0, 7); g.fillStyle = hov ? 'rgba(255,226,150,.5)' : 'rgba(210,196,160,.38)'; g.fill(); g.lineWidth = 1.6; g.strokeStyle = hov ? 'rgba(255,214,110,.95)' : 'rgba(30,20,8,.55)'; g.stroke();
+      if (!sceneImg || hov) { g.beginPath(); g.ellipse(x, base - 1, ws * 0.62, ws * 0.17, 0, 0, 7); g.fillStyle = hov ? 'rgba(255,226,150,.5)' : 'rgba(210,196,160,.38)'; g.fill(); g.lineWidth = 1.6; g.strokeStyle = hov ? 'rgba(255,214,110,.95)' : 'rgba(30,20,8,.55)'; g.stroke(); }
       if (hov) { const gl = g.createRadialGradient(x, base - hs * 0.4, 4, x, base - hs * 0.4, ws * 0.95); gl.addColorStop(0, 'rgba(255,226,140,.34)'); gl.addColorStop(1, 'rgba(255,226,140,0)'); g.fillStyle = gl; g.fillRect(x - ws, base - hs * 1.3, ws * 2, hs * 1.5); }
       // the building (a faint grey ghost while it is not built yet)
       const hgt = an && an.kind === 'build' ? Math.min(1, p * 1.5) : 1;
@@ -213,7 +217,7 @@ const TownArt = (() => {
       if (s.max > 1 && s.built) { g.font = 'bold 11px sans-serif'; g.lineWidth = 3; g.strokeStyle = '#000'; g.fillStyle = '#ffd24a'; const st = '★'.repeat(s.lv) + '☆'.repeat(Math.max(0, s.max - s.lv)); g.strokeText(st, x, py + 25); g.fillText(st, x, py + 25); }
     }
     // soft vignette so the panorama sits in its frame
-    { const vg = g.createRadialGradient(W / 2, H / 2, H * 0.55, W / 2, H / 2, W * 0.62); vg.addColorStop(0, 'rgba(8,4,0,0)'); vg.addColorStop(1, 'rgba(8,4,0,.38)'); g.fillStyle = vg; g.fillRect(0, 0, W, H); }
+    if (!sceneImg) { const vg = g.createRadialGradient(W / 2, H / 2, H * 0.55, W / 2, H / 2, W * 0.62); vg.addColorStop(0, 'rgba(8,4,0,0)'); vg.addColorStop(1, 'rgba(8,4,0,.38)'); g.fillStyle = vg; g.fillRect(0, 0, W, H); }
   }
   const reload = () => { for (const k in cache) delete cache[k]; for (const k in url) delete url[k]; };
   return { reload, sprite, pic, scene, drawFort, hueOf, slotAt, slotBox, NSLOTS };

@@ -1149,3 +1149,11 @@ body.skin .opts button.primary, body.skin .opts button.on, body.skin .seg button
 body.skin .opts button:disabled, body.skin .seg button:disabled, body.skin .ttab:disabled, body.skin .seedrow button:disabled { border-image-source: var(--b-d, url(art/ui/btn_disabled.png)) !important; color: #9a9a9a !important; }
 body.skin .opts button:hover:not(:disabled), body.skin .seg button:hover:not(:disabled), body.skin .ttab:hover:not(:disabled), body.skin .seedrow button:hover:not(:disabled) { filter: brightness(1.18); }
 body.skin .opts button.primary small { color: #3a2506; }
+
+/* ---------- the resource chips in the header are larger and easier to read ---------- */
+body #top #res .chip, body #mres .chip { font-size: 18px !important; padding: 4px 12px !important; gap: 6px !important; min-height: 38px; align-items: center; }
+body #top #res .chip .gi, body #mres .chip .gi { width: 26px !important; height: 26px !important; font-size: 24px !important; }
+body #top #res .chip b, body #mres .chip b { font-size: 18px !important; }
+body #top #res .chip small, body #mres .chip small { font-size: 12px !important; }
+body #top #res { gap: 8px !important; flex-wrap: wrap !important; overflow: visible !important; flex: 1 1 100% !important; }
+@media (max-width: 760px) { body #top #res .chip, body #mres .chip { font-size: 15px !important; padding: 3px 8px !important; min-height: 32px; } body #top #res .chip .gi, body #mres .chip .gi { width: 22px !important; height: 22px !important; } body #top #res .chip b, body #mres .chip b { font-size: 15px !important; } body #top #res { flex-wrap: nowrap !important; overflow-x: auto !important; gap: 5px !important; } }

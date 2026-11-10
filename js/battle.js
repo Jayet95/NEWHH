@@ -429,7 +429,7 @@ const Battle = (() => {
 
   async function tweenTo(s, x, y, ms) {
     if (typeof document !== 'undefined' && document.hidden) { s.px = x; s.py = y; return; }
-    ms /= spd(); faceTo(s, x, ms + 350); s.walkUntil = performance.now() + ms + 40;      // face the way it walks
+    ms /= spd(); faceTo(s, x, ms + 350); if (!s.walkUntil || performance.now() > s.walkUntil) s.walkT0 = performance.now(); s.walkUntil = performance.now() + ms + 40;      // face the way it walks
     const x0 = s.px, y0 = s.py, t0 = performance.now();
     for (;;) {
       const k = Math.min(1, (performance.now() - t0) / ms);
@@ -1125,7 +1125,7 @@ const Battle = (() => {
   const ANIM_STATES = ['idle', 'walk', 'attack', 'defend', 'death'], seqCache = {};
   // neutral creatures that are the same creature as a town one share its animation (until they get their own folder)
   const ANIM_ALIAS = { goblin: 'stronghold1', wolf: 'stronghold2', orc: 'stronghold3', ogre: 'stronghold4', golem: 'tower3', naga: 'tower6', dragon: 'rampart7' };
-  const ANIM_MS = { walk: 110, idle: 300, attack: 110, defend: 120, death: 180 };    // milliseconds per frame; the blow lands on attack frame 3
+  const ANIM_MS = { walk: 100, idle: 300, attack: 110, defend: 120, death: 180 };    // milliseconds per frame; the blow lands on attack frame 3
   const skipCache = {};
   function atkSkip(t) {     // 1 when attack_1 is just the idle pose again (then the attack starts on frame 2)
     const key = String(t); if (key in skipCache) return skipCache[key];
@@ -1152,7 +1152,7 @@ const Battle = (() => {
     const key = t + '|' + state; if (key in seqCache) return seqCache[key];
     let out = null;
     const base0 = String(t).replace(/_\d$/, '');
-    if (typeof Assets !== 'undefined') for (const id of [String(t), base0, ANIM_ALIAS[base0]]) for (const nm of (state === 'defend' ? ['defend', 'hurt'] : [state])) {
+    if (typeof Assets !== 'undefined') for (const id of [String(t), base0, ANIM_ALIAS[base0]]) for (const nm of (state === 'defend' ? ['defend', 'hurt'] : state === 'walk' ? ['walk', 'fly'] : [state])) {
       if (!id) continue;
       if (out) break;
       const list = []; for (let n = 1; n <= 24 && Assets.has('anim/' + id + '/' + nm + '_' + n); n++) list.push('anim/' + id + '/' + nm + '_' + n);
@@ -1163,7 +1163,7 @@ const Battle = (() => {
   // the frame to show now, or null when this creature has no frames for the state (or they have not loaded)
   function frameOf(s, state, now, t0, dur) {
     const seq = state === 'attack' ? atkFrames(s.t) : state === 'walk' ? (seqOf(s.t, 'walk') || seqOf(s.t, 'idle')) : seqOf(s.t, state); if (!seq || !seq.length) return null;
-    const n = seq.length, i = state === 'walk' ? Math.floor(now / ANIM_MS.walk) % n : state === 'idle' ? Math.floor((now - (s.idleT0 || 0)) / ANIM_MS.idle + (s.idleT0 ? 0 : s.c * 3 + s.r * 5)) % n : Math.min(n - 1, Math.max(0, Math.floor((now - t0) / dur * n)));
+    const n = seq.length, i = state === 'walk' ? Math.floor((now - (s.walkT0 || 0)) / ANIM_MS.walk) % n : state === 'idle' ? Math.floor((now - (s.idleT0 || 0)) / ANIM_MS.idle + (s.idleT0 ? 0 : s.c * 3 + s.r * 5)) % n : Math.min(n - 1, Math.max(0, Math.floor((now - t0) / dur * n)));
     return Assets.get(seq[i]) || null;
   }
   // Animation frames of one creature may have any canvas size as long as they are all the same: the figure's feet (bottom centre of the
@@ -1391,7 +1391,8 @@ const Battle = (() => {
         } else { const pr = k < 0.35 ? k / 0.35 : 1 - (k - 0.35) / 0.65; x -= ux * pr * 5 * f; y -= uy * pr * 5 * f; rot = -pr * 0.16 * sg * f; if (!own) { sx = 1 + 0.03 * pr; sy = 1 - 0.03 * pr; } }
       }
     }
-    if (s.walkUntil && now < s.walkUntil && !a) { const st = Math.sin(now / 95); y -= Math.abs(st) * (fly ? 1.5 : 3); rot += st * 0.035; }
+    if (s.walkUntil && now < s.walkUntil && !a && !seqOf(s.t, 'walk')) {      // real walk frames carry their own motion; the stepping bob is only for the idle-frame stand-in
+      const st = Math.sin(now / 95); y -= Math.abs(st) * (fly ? 1.5 : 3); rot += st * 0.035; }
     if (s.hurt) { const k = (now - s.hurt) / 280; if (k >= 0 && k < 1) { x += Math.sin(k * 40) * (1 - k) * 4; if (!seqOf(s.t, 'defend')) { sy *= 1 - 0.06 * Math.sin(k * Math.PI); sx *= 1 + 0.04 * Math.sin(k * Math.PI); } } }
     return { x, y, rot, sx, sy };
   }

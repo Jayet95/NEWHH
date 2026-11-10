@@ -1218,3 +1218,10 @@ body.skin #quick .qt, #quick .qt { width: 92px; height: 54px; border-radius: 8px
 #quick .qrow { display: flex; flex-direction: row; gap: 6px; align-items: center; }
 #quick .qcol { display: flex; flex-direction: column; gap: 6px; max-height: calc(100% - 70px); }
 body.skin #quick .qx, #quick .qx { width: 34px; height: 54px; border-radius: 8px !important; }
+/* hero selection: the full painted portrait in a framed square */
+.hart { display: block; object-fit: cover; border-radius: 8px; border: 2px solid #8c6a22; box-shadow: 0 2px 8px rgba(0, 0, 0, .65), inset 0 0 0 1px #000; background: #120c07; }
+.htile .hart { width: 100%; max-width: 96px; height: auto; aspect-ratio: 1; margin: 0 auto; }
+.htile.on .hart { border-color: #ffd86a; box-shadow: 0 0 0 2px rgba(255, 216, 106, .45), 0 0 12px rgba(255, 216, 106, .5), inset 0 0 0 1px #000; }
+.hsbig .hart { width: 100%; max-width: 190px; height: auto; aspect-ratio: 1; margin: 0 auto; border-radius: 6px; }
+@media (max-width: 860px) { .hsbig .hart { width: 110px; } .htile .hart { max-width: 72px; } }
+@media (max-width: 860px) { body.fr-portrait .hsbig .hart { border: 0; } }

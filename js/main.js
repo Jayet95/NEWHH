@@ -2352,12 +2352,14 @@
   }
   // each castle can have its own hero-selection picture (art/ui/hero_select_<castle>.webp); without one the Castle picture is used for Castle and the castle's town scene for the others
   const heroBg = (f) => typeof Assets !== 'undefined' && Assets.has('ui/hero_select_' + f) ? 'hero_select_' + f : f === 'castle' ? 'hero_select' : 'town_' + f;
+  // the hero's full painted art (a framed square, not a round crop); falls back to the round portrait when the art is missing
+  const heroArt = (icon, px, pid) => typeof Assets !== 'undefined' && pid && Assets.has('heroes/' + pid) ? `<img class="hart" draggable="false" width="${px}" height="${px}" alt="" src="${Assets.url('heroes/' + pid)}">` : Art.heroPic(icon, ownCol(0), px, pid);
   function showHeroSelect(f, diff = 'normal', map = {}, pick) {
     const ti = factionTiers(f), list = FACTIONS[f].heroes.map(([n]) => Object.assign({ key: n }, HEROES[n])); pick = pick || Settings.mem('lastHero:' + f) || list[0].key;
     const cur = list.find(d => d.key === pick) || list[0];
-    const tiles = list.map(d => `<button class="htile${d === cur ? ' on' : ''}" data-hid="${d.key}">${Art.heroPic(d.i, ownCol(0), 84, d.id)}<span>${d.name}</span><small>${clsLabel(d.cls)}</small></button>`).join('');
+    const tiles = list.map(d => `<button class="htile${d === cur ? ' on' : ''}" data-hid="${d.key}">${heroArt(d.i, 84, d.id)}<span>${d.name}</span><small>${clsLabel(d.cls)}</small></button>`).join('');
     const army = startArmy(cur, f).filter(Boolean).map(a => [a.t, a.n]);
-    const panel = `<div class="hspan"><div class="hsbig">${Art.heroPic(cur.i, ownCol(0), 150, cur.id)}</div><h3>${cur.name}</h3><div class="hscls">${clsLabel(cur.cls)}${cur.sk ? ` · ${PERKS[cur.sk].i} ${PERKS[cur.sk].n}` : ''}</div>
+    const panel = `<div class="hspan"><div class="hsbig">${heroArt(cur.i, 150, cur.id)}</div><h3>${cur.name}</h3><div class="hscls">${clsLabel(cur.cls)}${cur.sk ? ` · ${PERKS[cur.sk].i} ${PERKS[cur.sk].n}` : ''}</div>
       <div class="hsstats"><div><b>${cur.att}</b><span>Attack</span></div><div><b>${cur.def}</b><span>Defence</span></div><div><b>${cur.sp}</b><span>Spell power</span></div><div><b>${cur.kn}</b><span>Knowledge</span></div></div>
       <h4>Spells</h4><div class="hsspells">${[...START_SPELLS, ...cur.spells].map(k => `<span>${SPELLS[k].i} ${SPELLS[k].n}</span>`).join('')}</div>
       <h4>Starting army</h4><div class="hsarmy">${army.map(([id, n]) => `<div>${Art.pic(id, 60)}<small>${n} ${C[id].n}</small></div>`).join('')}</div>

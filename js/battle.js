@@ -443,6 +443,12 @@ const Battle = (() => {
     let best = null, bv = 1e9; for (const h of meleeSpots(s, e, reach)) { const v = h.d - (isRear(s, e, h) ? 2 : 0); if (v < bv) { bv = v; best = h; } }
     return best;
   }
+  // an enemy standing next to the hex (c, r), as seen by a creature that would stand there: clicking such an empty hex walks there and strikes
+  function foeBeside(s, c, r) {
+    if (!B || canShoot(s)) return null;
+    const mine = occHexes(s, c, r);
+    return B.stacks.find(o => !o.dead && o.side !== s.side && occHexes(o).some(([ec, er]) => mine.some(([mc, mr]) => hexDist({ c: mc, r: mr }, { c: ec, r: er }) === 1))) || null;
+  }
   function pathTo(reach, hex) {
     const p = []; let h = hex;
     while (h) { p.push(h); h = h.prev ? reach.get(h.prev) : null; }
@@ -800,7 +806,7 @@ const Battle = (() => {
       return toast('Too far away.');
     }
     const r = B.reach.get(key(h.c, h.r));
-    if (!t && r && r.d > 0) return playerAct(() => doMove(s, r));
+    if (!t && r && r.d > 0) { const fe = ev && ev.shiftKey ? null : foeBeside(s, r.c, r.r); return playerAct(() => fe ? doMelee(s, fe, r) : doMove(s, r)); }      // walk next to an enemy and strike (Shift = just walk)
   }
   function mousePt(ev) {
     const rc = cv.getBoundingClientRect();
@@ -822,7 +828,7 @@ const Battle = (() => {
     if (t && t.side !== s.side) return canShoot(s) ? Art.cursor('arrow') : meleeSpot(s, t, B.reach) ? Art.cursor('sword') : Art.cursor('no');
     if (t) return Art.cursor('no');
     const r = B.reach.get(key(h.c, h.r));
-    return r && r.d > 0 ? Art.cursor('boot') : Art.cursor('no');
+    return r && r.d > 0 ? (foeBeside(s, r.c, r.r) ? Art.cursor('sword') : Art.cursor('boot')) : Art.cursor('no');
   }
   function onMove(ev) { if (!B) return; B.hoverPt = mousePt(ev); B.hover = mouseHex(ev); if (!COARSE) { try { cv.style.cursor = battleCursor(B.hover) || ''; } catch (e) { /* ignore */ } } }
   // spell school rank (0 = untrained) and Insight gate: spell level <= 2 + Insight rank
@@ -1583,9 +1589,10 @@ const Battle = (() => {
     const c = C[s.t];
     ctx.fillStyle = '#f3e7bd'; ctx.font = '14px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.fillText(`${c.i} ${s.n} ${c.n}${'★'.repeat((c.lv || 1) - 1)}   Att ${attackOf(s)}  Def ${defenceOf(s)}  Dmg ${c.lo}-${c.hi}  HP ${s.hp}/${c.hp}  Spd ${speedOf(s)}${c.shoot ? `  Archer · Ammo ${s.ammo}` : ''}${c.fly ? '  Flying' : ''}`, 14, 612);
-    if (B.cur && B.cur.side === 0 && h && stackAt(h.c, h.r) && stackAt(h.c, h.r).side === 1 && B.input) {
-      const e = stackAt(h.c, h.r), a = B.cur;
-      const shoot = canShoot(a), spot = !shoot ? pickSpot(a, e, B.reach, B.hoverPt) : null, rear = !!spot && isRear(a, e, spot), d = calcDmg(a, e, !shoot, true, 0, spot || undefined) * (abil(a, 'dstrike') && !shoot ? 2 : 1), th = totalHp(e), kills = d >= th ? e.n : Math.max(0, e.n - Math.ceil((th - d) / C[e.t].hp));
+    const hr0 = h && !stackAt(h.c, h.r) && B.reach && B.reach.get(key(h.c, h.r)), hfoe = hr0 && hr0.d > 0 && B.cur && B.cur.side === 0 ? foeBeside(B.cur, h.c, h.r) : null;      // hovering an empty hex beside an enemy previews the strike from there
+    if (B.cur && B.cur.side === 0 && h && ((stackAt(h.c, h.r) && stackAt(h.c, h.r).side === 1) || hfoe) && B.input) {
+      const e = hfoe || stackAt(h.c, h.r), a = B.cur;
+      const shoot = canShoot(a), spot = !shoot ? (hfoe ? hr0 : pickSpot(a, e, B.reach, B.hoverPt)) : null, rear = !!spot && isRear(a, e, spot), d = calcDmg(a, e, !shoot, true, 0, spot || undefined) * (abil(a, 'dstrike') && !shoot ? 2 : 1), th = totalHp(e), kills = d >= th ? e.n : Math.max(0, e.n - Math.ceil((th - d) / C[e.t].hp));
       let ret = 0; if (!shoot && d < th && !abil(a, 'noRet') && (abil(e, 'unlimRet') || e.ret)) ret = calcDmg(e, a, true, true);
       const rk = ret ? Math.min(a.n, Math.floor(ret / C[a.t].hp)) : 0;
       ctx.fillStyle = '#ffb3a8'; ctx.fillText(`${shoot ? 'Shoot' : 'Attack'}${rear ? ' from behind (+' + REAR_BONUS + ' Att)' : ''}: ~${d} dmg (~${kills} kills)${ret ? `   ↩ retaliation ~${ret} (~${rk} lost)` : ''}${shoot ? rangeNote(a, e) : ''}`, 14, 630);

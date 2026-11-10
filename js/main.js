@@ -827,7 +827,7 @@
     if (G.boats.some(b => b.x === x && b.y === y)) return '<b>⛵ Your boat</b><br>Walk onto it from the shore to set sail.';
     let o = objAt(G, x, y);
     if (o && o.t === 'monster' && !seen) o = null;
-    if (!o) { const tt = G.tiles[y][x], bm = G.biome && G.biome[y] ? G.biome[y][x] : 0, base = ['Grass', 'Forest (needs Woodcraft)', 'Mountains (needs Cragwalking)', 'Water (needs a boat or Wave Treading)', 'Road (half the movement cost)', 'Sand (slow)'][tt]; return bm && tt !== T.ROAD && tt !== T.WATER ? `${BIOME_NAME[bm]} — ${base.replace(/ (.*)/, '')} (slower: ×${BIOME_COST[bm]} movement)` : base; }
+    if (!o) { const tt = G.tiles[y][x], bm = G.biome && G.biome[y] ? G.biome[y][x] : 0, cpt = G.hero ? capsOf(G.hero) : {}, base = ['Grass', cpt.forest ? 'Forest (passable with Woodcraft)' : 'Forest (needs Woodcraft)', cpt.mount ? 'Mountains (passable with Cragwalking)' : 'Mountains (needs Cragwalking)', cpt.water ? 'Water (passable with Wave Treading)' : 'Water (needs a boat or Wave Treading)', 'Road (half the movement cost)', 'Sand (slow)'][tt]; return bm && tt !== T.ROAD && tt !== T.WATER ? `${BIOME_NAME[bm]} — ${base.replace(/ (.*)/, '')} (slower: ×${BIOME_COST[bm]} movement)` : base; }
     const g = o.guard && o.guard.length ? `<br>Guarded by: ${armyList(o.guard, true)}` : '';
     switch (o.t) {
       case 'town': {

@@ -429,7 +429,7 @@ const Battle = (() => {
 
   async function tweenTo(s, x, y, ms) {
     if (typeof document !== 'undefined' && document.hidden) { s.px = x; s.py = y; return; }
-    ms /= spd(); faceTo(s, x, ms + 350); if (!s.walkUntil || performance.now() > s.walkUntil) s.walkT0 = performance.now(); s.walkUntil = performance.now() + ms + 40;      // face the way it walks
+    ms /= spd(); s.walkMs = Math.max(55, Math.min(130, ms * 0.5)); faceTo(s, x, ms + 350); if (!s.walkUntil || performance.now() > s.walkUntil) s.walkT0 = performance.now(); s.walkUntil = performance.now() + ms + 40;      // face the way it walks
     const x0 = s.px, y0 = s.py, t0 = performance.now();
     for (;;) {
       const k = Math.min(1, (performance.now() - t0) / ms);
@@ -438,11 +438,13 @@ const Battle = (() => {
       await raf();
     }
   }
+  // how long one hex takes: slow creatures (speed 3-4) trudge, fast ones (9+) race; heavy units never hurry. Flyers cover a whole straight line in one smooth glide.
+  const pace = (t) => { const sp = C[t].s || 5; return sp <= 3 ? 300 : sp >= 12 ? 130 : Math.round(300 - (sp - 3) * 19); };
   async function doMove(s, hex) {
     const fly = C[s.t].fly, path = fly ? [{ c: s.c, r: s.r }, hex] : pathTo(B.reach, hex);
     for (let i = 1; i < path.length; i++) {
       const p = hexPx(path[i].c, path[i].r);
-      await tweenTo(s, p.x, p.y, fly ? 280 : 90);
+      await tweenTo(s, p.x, p.y, fly ? Math.max(320, Math.min(760, hexDist({ c: s.c, r: s.r }, hex) * pace(s.t) * 0.6)) : pace(s.t));
       if (!fly && B.mines && B.mines.has(key(path[i].c, path[i].r))) { s.c = path[i].c; s.r = path[i].r; detonate(s); return; }
     }
     s.c = hex.c; s.r = hex.r;
@@ -1163,7 +1165,7 @@ const Battle = (() => {
   // the frame to show now, or null when this creature has no frames for the state (or they have not loaded)
   function frameOf(s, state, now, t0, dur) {
     const seq = state === 'attack' ? atkFrames(s.t) : state === 'walk' ? (seqOf(s.t, 'walk') || seqOf(s.t, 'idle')) : seqOf(s.t, state); if (!seq || !seq.length) return null;
-    const n = seq.length, i = state === 'walk' ? Math.floor((now - (s.walkT0 || 0)) / ANIM_MS.walk) % n : state === 'idle' ? Math.floor((now - (s.idleT0 || 0)) / ANIM_MS.idle + (s.idleT0 ? 0 : s.c * 3 + s.r * 5)) % n : Math.min(n - 1, Math.max(0, Math.floor((now - t0) / dur * n)));
+    const n = seq.length, i = state === 'walk' ? Math.floor((now - (s.walkT0 || 0)) / (s.walkMs || ANIM_MS.walk)) % n : state === 'idle' ? Math.floor((now - (s.idleT0 || 0)) / ANIM_MS.idle + (s.idleT0 ? 0 : s.c * 3 + s.r * 5)) % n : Math.min(n - 1, Math.max(0, Math.floor((now - t0) / dur * n)));
     return Assets.get(seq[i]) || null;
   }
   // Animation frames of one creature may have any canvas size as long as they are all the same: the figure's feet (bottom centre of the

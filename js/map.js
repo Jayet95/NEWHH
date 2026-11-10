@@ -56,15 +56,17 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (tiles[y][x] === T.MOUNT) starts.push({ x, y });
     const nR = Math.max(2, Math.round(2.5 * sc));
     for (let k = 0; k < nR && starts.length; k++) {
-      let c = starts.splice(Math.floor(RR() * starts.length), 1)[0], steps = 0; const seen = new Set();
+      let c = starts.splice(Math.floor(RR() * starts.length), 1)[0], steps = 0, prev = null; const seen = new Set();
+      // a river tile stores a bit for each neighbour its stream really flows to (64 marks 'river'); touching tiles of another bend are not joined, so no webs
+      const link = (a, b2) => { if (!a || !b2 || tiles[a.y][a.x] === T.MOUNT || tiles[a.y][a.x] === T.WATER) return; const i = hexNb(a.x, a.y).findIndex(([nx, ny]) => nx === b2.x && ny === b2.y); if (i >= 0) river[a.y][a.x] |= 64 | (1 << i); };
       while (c && steps++ < 70) {
-        if (tiles[c.y][c.x] === T.WATER) break;
+        if (tiles[c.y][c.x] === T.WATER) { link(prev, c); break; }
         seen.add(c.y * W + c.x);
-        if (tiles[c.y][c.x] !== T.MOUNT) river[c.y][c.x] = 1;
+        if (tiles[c.y][c.x] !== T.MOUNT) { river[c.y][c.x] |= 64; link(c, prev); link(prev, c); }
         const nb = hexNb(c.x, c.y).filter(([nx, ny]) => nx >= 0 && ny >= 0 && nx < W && ny < H && !seen.has(ny * W + nx));
         if (!nb.length) break;
         nb.sort((p, q) => (n1[p[1]][p[0]] + RR() * 0.12) - (n1[q[1]][q[0]] + RR() * 0.12));
-        const nx = nb[0]; c = { x: nx[0], y: nx[1] };
+        const nx = nb[0]; prev = c; c = { x: nx[0], y: nx[1] };
       }
     } }
   // the player's castle starts in a random corner (the map is laid out as before and mirrored); the bay lies along the nearest edge

@@ -1490,3 +1490,28 @@ body.skin #mbox .gacts button, #mbox .gacts button { flex: 1 1 0; min-width: 0; 
 .qty input { color: #fff3cf !important; font-weight: bold; font-size: 15px; border: 1px solid var(--edge); border-radius: 5px; }
 .tpr { display: flex; align-items: center; gap: 8px; }
 .tpall { min-height: 30px !important; height: 30px; padding: 0 14px !important; font-size: 13px !important; border: 1px solid #0d0803 !important; border-image: none !important; border-radius: 6px !important; background: var(--grain), linear-gradient(#d9a52a, #7d5810) !important; color: #2a1604 !important; text-shadow: none; box-shadow: inset 0 0 0 1px var(--edge) !important; }
+
+/* ---------- desktop / tablet: the same screen as the phone — resources on top, the map filling the window, the action bar at the bottom ---------- */
+@media (min-width: 761px) and (min-height: 541px) {
+  body:not(.inbattle) { overflow: hidden; padding-bottom: 0; }
+  body:not(.inbattle) #app { max-width: none; height: 100vh; height: 100dvh; display: flex; flex-direction: column; gap: 6px; padding: 6px 10px; }
+  body:not(.inbattle) #top { margin: 0; flex: none; padding: 4px 14px; gap: 2px 14px; flex-wrap: nowrap; align-items: center; min-height: 0; }
+  body:not(.inbattle) #top .btns { display: none; }
+  body:not(.inbattle) #top #res { flex: 1 1 auto; flex-wrap: wrap; justify-content: flex-start; overflow: visible; gap: 6px; }
+  body:not(.inbattle) #top .chip { font-size: 14px; padding: 1px 9px; }
+  body:not(.inbattle) #top #date { flex: 0 1 auto; text-align: right; }
+  body:not(.inbattle) #game { flex: 1; min-height: 0; display: block; }
+  body:not(.inbattle) #stage { height: 100%; min-height: 0; width: 100%; }
+  body:not(.inbattle) #stage canvas { aspect-ratio: auto; height: 100%; }
+  body:not(.inbattle) #map { width: 100%; }
+  body:not(.inbattle) #side { display: none; }
+  body:not(.inbattle) #mbar { display: flex; position: static; flex: none; width: min(760px, 100%); align-self: center; gap: 6px; padding: 5px 6px; border: 2px solid var(--edge); border-radius: 10px; }
+  body.inbattle #mbar { display: none; }
+  body:not(.inbattle) #mbar button { flex: 1 1 0; min-width: 0; min-height: 58px; padding: 4px 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 13px; line-height: 1.1; }
+  body:not(.inbattle) #mbar button b { font-size: 24px; font-weight: normal; line-height: 1; }
+  body:not(.inbattle) #mbar button.primary { flex: 1.4; }
+  body:not(.inbattle) #mbar #mMenu { flex: 1 1 0; }
+  #sheetBody > * { margin-bottom: 8px; }
+  #sheetBody #mini { display: block; }
+  #hint { bottom: calc(96px + var(--sab)); top: auto; }
+}

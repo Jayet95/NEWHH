@@ -833,7 +833,7 @@
     if (b.dataset.qx) { Settings.mem('quickOpen', !Settings.mem('quickOpen')); renderQuick(); return; }
     if (b.dataset.qt !== undefined) { const t = myTowns()[+b.dataset.qt]; if (t) { centerOn(t.x, t.y); openTown(t); } return; }
     const i = +b.dataset.qh, h = G.heroes[i]; if (!h) return;
-    if (h === G.hero) return (matchMedia('(max-width: 760px), (orientation: landscape) and (max-height: 540px)').matches ? $('mHero').click() : openHeroInfo(h));   // on a phone the map hero opens the same Hero screen as the bottom button
+    if (h === G.hero) return $('mHero').click();   // on a phone the map hero opens the same Hero screen as the bottom button
     setActive(i); G.path = null; centerOn(h.x, h.y); renderAll();
   });
   function nextHero() {

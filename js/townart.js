@@ -257,7 +257,7 @@ const TownArt = (() => {
       const nm = s.name || '', pw = Math.max(62, nm.length * 6.6 + 16), py = base + (layout ? 4 : sceneImg ? 24 : 8);
       g.font = 'bold 11px Cinzel, Georgia, serif'; roundRect(g, x - pw / 2, py, pw, 17, 5); g.fillStyle = hov ? 'rgba(48,32,10,.95)' : 'rgba(14,9,5,.84)'; g.fill(); g.lineWidth = 1.2; g.strokeStyle = s.built ? (hov ? '#ffd766' : '#c9a24a') : 'rgba(255,255,255,.28)'; g.stroke();
       g.fillStyle = s.built ? '#f6ebc8' : '#aaa59a'; g.fillText(nm, x, py + 9);
-      if (s.max > 1 && s.built) { g.font = 'bold 11px sans-serif'; g.lineWidth = 3; g.strokeStyle = '#000'; g.fillStyle = '#ffd24a'; const st = '★'.repeat(s.lv) + '☆'.repeat(Math.max(0, s.max - s.lv)); g.strokeText(st, x, py + 25); g.fillText(st, x, py + 25); }
+      if (s.max > 1 && s.built && s.lv > 0) { g.font = 'bold 11px sans-serif'; g.lineWidth = 3; g.strokeStyle = '#000'; g.fillStyle = '#ffd24a'; const st = '★'.repeat(Math.max(0, Math.min(s.lv, s.max))); g.strokeText(st, x, py + 25); g.fillText(st, x, py + 25); }
     }
     // soft vignette so the panorama sits in its frame
     if (!sceneImg) { const vg = g.createRadialGradient(W / 2, H / 2, H * 0.55, W / 2, H / 2, W * 0.62); vg.addColorStop(0, 'rgba(8,4,0,0)'); vg.addColorStop(1, 'rgba(8,4,0,.38)'); g.fillStyle = vg; g.fillRect(0, 0, W, H); }

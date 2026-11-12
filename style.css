@@ -1481,3 +1481,10 @@ body.skin #mbox .gacts button, #mbox .gacts button { flex: 1 1 0; min-width: 0; 
   .tpbody .wcard .bacts button { width: 100%; min-width: 0; height: 26px; min-height: 26px !important; }
   .tpbody .wcard .wpic .bcr { width: 20px; height: 20px; }
 }
+/* recruit amount: read-only, set with − / + and Max (no keyboard) */
+.qty { display: flex; align-items: center; gap: 4px; }
+.qty input { width: 52px !important; text-align: center; pointer-events: none; caret-color: transparent; background: rgba(0, 0, 0, .35); }
+.qty .qb { min-width: 30px !important; width: auto !important; padding: 0 8px !important; min-height: 30px !important; height: 30px; font-size: 15px !important; }
+.qty .qmax { font-size: 12px !important; }
+@media (max-width: 760px) { .tpbody .wcard .bacts .qty { width: 100%; } .tpbody .wcard .bacts .qty input { width: 100% !important; min-width: 0; flex: 1 1 auto !important; } .tpbody .wcard .qty .qb { min-width: 0 !important; padding: 0 !important; height: 24px; min-height: 24px !important; font-size: 13px !important; flex: 0 0 24px !important; } .tpbody .wcard .qty .qmax { flex: 0 0 34px !important; font-size: 10px !important; } .tpbody .wcard .bacts { max-width: 120px; } }
+.qty input { color: #fff3cf !important; font-weight: bold; font-size: 15px; border: 1px solid var(--edge); border-radius: 5px; }

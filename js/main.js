@@ -1559,7 +1559,7 @@
   const townNeeded = new Set();
   const defaultTown = () => townAt(G.hero.x, G.hero.y) || nearestTown(G.hero.x, G.hero.y);
   const tierType = (t, tier) => lineType(tiersOf(t)[tier - 1], (t.up && t.up[tier]) || 1);
-  const starStr = (lv, max = MAX_LV) => '★'.repeat(lv) + '☆'.repeat(max - lv);
+  const starStr = (lv, max = MAX_LV) => '★'.repeat(Math.max(0, Math.min(lv, max)));   // only the stars it has now, no empty ones
   function startTownAnim(kind, slot) { townAnim = { kind, slot, t0: performance.now() }; sfx(kind === 'upgrade' ? 'level' : 'build'); }
   // what each of the 16 plots in the castle picture shows: 0-6 the dwellings, 7-15 the town buildings
   const DWELL_NAMES = ['Guardhouse', 'Training Grounds', 'Barracks', 'War Hall', 'Citadel', 'Great Keep', 'Royal Lair'];   // what the creature buildings are called in the town picture
@@ -1759,6 +1759,7 @@
     tiersOf(t).forEach((id, i) => {
       const tier = i + 1, lv = t.up[tier], c = C[lineType(id, lv)], built = t.b[tier], av = t.avail[tier] || 0;
       const needHall = TIER_HALL[tier], locked = t.b.hall < needHall;
+      let mb = av; while (mb > 0 && !canAfford(G.res, Object.fromEntries(Object.entries(c.cost).map(([k, v]) => [k, v * mb])))) mb--;   // the most you can recruit now: stock and money
       const nextLv = lv + 1, upC = lv < MAX_LV ? upgradeCost(tier, nextLv) : null, upLocked = lv < MAX_LV && t.b.hall < UP_HALL[nextLv];
       let upArmy = null;
       if (built && here) {
@@ -1771,12 +1772,12 @@
       wc += `<div class="bcard wcard${built ? ' built' : ''}${!built && locked ? ' lockedrow' : ''}" data-slot="${i}"><div class="bpic wpic">${Art.pic(lineType(id, lv), 256)}<span class="bcr">${TownArt.pic('dwell', lv, t.fac, 44, lineType(id, lv))}</span>${built ? `<span class="wav" title="Ready to recruit">${av}</span>` : ''}</div>
         <div><b>${c.n}</b> <span class="stars">${built ? starStr(lv) : ''}</span><div class="wstats"><span>⚔ ${c.a}</span><span>🛡 ${c.d}</span><span>HP ${c.hp}</span><span>👢 ${c.s}</span><span>${c.lo}-${c.hi} dmg</span>${c.shoot ? '<span>🏹 archer</span>' : ''}${c.fly ? '<span>flying</span>' : ''}</div>
         <span class="small">${built ? `${fmtCost(c.cost)} each · +${c.gr}/week` : locked ? `🔒 Needs the ${HALL_LEVELS[needHall].n}` : `Dwelling not built — ${fmtCost(DWELL_COST[tier])}`}</span></div>
-        <div class="bacts">${built ? `<input type="number" min="1" max="${av}" value="${av}" id="n${tier}"><button class="primary" data-buy="${tier}">Recruit</button>${upC ? (upLocked ? `<span class="lockpill" title="Requires Town Hall level ${UP_HALL[nextLv]}">Lv${nextLv} · Hall ${UP_HALL[nextLv]}</span>` : `<button data-up="${tier}" title="${Art.fmtCostTxt(upC)}">⬆ Lv${nextLv} ${fmtCost(upC)}</button>`) : ''}${upArmy ? `<button data-uparmy="${tier}">🪖 Upgrade ${upArmy.count} troops ${RES_ICON.gold}${upArmy.cost}</button>` : ''}` : (locked ? `<span class="lockpill">🔒 Hall ${needHall}</span>` : `<button class="primary" data-build="${tier}">Build</button>`)}</div></div>`;
+        <div class="bacts">${built ? `<div class="qty"><button type="button" class="qb" data-qty="${tier}:-1" title="Fewer">−</button><input type="number" id="n${tier}" value="${mb}" data-max="${mb}" readonly inputmode="none" tabindex="-1"><button type="button" class="qb" data-qty="${tier}:1" title="More">+</button><button type="button" class="qb qmax" data-qty="${tier}:max" title="Buy as many as you can">Max</button></div><button class="primary" data-buy="${tier}">Recruit</button>${upC ? (upLocked ? `<span class="lockpill" title="Requires Town Hall level ${UP_HALL[nextLv]}">Lv${nextLv} · Hall ${UP_HALL[nextLv]}</span>` : `<button data-up="${tier}" title="${Art.fmtCostTxt(upC)}">⬆ Lv${nextLv} ${fmtCost(upC)}</button>`) : ''}${upArmy ? `<button data-uparmy="${tier}">🪖 Upgrade ${upArmy.count} troops ${RES_ICON.gold}${upArmy.cost}</button>` : ''}` : (locked ? `<span class="lockpill">🔒 Hall ${needHall}</span>` : `<button class="primary" data-build="${tier}">Build</button>`)}</div></div>`;
       war += `<div class="trow big${!built && locked ? ' lockedrow' : ''}"><div class="ic">${Art.pic(lineType(id, lv), 68)}</div>
         <div><b>${c.n}</b> <span class="stars">${built ? starStr(lv) : ''}</span> <span class="small">Att ${c.a} Def ${c.d} Dmg ${c.lo}-${c.hi} HP ${c.hp} Spd ${c.s}${c.shoot ? ' · Archer' : ''}${c.fly ? ' · Flying' : ''}</span><br>
         <span class="small">${built ? `Available: <b>${av}</b> · ${fmtCost(c.cost)} each · +${c.gr}/week` : locked ? `🔒 Requires ${HALL_LEVELS[needHall].n} (Town Hall level ${needHall})` : `Dwelling not built — ${fmtCost(DWELL_COST[tier])}`}</span></div>
         <div class="acts">${built
-          ? `<input type="number" min="1" max="${av}" value="${av}" id="n${tier}"><button data-buy="${tier}">Recruit</button>
+          ? `<div class="qty"><button type="button" class="qb" data-qty="${tier}:-1" title="Fewer">−</button><input type="number" id="n${tier}" value="${mb}" data-max="${mb}" readonly inputmode="none" tabindex="-1"><button type="button" class="qb" data-qty="${tier}:1" title="More">+</button><button type="button" class="qb qmax" data-qty="${tier}:max" title="Buy as many as you can">Max</button></div><button data-buy="${tier}">Recruit</button>
              ${upC ? (upLocked ? `<span class="lockpill" title="Requires Town Hall level ${UP_HALL[nextLv]}">Lv${nextLv} · Hall ${UP_HALL[nextLv]}</span>` : `<button data-up="${tier}" title="${Art.fmtCostTxt(upC)}">⬆ Lv${nextLv} ${fmtCost(upC)}</button>`) : '<span class="small">MAX</span>'}
              ${upArmy ? `<button data-uparmy="${tier}">🪖 Upgrade ${upArmy.count} troops ${RES_ICON.gold}${upArmy.cost}</button>` : ''}`
           : (locked ? `<span class="lockpill">🔒 Hall ${needHall}</span>` : `<button data-build="${tier}">Build</button>`)}</div></div>`;
@@ -1953,6 +1954,10 @@
       G.res.gold -= cost;
       for (const s of th.army) if (s && C[s.t].line === id && C[s.t].lv < t.up[tier]) s.t = to;
       mergeArmy(th); toast('Your troops have been upgraded!'); startTownAnim('upgrade', tier - 1); again();
+    });
+    q('[data-qty]', b => b.onclick = () => {
+      const [tr, op] = b.dataset.qty.split(':'), inp = $('n' + tr), mx = +inp.dataset.max || 0; let v = +inp.value || 0;
+      v = op === 'max' ? mx : v + +op; inp.value = Math.max(mx ? 1 : 0, Math.min(mx, v)); sfx('click');
     });
     q('[data-buy]', b => b.onclick = () => {
       const tier = +b.dataset.buy, type = tierType(t, tier), c = C[type];

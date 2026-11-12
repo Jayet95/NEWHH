@@ -121,3 +121,41 @@
   frames(); document.addEventListener('assets-progress', frames); document.addEventListener('assets-ready', frames);
   if (typeof Assets !== 'undefined' && Assets.ready) Assets.ready.then(frames);
 })();
+
+// ---------- 6. phone screens without scrolling: Settings and Kingdom split into pages (‹ 1/2 ›) that fit the screen ----------
+(() => {
+  const $ = (id) => document.getElementById(id), box = $('mbox'); if (!box || typeof MutationObserver === 'undefined') return;
+  const small = () => matchMedia('(max-width: 760px), (orientation: landscape) and (max-height: 540px)').matches;
+  const wanted = () => box.querySelector('.setrow') || /kingdom/i.test((box.querySelector('h2') || {}).textContent || '');
+  let busy = false, pages = [], cur = 0, bar = null;
+  const show = () => {
+    pages.forEach((units, i) => units.forEach(u => u.classList.toggle('pg-hide', i !== cur)));
+    if (bar) { bar.querySelector('span').textContent = (cur + 1) + ' / ' + pages.length; bar.children[0].disabled = cur === 0; bar.children[2].disabled = cur === pages.length - 1; }
+    box.scrollTop = 0;
+  };
+  const build = () => {
+    if (busy) return; busy = true;
+    try {
+      box.querySelectorAll('.pgbar').forEach(e => e.remove()); box.querySelectorAll('.pg-hide').forEach(e => e.classList.remove('pg-hide')); pages = []; bar = null;
+      if (!small() || !wanted()) return;
+      const kids = [...box.children], fixed = kids.filter(k => k.tagName === 'H2' || k.classList.contains('mb')), body = kids.filter(k => !fixed.includes(k));
+      if (box.scrollHeight <= box.clientHeight + 2 || body.length < 2) return;
+      const avail = box.clientHeight - fixed.reduce((s, k) => s + k.offsetHeight + 8, 0) - 52;
+      const units = []; let carry = [];
+      body.forEach(k => { carry.push(k); if (!/^H[2-4]$/.test(k.tagName)) { units.push(carry); carry = []; } }); if (carry.length) units.push(carry);
+      let page = [], h = 0;
+      units.forEach(u => { const uh = u.reduce((s, k) => s + k.offsetHeight + 8, 0); if (page.length && h + uh > avail) { pages.push(page); page = []; h = 0; } page.push(...u); h += uh; });
+      if (page.length) pages.push(page);
+      if (pages.length < 2) { pages = []; return; }
+      bar = document.createElement('div'); bar.className = 'pgbar'; bar.innerHTML = '<button type="button">‹</button><span></span><button type="button">›</button>';
+      bar.children[0].onclick = () => { if (cur > 0) { cur--; show(); } }; bar.children[2].onclick = () => { if (cur < pages.length - 1) { cur++; show(); } };
+      const foot = fixed.find(k => k.classList.contains('mb')); box.insertBefore(bar, foot || null);
+      cur = Math.min(cur, pages.length - 1); show();
+    } finally { setTimeout(() => { busy = false; }, 0); }
+  };
+  let t = 0; const later = () => { clearTimeout(t); t = setTimeout(() => { cur = 0; build(); }, 60); };
+  new MutationObserver((m) => { if (busy || m.every(x => [...x.addedNodes, ...x.removedNodes].every(n => n.classList && n.classList.contains('pgbar')))) return; later(); }).observe(box, { childList: true });
+  window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(build, 150); });
+  let sx = 0; box.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; }, { passive: true });
+  box.addEventListener('touchend', (e) => { if (!pages.length) return; const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 70) { if (dx < 0 && cur < pages.length - 1) cur++; else if (dx > 0 && cur > 0) cur--; show(); } }, { passive: true });
+})();

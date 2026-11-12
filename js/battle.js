@@ -990,7 +990,7 @@ const Battle = (() => {
     $('bWait').onclick = () => B && B.cur && !B.cur.waited && playerAct(async () => { B.cur.waited = true; B.waitQ.push(B.cur); log(`${C[B.cur.t].n} waits.`); });
     $('bDef').onclick = () => B && playerAct(async () => { B.cur.defb = true; log(`${C[B.cur.t].n} defends.`); });
     $('bSpell').onclick = () => B && B.input && openSpells();
-    if ($('bZoom')) $('bZoom').onclick = () => { document.body.classList.toggle('bzfit'); const st = $('stage'), c = $('bat'); if (B && B.cur && st && c) setTimeout(() => st.scrollTo({ left: Math.max(0, (B.cur.px / 960) * c.clientWidth - st.clientWidth / 2), top: Math.max(0, (B.cur.py / 640) * c.clientHeight - st.clientHeight / 2) }), 60); };
+    if ($('bZoom')) $('bZoom').onclick = () => { document.body.classList.toggle('bzfit'); try { localStorage.setItem('h3-bzoom', document.body.classList.contains('bzfit') ? '0' : '1'); } catch (e) { /* ignore */ } const st = $('stage'), c = $('bat'); if (B && B.cur && st && c) setTimeout(() => st.scrollTo({ left: Math.max(0, (B.cur.px / 960) * c.clientWidth - st.clientWidth / 2), top: Math.max(0, (B.cur.py / 640) * c.clientHeight - st.clientHeight / 2) }), 60); };
     $('bBal').onclick = () => { if (B && B.input && !B.balUsed) { B.spell = '__ballista'; toast('Ballista: pick an enemy stack'); } };
     $('bTent').onclick = () => { if (B && B.input && !B.tentUsed) { B.spell = '__tent'; toast('First aid: pick one of your stacks'); } };
     $('bHero').onclick = () => { if (B && B.input && !B.strikeUsed) { B.spell = '__strike'; toast('Hero Strike: pick an enemy stack'); } };
@@ -1676,6 +1676,7 @@ const Battle = (() => {
       placeMines();
       $('blog').innerHTML = ''; $('btitle').textContent = opts.title || 'Battle';
       document.body.classList.add('inbattle'); rotateHint(true);
+      try { if (matchMedia('(orientation: landscape) and (max-height: 540px)').matches) document.body.classList.toggle('bzfit', localStorage.getItem('h3-bzoom') !== '1'); } catch (e) { /* ignore */ }   // phones in landscape: the whole field fits at once; the zoom button still follows the active unit
       log(opts.siege ? (opts.siege.dside === 1 ? '🏰 Siege! Break the gate, cross the drawbridge, beware the towers.' : '🏰 The castle is under siege — hold the walls!') : 'Battle begins!');
       refreshButtons();
       requestAnimationFrame(draw);

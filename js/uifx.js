@@ -141,10 +141,12 @@
     const units = []; let carry = [];
     const push = (u) => { if (carry.length) { u.els = carry.concat(u.els); u.h += carry.reduce((a, e) => a + e.offsetHeight + 6, 0); carry = []; } units.push(u); };
     els.forEach((el) => {
+      if (Array.isArray(el)) { push({ els: el, h: Math.max(...el.map(e => e.offsetHeight)) + 8, host: host.slice() }); return; }   // a row of cards of one grid
       if (!el.offsetHeight && !el.children.length) return;
       if (/^H[2-4]$/.test(el.tagName)) { carry.push(el); return; }
       const kids = [...el.children].filter(k => k.offsetHeight > 0);
-      if (el.offsetHeight > avail * 0.85 && kids.length >= 2 && depth < 4 && !el.matches('canvas, img, button, p, span, b, i, label, input, select')) {
+      if (el.offsetHeight > avail * 0.85 && kids.length === 1 && depth < 5 && !/^(canvas|img|button|input|select|p|span|b|i|label)$/i.test(el.tagName)) { split(kids, avail, host.concat(el), depth + 1).forEach(u => push(u)); return; }   // a wrapper around one big block: look inside
+      if (el.offsetHeight > avail * 0.85 && kids.length >= 2 && depth < 4 && !el.matches('canvas, img, button, p, span, b, i, label, input, select, .doll, .armyrow, .garrow, .hsstats, .hsarmy, .hsbig, .stats, .chips, .acts, .bacts, .opts, .seg, .flags, .tl, svg')) {
         const rows = []; kids.forEach(k => { const last = rows[rows.length - 1]; if (last && Math.abs(last[0].offsetTop - k.offsetTop) < 3 && /grid|row|list/i.test(getComputedStyle(el).display + ' ' + el.className)) last.push(k); else rows.push([k]); });
         const inner = split(rows.map(r => (r.length === 1 ? r[0] : r)), avail, host.concat(el), depth + 1);
         inner.forEach(u => push(u)); return;
@@ -165,11 +167,11 @@
       const kids = [...root.children], fixed = kids.filter(isFixed), body = kids.filter(k => !isFixed(k));
       const foot = fixed.find(k => k.classList.contains('mb')), fixedH = fixed.reduce((a, k) => a + (k.offsetHeight && getComputedStyle(k).position !== 'sticky' && getComputedStyle(k).position !== 'absolute' ? k.offsetHeight + 8 : 0), 0);
       const stick = foot && ['sticky', 'fixed', 'absolute'].includes(getComputedStyle(foot).position) ? foot.offsetHeight + 8 : 0;
-      const avail = box.clientHeight - fixedH - stick - 60 - (root === box ? 0 : (root.offsetTop > 0 ? Math.min(root.offsetTop, 40) : 0));
+      const avail = box.clientHeight - fixedH - stick - 52 - (root === box ? 0 : (root.offsetTop > 0 ? Math.min(root.offsetTop, 40) : 0));
       if (avail < 120) return;
       const units = split(body, avail, [], 0);
       const pgs = []; let page = [], h = 0;
-      units.forEach(u => { if (page.length && h + u.h > avail) { pgs.push(page); page = []; h = 0; } page.push(u); h += u.h; });
+      units.forEach(u => { if (page.length && h + u.h > avail && !(u.h > avail * 0.8 && h < avail * 0.35)) { pgs.push(page); page = []; h = 0; } page.push(u); h += u.h; });
       if (page.length) pgs.push(page);
       if (pgs.length < 2) return;
       units.forEach(u => { u.els.forEach(e => hideable.add(e)); u.host.forEach(e => hideable.add(e)); });

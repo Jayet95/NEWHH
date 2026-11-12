@@ -1434,3 +1434,28 @@ body.skin #mbox .gacts button, #mbox .gacts button { flex: 1 1 0; min-width: 0; 
 .tpbody .wcard .wpic .bcr { position: absolute; right: 6px; top: 6px; }
 .tpbody .wcard .wpic .bcr { position: absolute !important; right: 6px; top: 6px; width: 52px; height: 52px; z-index: 2; }
 .tpbody .wcard .wpic .bcr img.pic { width: 100% !important; height: 100% !important; max-width: none; aspect-ratio: auto; object-fit: contain; }
+
+/* Warriors popup: all seven creatures on one page, no sideways scrolling */
+#mbox .tpbody .bgrid.wgrid { display: grid !important; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; overflow: visible !important; scroll-snap-type: none; cursor: default; flex: 1 1 auto; align-items: stretch; }
+#mbox .tpbody .bgrid.wgrid > .wcard { flex: none; min-width: 0; }
+.tpbody .wcard .bacts { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.tpbody .wcard .bacts input { width: 100% !important; box-sizing: border-box; text-align: center; }
+.tpbody .wcard .bacts button { width: 100%; }
+.tpbody .wcard .wstats { display: flex; flex-wrap: wrap; gap: 2px; }
+@media (min-width: 761px) and (max-width: 1100px) { #mbox .tpbody .bgrid.wgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 760px) {
+  #mbox .tpbody .bgrid.wgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+  .tpbody .wcard { padding: 4px !important; }
+  .tpbody .wcard .wstats, .tpbody .wcard .small { display: none; }
+  .tpbody .wcard b { font-size: 11px; line-height: 1.1; }
+  .tpbody .wcard .wpic .bcr { width: 26px; height: 26px; right: 2px; top: 2px; }
+  .tpbody .wcard .wpic .wav { font-size: 11px; min-width: 20px; height: 20px; }
+  .tpbody .wcard .bacts button, .tpbody .wcard .bacts input { font-size: 11px !important; min-height: 30px !important; padding: 2px !important; }
+  .tpbody .wcard .lockpill { font-size: 10px; }
+}
+@media (max-width: 760px) {
+  body.skin .tpbody .wcard .bacts button { border: 1px solid #0d0803 !important; border-image: none !important; border-radius: 6px !important; background: var(--grain), linear-gradient(#b8892a, #6f4d10) !important; color: #2a1604 !important; box-shadow: inset 0 0 0 1px var(--edge) !important; min-height: 30px !important; height: 30px; padding: 0 2px !important; font-size: 11px !important; text-shadow: none; }
+  .tpbody .wcard .bacts input { height: 28px !important; min-height: 0 !important; padding: 0 !important; font-size: 12px !important; }
+  .tpbody .wcard .bacts { margin-top: auto; }
+}
+.tpbody .wcard .bacts input, .tpbody .wcard .bacts button { flex: 0 0 auto !important; }

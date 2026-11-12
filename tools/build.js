@@ -21,6 +21,7 @@ if (fs.existsSync(path.join(root, 'audio'))) fs.cpSync(path.join(root, 'audio'),
 if (fs.existsSync(path.join(root, 'fonts'))) fs.cpSync(path.join(root, 'fonts'), path.join(dist, 'fonts'), { recursive: true });
 if (fs.existsSync(path.join(root, 'themes'))) fs.cpSync(path.join(root, 'themes'), path.join(dist, 'themes'), { recursive: true });
 if (fs.existsSync(path.join(root, 'art'))) fs.cpSync(path.join(root, 'art'), path.join(dist, 'art'), { recursive: true });
+if (fs.existsSync(path.join(root, 'art'))) require('./pack_art')(root, path.join(dist, 'art', 'packs'));   // a few big files instead of thousands of requests
 fs.writeFileSync(path.join(dist, 'sw.js'), fs.readFileSync(path.join(root, 'sw.js'), 'utf8').replace('__VERSION__', version));
 
 const size = (d) => fs.readdirSync(d, { withFileTypes: true }).reduce((s, e) => s + (e.isDirectory() ? size(path.join(d, e.name)) : fs.statSync(path.join(d, e.name)).size), 0);

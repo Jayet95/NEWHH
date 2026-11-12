@@ -1826,7 +1826,7 @@
     const bsrc = (k) => (Assets.has('ui/town_btn_' + t.fac + '_' + k) && Assets.src('ui/town_btn_' + t.fac + '_' + k)) || null;
     const tabBtn = (k, label, ico) => { const u = bsrc(k === 'war' ? 'war' : 'bld'); return `<button class="ttab${townTab === k ? ' on' : ''}${u ? ' tbtn' : ''}" data-ttab="${k}" title="${label}">${u ? `<img src="${u}" alt="${label}" draggable="false">` : ico + ' ' + label}</button>`; };
     // the whole screen is the town picture (like the original); the troops, two buttons and a panel for Warriors / Buildings sit on top of it
-    const panel = townTab ? `<div class="tpanel"><div class="tphead"><b>${townTab === 'bld' ? '🏗️ Buildings' : '⚔️ Warriors'}</b><button id="tpClose" class="tpx" title="Close">✕</button></div><div class="tpbody">${townTab !== 'bld' ? `<div class="bgrid wgrid">${wc}</div>` + outpostHtml(t) : `<h4>Creature dwellings</h4><div class="bgrid">${dwc}</div><h4>Town buildings</h4><div class="bgrid">${cardify(bld + smithy)}</div>` + caravanHtml(t, mt)}</div></div>` : '';
+    const panel = townTab ? `<div class="tpanel"><div class="tphead"><b>${townTab === 'bld' ? '🏗️ Buildings' : '⚔️ Warriors'}</b><span class="tpr">${townTab === 'bld' ? '' : '<button id="tBuyAll" class="tpall" title="Recruit as many of every creature as you can afford, strongest first">Recruit all</button>'}<button id="tpClose" class="tpx" title="Close">✕</button></span></div><div class="tpbody">${townTab !== 'bld' ? `<div class="bgrid wgrid">${wc}</div>` + outpostHtml(t) : `<h4>Creature dwellings</h4><div class="bgrid">${dwc}</div><h4>Town buildings</h4><div class="bgrid">${cardify(bld + smithy)}</div>` + caravanHtml(t, mt)}</div></div>` : '';
     const html = cvHtml + `<div class="tui"><div class="ttop">${topHtml}</div><div class="tfill"></div><div class="gstack">` + gTop + gHero + `</div><div class="tbar">${tabBtn('war', 'Warriors', '⚔️')}${tabBtn('bld', 'Buildings', '🏗️')}<button class="primary" id="tClose">Leave town</button></div>${panel}</div>`;
     $('mbox').innerHTML = html; $('mbox').classList.add('townfull'); $('modal').classList.remove('hide'); townHover = -1;
     { const cv = $('tcv'), at = (e) => { const r = cv.getBoundingClientRect(); return TownArt.slotAt((e.clientX - r.left - townV.x) / townV.k, (e.clientY - r.top - townV.y) / townV.k, TW, TH); };
@@ -1955,6 +1955,18 @@
       for (const s of th.army) if (s && C[s.t].line === id && C[s.t].lv < t.up[tier]) s.t = to;
       mergeArmy(th); toast('Your troops have been upgraded!'); startTownAnim('upgrade', tier - 1); again();
     });
+    if ($('tBuyAll')) $('tBuyAll').onclick = () => {   // every built dwelling, strongest first: as many as the stock, the money and the free slots allow
+      const got = []; let bought = 0, full = false;
+      for (let tier = 7; tier >= 1; tier--) {
+        if (!t.b[tier]) continue; const type = tierType(t, tier), c = C[type]; let n = t.avail[tier] || 0;
+        while (n > 0 && !canAfford(G.res, Object.fromEntries(Object.entries(c.cost).map(([k, v]) => [k, v * n])))) n--;
+        if (n <= 0) continue;
+        if (!addToArmy(th || { army: t.garrison }, type, n)) { full = true; continue; }
+        pay(G.res, c.cost, n); t.avail[tier] -= n; bought += n; got.push(n + ' ' + c.n);
+      }
+      if (!bought) return toast(full ? (here ? 'No free army slot.' : 'The garrison is full.') : 'Nothing to recruit (stock or resources).');
+      sfx('click'); toast('Recruited ' + got.join(', ') + '.' + (full ? ' Some stacks did not fit.' : '')); again();
+    };
     q('[data-qty]', b => b.onclick = () => {
       const [tr, op] = b.dataset.qty.split(':'), inp = $('n' + tr), mx = +inp.dataset.max || 0; let v = +inp.value || 0;
       v = op === 'max' ? mx : v + +op; inp.value = Math.max(mx ? 1 : 0, Math.min(mx, v)); sfx('click');

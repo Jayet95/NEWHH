@@ -1367,3 +1367,5 @@ body.skin #mbox .gacts button, #mbox .gacts button { flex: 1 1 0; min-width: 0; 
 .slot.drag-src { opacity: .35; }
 .slot.drop { outline: 2px solid #ffd86a; outline-offset: -2px; box-shadow: 0 0 12px rgba(255, 216, 106, .7); }
 .slot-ghost { position: fixed !important; z-index: 99999; pointer-events: none; transform: translate(-50%, -50%) scale(1.1); opacity: .92; box-shadow: 0 8px 18px rgba(0, 0, 0, .7); width: 62px; height: 70px; margin: 0; }
+.gstack { background: rgba(0, 0, 0, .22); border: 1px solid var(--edge); border-radius: 8px; padding: 2px 6px 4px; margin: 6px 0; }
+.gstack .garrow { margin: 1px 0 2px; }

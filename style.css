@@ -1357,3 +1357,8 @@ body.skin #mbox .gacts button, #mbox .gacts button { flex: 1 1 0; min-width: 0; 
 /* desktop: the town picture leaves room for the hero army and the tabs without scrolling */
 @media (min-width: 761px) and (min-height: 541px) { #mbox #tcv { width: auto !important; max-width: 100% !important; height: auto !important; max-height: 36vh; margin: 0 auto; } }
 .gacts { max-width: 560px; margin-left: auto; margin-right: auto; }
+/* town, Warriors tab: the creature cards sit in one row that slides sideways (swipe, wheel or drag) */
+#mbox .bgrid.wgrid { display: flex !important; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; gap: 8px; scroll-snap-type: x proximity; padding: 2px 2px 8px; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; scrollbar-width: thin; cursor: grab; }
+#mbox .bgrid.wgrid.dragging { cursor: grabbing; scroll-snap-type: none; user-select: none; }
+#mbox .bgrid.wgrid > .wcard { flex: 0 0 clamp(150px, 44vw, 210px); scroll-snap-align: start; }
+@media (min-width: 761px) { #mbox .bgrid.wgrid > .wcard { flex-basis: 215px; } }

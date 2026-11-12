@@ -189,3 +189,14 @@
   let sx = 0; box.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; }, { passive: true });
   box.addEventListener('touchend', (e) => { if (!pages.length) return; const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 70) { if (dx < 0 && cur < pages.length - 1) cur++; else if (dx > 0 && cur > 0) cur--; show(); } }, { passive: true });
 })();
+
+// ---------- 7. sliding rows (town Warriors): the mouse wheel and a mouse drag move them sideways; touch scrolls natively ----------
+(() => {
+  const box = document.getElementById('mbox'); if (!box) return;
+  const row = (e) => e.target.closest && e.target.closest('.wgrid');
+  box.addEventListener('wheel', (e) => { const r = row(e); if (!r || r.scrollWidth <= r.clientWidth) return; if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { r.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
+  let drag = null;
+  box.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse' || e.button !== 0) return; const r = row(e); if (!r || r.scrollWidth <= r.clientWidth || e.target.closest('button, input, select')) return; drag = { r, x: e.clientX, left: r.scrollLeft, moved: false }; });
+  window.addEventListener('pointermove', (e) => { if (!drag) return; const dx = e.clientX - drag.x; if (Math.abs(dx) > 4) { drag.moved = true; drag.r.classList.add('dragging'); } if (drag.moved) drag.r.scrollLeft = drag.left - dx; });
+  window.addEventListener('pointerup', () => { if (drag) { drag.r.classList.remove('dragging'); drag = null; } });
+})();

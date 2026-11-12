@@ -1395,3 +1395,9 @@ body.skin #mbox .gacts button, #mbox .gacts button { flex: 1 1 0; min-width: 0; 
 @media (min-width: 761px) { .tpanel { left: 50%; right: auto; transform: translateX(-50%); width: min(calc(100% - 16px), 1100px); } }
 #mbox.townfull > #tcv { touch-action: none; }
 @media (max-width: 760px) { .ttop h2 { font-size: 15px; padding: 1px 12px; } }
+/* hero selection (phone): the painted portrait sits centred inside its frame, which hugs the picture */
+@media (max-width: 700px) and (orientation: portrait) {
+  .hspan { grid-template-columns: auto 1fr !important; }
+  .hspan .hsbig { grid-row: 1 / 4; grid-column: 1; width: max-content; height: max-content; align-self: center; justify-self: start; padding: 6px !important; box-sizing: content-box; }
+  .hsbig .pic, .hsbig .hart { width: 64px !important; height: 64px !important; max-width: none !important; display: block; margin: 0; }
+}

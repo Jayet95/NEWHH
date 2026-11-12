@@ -59,7 +59,7 @@ const Celebrate = (() => {
     raf = requestAnimationFrame(tick);
   }
   return {
-    fight() { if (reduce() || typeof document === 'undefined') return; begin(3.2); const W = cv.width, H = cv.height; cannon(W * 0.08, H + 10, 70, 0.45, H * 1.05, -Math.PI / 2 + 0.35); cannon(W * 0.92, H + 10, 70, 0.45, H * 1.05, -Math.PI / 2 - 0.35); say('VICTORY!', '', 2.4); },
+    fight() { if (reduce() || typeof document === 'undefined') return; begin(3.2); const W = cv.width, H = cv.height; cannon(W * 0.08, H + 10, 70, 0.45, H * 1.05, -Math.PI / 2 + 0.35); cannon(W * 0.92, H + 10, 70, 0.45, H * 1.05, -Math.PI / 2 - 0.35); },
     loot() { if (reduce() || typeof document === 'undefined') return; begin(3.5); coins(40); },
     game() { if (reduce() || typeof document === 'undefined') return; begin(8); fwUntil = performance.now() + 7000; nextFw = 0; say('YOU WIN!', 'Every rival has fallen — the realm is yours', 7); cannon(cv.width * 0.1, cv.height + 10, 90, 0.5, cv.height * 1.1, -Math.PI / 2 + 0.3); cannon(cv.width * 0.9, cv.height + 10, 90, 0.5, cv.height * 1.1, -Math.PI / 2 - 0.3); coins(30); },
   };

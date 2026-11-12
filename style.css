@@ -1287,3 +1287,8 @@ img.pic.hart { object-fit: cover; border-radius: 6px; border: 2px solid #8c6a22;
 .eqhero { width: 100%; min-width: 0; box-sizing: border-box; padding: 0 2px; overflow: hidden; justify-self: stretch; }
 .eqhero .pic, .eqhero img.pic.hart { width: 100% !important; max-width: 100% !important; height: auto !important; aspect-ratio: 1 / 1; object-fit: cover; margin: 0 auto; display: block; box-sizing: border-box; }
 .eqhero b, .eqhero small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* phones: the seven resources sit on two lines (4 + 3), all visible, nothing to scroll sideways */
+@media (max-width: 760px) {
+  body #top #res, body #mres { flex-wrap: wrap !important; overflow: visible !important; justify-content: center !important; gap: 4px 5px !important; }
+  body #top #res .chip, body #mres .chip { flex: 0 1 calc(25% - 6px); min-width: 0; justify-content: center; box-sizing: border-box; }
+}

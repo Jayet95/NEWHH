@@ -1,7 +1,7 @@
 'use strict';
 const RES = ['gold', 'wood', 'ore', 'mercury', 'sulfur', 'crystal', 'gems'];
-const RES_ICON = { gold: '🪙', wood: '🪵', ore: '🪨', mercury: '🧪', sulfur: '🌋', crystal: '💠', gems: '💎' };
-const RES_VALUE = { gold: 1, wood: 250, ore: 250, mercury: 500, sulfur: 500, crystal: 500, gems: 500 };
+const RES_ICON = { gold: '🪙', wood: '🪵', ore: '🪨', mercury: '🧪', sulfur: '🌋', crystal: '💠', gems: '💎', food: '🌾' };
+const RES_VALUE = { gold: 1, wood: 250, ore: 250, mercury: 500, sulfur: 500, crystal: 500, gems: 500, food: 60 };
 const MINE_YIELD = { gold: 1000, wood: 2, ore: 2, mercury: 1, sulfur: 1, crystal: 1, gems: 1 };
 const MINE_ICON = { gold: '💰', wood: '🪵', ore: '⛏️', mercury: '🧪', sulfur: '🌋', crystal: '💠', gems: '💎' };
 const MARKET_RATE = 0.8, MERCHANT_RATE = 0.6;
@@ -446,6 +446,17 @@ function groupLabel(n) {
   if (n < 50) return 'Lots of'; if (n < 100) return 'A horde of'; return 'A throng of';
 }
 function fmtCost(c) { return Object.keys(c).map(k => RES_ICON[k] + c[k]).join(' '); }
+// ---------- Food mode (optional): farms feed the army; every recruit costs food next to the coins ----------
+const FOOD = {
+  start: 200, mapFarm: 10, field: 8, maxField: 12, fieldCost: { gold: 800, wood: 8 }, upkeepDiv: 30,
+  town: [{ n: 'No farm' }, { n: 'Farm', inc: 12, cost: { gold: 1000, wood: 10 } }, { n: 'Large farm', inc: 24, cost: { gold: 2000, wood: 10, ore: 10 } }, { n: 'Granary estate', inc: 40, cost: { gold: 3500, wood: 15, ore: 15 } }],
+};
+const foodOf = (id) => Math.max(1, Math.round(Math.sqrt((C[id] && C[id].v || 50) / 60) / 1.3));
+function setFoodMode(on) {
+  const i = RES.indexOf('food');
+  if (on && i < 0) RES.push('food'); else if (!on && i >= 0) RES.splice(i, 1);
+  for (const id of Object.keys(C)) if (C[id].cost) { if (on) C[id].cost.food = foodOf(id); else delete C[id].cost.food; }
+}
 function canAfford(res, c) { return Object.keys(c).every(k => res[k] >= c[k]); }
 function pay(res, c, mul = 1) { for (const k in c) res[k] -= c[k] * mul; }
 function armyValue(arr) { return arr.reduce((s, a) => s + (a ? C[a.t].v * a.n : 0), 0); }

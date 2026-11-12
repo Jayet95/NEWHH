@@ -1515,3 +1515,13 @@ body.skin #mbox .gacts button, #mbox .gacts button { flex: 1 1 0; min-width: 0; 
   #sheetBody #mini { display: block; }
   #hint { bottom: calc(96px + var(--sab)); top: auto; }
 }
+
+/* wide screens: the important things sit in a column on the right (minimap, hero, army, territory), the action bar stays at the bottom */
+@media (min-width: 1000px) and (min-height: 541px) {
+  body:not(.inbattle) #game { display: flex; flex-direction: row; gap: 8px; }
+  body:not(.inbattle) #stage { flex: 1 1 auto; width: auto; min-width: 0; }
+  body:not(.inbattle) #side { display: flex; flex-direction: column; gap: 8px; flex: none; width: clamp(280px, 22vw, 340px); overflow-y: auto; overflow-x: hidden; max-height: 100%; scrollbar-width: thin; }
+  body:not(.inbattle) #minipanel { max-width: none; width: auto; grid-column: auto; }
+  body:not(.inbattle) #emblem { display: none; }
+  body:not(.inbattle) #mbar #mHero, body:not(.inbattle) #mbar #mArmy, body:not(.inbattle) #mbar #mLand { display: none !important; }
+}

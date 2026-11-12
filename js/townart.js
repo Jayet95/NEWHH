@@ -187,7 +187,7 @@ const TownArt = (() => {
     g.restore();
   }
   function scene(g, t, now, anim, info, W, H, hover = -1, full = null) {
-    layout = full ? full.plots.map(([px, py, pw]) => ({ x: full.x + px * full.iw, y: full.y + py * full.ih, w: pw * full.iw })) : null;
+    layout = full ? full.plots.map(([px, py, pw]) => ({ x: full.x + px * full.iw, y: full.y + py * full.ih, w: pw * full.iw * 1.3 })) : null;
     const sceneImg = full ? full.img : typeof Assets !== 'undefined' ? (innerWidth < 700 && Assets.get('ui/town_scene_' + t.fac + '_s')) || Assets.get('ui/town_scene_' + t.fac) : null; scn = !!sceneImg;
     const hue = hueOf(t.fac), fort = t.fort || 0, sky = SKY[t.fac] || [hsl(hue, 40, 22), hsl(hue, 45, 62)], mea = MEADOW[t.fac] || [hsl(hue, 30, 38), hsl(hue, 34, 16)];
     const hy = H * 0.5;

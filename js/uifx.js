@@ -110,7 +110,6 @@
     document.addEventListener('assets-progress', (e) => { const d = e.detail; if (!d || finished) return; bar.classList.remove('indet'); fill.style.width = Math.max(4, Math.round(100 * d.done / Math.max(1, d.total))) + '%'; if (d.done >= d.total) finish(); });
     document.addEventListener('assets-ready', finish);
     if (typeof Assets !== 'undefined' && Assets.ready) Assets.ready.then(finish); else finish();
-    setTimeout(finish, 15000);
   }
 
   // ---------- 5. optional frame art: turn on the frames only when the files exist ----------

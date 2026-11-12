@@ -1,11 +1,11 @@
 'use strict';
 // Optional hand-made art in art/ (see ART.md): when an image exists it replaces the picture painted in code.
 // art/manifest.json (written by `npm run art` and by the build) lists the files. Big sets (battle poses, mounted heroes,
-// large backgrounds) are loaded on demand with Assets.need(); everything else is loaded up front.
+// large backgrounds) are all loaded up front behind the title-screen loading bar; Assets.need() then resolves at once.
+document.documentElement.classList.add('assets-loading');
 const Assets = (() => {
   const BASE = 'art/', stems = {}, files = {}, pending = {};
   const stem = (f) => f.replace(/\.(png|webp|jpe?g|svg|gif)$/i, '');
-  const LAZY = /^(poses|mounted|anim)\/|^ui\/(castle_select|hero_select|adventure|town_)/;
   const loadOne = (s) => {
     if (stems[s]) return Promise.resolve(stems[s]);
     if (!files[s]) return Promise.resolve(null);
@@ -16,12 +16,13 @@ const Assets = (() => {
     .then(async (m) => {
       const list = (m && m.files) || []; if (!list.length) return 0;
       list.forEach(f => { files[stem(f)] = f; });
-      const eager = Object.keys(files).filter(s => !LAZY.test(s)); let done = 0;
+      const eager = Object.keys(files); let done = 0, next = 0;   // everything is loaded up front, so no screen shows a second loader later
       const tick = () => { try { document.dispatchEvent(new CustomEvent('assets-progress', { detail: { done, total: eager.length } })); } catch (e) { /* ignore */ } };
-      await Promise.all(eager.map(s => loadOne(s).then(() => { if (++done % 20 === 0 || done === eager.length) tick(); })));
+      const worker = async () => { while (next < eager.length) { const s = eager[next++]; await loadOne(s); if (++done % 25 === 0 || done === eager.length) tick(); } };
+      await Promise.all(Array.from({ length: 24 }, worker));   // 24 at a time keeps the browser responsive and the bar moving
       return eager.length;
     })
-    .then((n) => { if (n) { try { document.dispatchEvent(new Event('assets-ready')); } catch (e) { /* ignore */ } } return n; });
+    .then((n) => { document.documentElement.classList.remove('assets-loading'); if (n) { try { document.dispatchEvent(new Event('assets-ready')); } catch (e) { /* ignore */ } } return n; });
   return {
     ready,
     // first loaded image among the stems (e.g. 'portraits/castle1_up', 'portraits/castle1')

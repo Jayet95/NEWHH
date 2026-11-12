@@ -1240,3 +1240,7 @@ body.skin #quick .qx, #quick .qx { width: 34px; height: 54px; border-radius: 8px
   .garrow .slot img { width: 92%; height: auto; max-width: none; }
   .garrow .slot small { font-size: 10px; margin-top: 1px; }
 }
+
+/* the menu buttons wait until every asset is loaded, so nothing loads later */
+html.assets-loading #title .col { opacity: .0; pointer-events: none; }
+#title .col { transition: opacity .4s; }

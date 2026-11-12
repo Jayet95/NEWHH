@@ -1525,3 +1525,22 @@ body.skin #mbox .gacts button, #mbox .gacts button { flex: 1 1 0; min-width: 0; 
   body:not(.inbattle) #emblem { display: none; }
   body:not(.inbattle) #mbar #mHero, body:not(.inbattle) #mbar #mArmy, body:not(.inbattle) #mbar #mLand { display: none !important; }
 }
+
+/* phone: the End turn button sits on the map; the bottom bar can be folded away with its handle */
+#mapEnd, #mTog { display: none; }
+@media (max-width: 760px), (orientation: landscape) and (max-height: 540px) {
+  #mapEnd { display: flex; position: absolute; left: 8px; bottom: 8px; z-index: 8; align-items: center; gap: 6px; padding: 8px 14px 8px 10px; min-height: 44px; font-size: 14px; font-weight: bold; border-radius: 10px; box-shadow: 0 2px 8px #000a; }
+  #mapEnd svg { width: 24px; height: 24px; fill: currentColor; }
+  body.inbattle #mapEnd { display: none; }
+  #mbar #mEnd { display: none !important; }
+  #mbar #mTog { display: flex; flex: 0 0 30px; min-height: 50px; align-items: center; justify-content: center; font-size: 18px; padding: 0; }
+  body.barhid #mbar > button:not(#mTog) { display: none !important; }
+  body.barhid #mbar { padding: 0; min-height: 0; background: none; border: 0; box-shadow: none; justify-content: center; }
+  body.barhid #mbar #mTog { flex: 0 0 auto; width: 64px; min-height: 22px; height: 22px; border-radius: 10px 10px 0 0; font-size: 14px; }
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  body.barhid #app { padding-right: calc(3px + var(--sar)) !important; }
+  body.barhid #mbar { width: 26px; background: none; border: 0; }
+  body.barhid #mbar #mTog { width: 26px; height: 64px; min-height: 64px; border-radius: 10px 0 0 10px; }
+  #mbar #mTog { flex: 0 0 26px; min-height: 0; width: 100%; height: 26px; }
+}

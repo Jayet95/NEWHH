@@ -2528,6 +2528,9 @@
   $('bTown').onclick = () => G && !busy && openTown();
   function fitZoom() { if (!G) return; setZoom(Math.min(cmap.clientWidth / ((G.W + 0.5) * TS), cmap.clientHeight / (G.H * RH + HR * 0.5)), 0, 0); clampCam(); }
   $('mEnd').onclick = endTurn;
+  $('mapEnd').onclick = endTurn;
+  { const tog = $('mTog'), apply = (v) => { document.body.classList.toggle('barhid', v); tog.firstChild.textContent = v ? '▲' : '▼'; try { Settings.mem('barhid', v ? 1 : 0); } catch (e) { /* ignore */ } };
+    apply(!!(Settings.mem('barhid'))); tog.onclick = () => apply(!document.body.classList.contains('barhid')); }
   $('mTown').onclick = () => G && !busy && openTown();
   // phone action bar: the side panels open as sheets (the real elements are moved into the dialog and back, so they stay live)
   let sheetBack = null;

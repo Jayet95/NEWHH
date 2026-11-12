@@ -1706,7 +1706,7 @@
   function openTown(t) {
     t = t || (curTown && curTown.owner === 0 ? curTown : defaultTown());
     if (!t) return toast('You do not own a town.');
-    curTown = t; (G.flags = G.flags || {}).town = true; Assets.need(['ui/town_' + t.fac, 'ui/town_scene_' + t.fac, 'ui/town_scene_' + t.fac + '_s']); if (typeof Sfx !== 'undefined' && Sfx.ambience) Sfx.ambience(t.fac); // quiet per-castle ambience while the town screen is open
+    curTown = t; (G.flags = G.flags || {}).town = true; Assets.need(['ui/town_' + t.fac, 'ui/town_scene_' + t.fac, 'ui/town_scene_' + t.fac + '_s'].concat(Assets.list('buildings/'))).then(() => { try { TownArt.reload(); } catch (e) { /* ignore */ } }); if (typeof Sfx !== 'undefined' && Sfx.ambience) Sfx.ambience(t.fac); // quiet per-castle ambience while the town screen is open
     const th = townHero(t), here = !!th, mt = myTowns(), coastal = !!G.dock && t === mt[0];
     const tabs = mt.length > 1 ? `<div class="hlist">${mt.map((x, i) => `<button class="hbtn${x === t ? ' on' : ''}" data-tab="${i}" title="${x.name}">${FACTIONS[x.fac].icon}</button>`).join('')}</div>` : '';
     let html = `${tabs}<h2>🏰 ${t.name} <span class="small">${FACTIONS[t.fac].name} · ${t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Settlement'}</span></h2><span class="townwide"></span><canvas id="tcv" width="1040" height="470" style="width:100%;height:auto;aspect-ratio:1040/470;border-radius:8px;border:2px solid #8c6a33;display:block;touch-action:manipulation"></canvas>

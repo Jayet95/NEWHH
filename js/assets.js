@@ -6,7 +6,7 @@ document.documentElement.classList.add('assets-loading');
 const Assets = (() => {
   const BASE = 'art/', stems = {}, files = {}, pending = {};
   const stem = (f) => f.replace(/\.(png|webp|jpe?g|svg|gif)$/i, '');
-  const LATER = /^(poses|mounted|anim)\/|^ui\/(castle_select|hero_select|adventure|town_)/;
+  const LATER = /^(poses|mounted|anim|buildings)\/|^ui\/(castle_select|hero_select|adventure|town_)/;
   const loadOne = (s) => {
     if (stems[s]) return Promise.resolve(stems[s]);
     if (!files[s]) return Promise.resolve(null);
@@ -25,9 +25,10 @@ const Assets = (() => {
     })
     .then((n) => {
       // background pass: everything else, 6 at a time, backdrops and poses before animation frames; Assets.need() still jumps the queue for what a screen asks for
-      const rest = Object.keys(files).filter(k => !stems[k]).sort((a, b) => (/^anim\//.test(a) - /^anim\//.test(b)) || (a < b ? -1 : 1)); let bi = 0;
+      const rank = (k) => (/^buildings\//.test(k) ? 0 : /^anim\//.test(k) ? 3 : /^(poses|mounted)\//.test(k) ? 2 : 1);
+      const rest = Object.keys(files).filter(k => !stems[k]).sort((a, b) => (rank(a) - rank(b)) || (a < b ? -1 : 1)); let bi = 0, bLeft = rest.filter(k => rank(k) === 0).length;
       const idle = (fn) => (window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 400 }) : setTimeout(fn, 30));
-      const bg = () => { if (bi >= rest.length) return; const k = rest[bi++]; loadOne(k).then(() => idle(bg)); };
+      const bg = () => { if (bi >= rest.length) return; const k = rest[bi++]; loadOne(k).then(() => { if (rank(k) === 0 && --bLeft === 0) { try { document.dispatchEvent(new Event('assets-ready')); } catch (e) { /* ignore */ } } idle(bg); }); };
       setTimeout(() => { for (let i = 0; i < 6; i++) bg(); }, 1500);
       document.documentElement.classList.remove('assets-loading'); if (n) { try { document.dispatchEvent(new Event('assets-ready')); } catch (e) { /* ignore */ } } return n; });
   return {
@@ -37,6 +38,7 @@ const Assets = (() => {
     need: (list) => Promise.all(list.map(loadOne)),
     url: (s) => (files[s] ? BASE + files[s] : null),
     has: (s) => !!files[s],
+    list: (prefix) => Object.keys(files).filter(k => k.startsWith(prefix)),
     count: () => Object.keys(stems).length,
   };
 })();

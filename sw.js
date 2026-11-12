@@ -21,7 +21,10 @@ self.addEventListener('fetch', (e) => {
   const heavy = HEAVY.test(req.url), store = (res) => { if (res && res.status === 200) { const copy = res.clone(); caches.open(heavy ? ART : CACHE).then((c) => c.put(req, copy)); } return res; };
   if (heavy) {
     e.respondWith(caches.open(ART).then((c) => c.match(req, { ignoreSearch: true })).then((hit) => {
-      const net = fetch(req, hit ? { cache: 'no-cache' } : undefined).then(store).catch(() => hit);   // a cached file is only revalidated (a tiny 304 answer), never downloaded again
+      // a cached file is served at once; it is checked again (a tiny 304 answer) only when the copy is over a day old, so a visit does not fire thousands of background requests
+      const age = hit ? Date.now() - (Date.parse(hit.headers.get('date') || '') || 0) : 0;
+      if (hit && age < 864e5) return hit;
+      const net = fetch(req, hit ? { cache: 'no-cache' } : undefined).then(store).catch(() => hit);
       return hit || net;
     }));
     return;

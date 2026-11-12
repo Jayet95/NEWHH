@@ -1292,3 +1292,65 @@ img.pic.hart { object-fit: cover; border-radius: 6px; border: 2px solid #8c6a22;
   body #top #res, body #mres { flex-wrap: wrap !important; overflow: visible !important; justify-content: center !important; gap: 4px 5px !important; }
   body #top #res .chip, body #mres .chip { flex: 0 1 calc(25% - 6px); min-width: 0; justify-content: center; box-sizing: border-box; }
 }
+/* the resource bar above every window uses the same stone top bar as the map (day and night), not the old dark bar with dividers */
+body.skin #mres { border: 16px solid transparent; border-image: var(--t-d, url(art/ui/topbar_day.png)) 38 fill / 16px stretch; background: none; box-shadow: none; padding: 2px 6px; }
+body.skin.night #mres { border-image: var(--t-n, url(art/ui/topbar_night.png)) 38 fill / 16px stretch; }
+@media (max-width: 760px) { body.skin #mres { border-width: 12px; border-image-width: 12px; } }
+
+/* ===== phones in portrait: the new-game screens are compact enough to fit one screen ===== */
+@media (max-width: 620px) and (orientation: portrait) {
+  .facgrid { grid-template-columns: repeat(3, 1fr) !important; gap: 6px !important; }
+  .facpic { height: 84px !important; } .ribbon { font-size: 13px !important; padding: 12px 4px 3px !important; letter-spacing: 0 !important; }
+  .card.fac .blurb { display: none !important; }
+  .card.fac .crow { gap: 2px !important; margin-top: 3px !important; } .card.fac .crow .pic { width: 26px !important; height: 26px !important; }
+  .card.fac { padding-bottom: 4px !important; }
+  .hsgrid { grid-template-columns: repeat(4, 1fr) !important; gap: 5px !important; }
+  .htile { padding: 3px 2px !important; } .htile .pic, .htile .hart { width: 54px !important; height: 54px !important; max-width: 54px !important; } .htile span { font-size: 11px; } .htile small { display: none; }
+  .hsbig .pic, .hsbig .hart { width: 84px !important; height: 84px !important; }
+  .hspan { padding: 6px 8px !important; } .hspan h3 { font-size: 16px; margin: 2px 0 0; } .hsstats { margin: 4px 0 !important; } .hsstats b { font-size: 15px; }
+  .hspan h4 { margin: 4px 0 2px !important; font-size: 10px; }
+  .hsarmy .pic { width: 40px !important; height: 40px !important; }
+  .opt { padding-bottom: 4px !important; } .optc small, .opts button small { display: none !important; } .opts button { min-height: 34px !important; }
+  .setup .grid.two .card .small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+}
+@media (max-width: 620px) and (orientation: portrait) {
+  .hsgrid { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; gap: 4px !important; } .htile { min-width: 0; }
+  .htile .pic, .htile .hart { width: 42px !important; height: 42px !important; max-width: 42px !important; } .htile span { font-size: 9px; margin-top: 1px; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+}
+@media (max-width: 700px) and (orientation: portrait) {
+  #mbox.art-banner > .setup::before { height: 84px; }
+  #mbox.art-banner h2 { margin-top: -26px; font-size: 20px; }
+  .hspan .hsgo { display: none !important; } .hsgo2 { display: inline-flex !important; }
+  .hsbig { display: flex; justify-content: center; } .hsarmy .pic { width: 34px !important; height: 34px !important; } .hsarmy div { width: 56px; font-size: 9px; }
+}
+@media (max-width: 700px) and (orientation: portrait) {
+  .hspan { display: grid !important; grid-template-columns: 92px 1fr; gap: 0 10px; align-items: center; padding: 6px 8px !important; }
+  .hspan .hsbig { grid-row: 1 / 4; grid-column: 1; }
+  .hspan h3, .hspan .hscls, .hspan .hsstats { grid-column: 2; margin: 0 !important; }
+  .hspan h4 { display: none !important; }
+  .hspan .hsspells, .hspan .hsarmy { grid-column: 1 / -1; margin-top: 4px; }
+  .setup > .small { display: none; }
+}
+@media (max-width: 700px) and (orientation: portrait) {
+  #mbox.art-banner > .setup::before { height: 64px; background: linear-gradient(180deg, transparent 55%, rgba(14, 9, 4, .95)), var(--scr-art) center 30% / cover no-repeat; }
+  #mbox.art-banner h2 { margin-top: -22px; }
+  .hsgrid .htile span { display: none; } .htile { padding: 2px !important; }
+}
+@media (max-width: 620px) and (orientation: portrait) {
+  .card.fac .crow { display: none !important; }
+  .facpic { height: 96px !important; }
+}
+@media (max-width: 700px) and (orientation: portrait) {
+  #mbox.art-banner > .setup::before { display: none; } #mbox.art-banner h2 { margin-top: 0; }
+  .setup .grid.two .card .mprev { height: 70px !important; width: 100%; object-fit: cover; }
+  .setup .grid.two .card { padding: 5px !important; } .setup .grid.two .card h3, .setup .grid.two .card b { font-size: 13px; }
+  .optpanel { padding: 6px 8px !important; gap: 4px !important; }
+  .opt { grid-template-columns: 1fr !important; gap: 3px !important; padding-bottom: 3px !important; }
+}
+/* town: garrison above the picture, hero army below it, two tabs (Warriors, Buildings) */
+.glabel { font-size: 11px; letter-spacing: .6px; text-transform: uppercase; color: var(--mut); margin: 4px 2px 2px; }
+#mbox .garrow { justify-content: center; margin: 2px 0 4px; }
+.gacts { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin: 2px 0 4px; } .gacts button { padding: 3px 10px !important; min-height: 28px !important; font-size: 12px !important; }
+.gnohero { text-align: center; margin: 4px 0; }
+body.skin #mbox .gacts button, #mbox .gacts button { flex: 1 1 0; min-width: 0; border: 1px solid #0d0803 !important; border-image: none !important; border-radius: 6px !important; background: var(--grain), linear-gradient(#3b2d1c, #19110a) !important; box-shadow: inset 0 0 0 1px var(--edge) !important; min-height: 30px !important; padding: 2px 4px !important; font-size: 11px !important; white-space: nowrap; }
+.gacts { flex-wrap: nowrap; }

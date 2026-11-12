@@ -69,10 +69,28 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
         const nx = nb[0]; prev = c; c = { x: nx[0], y: nx[1] };
       }
     } }
-  // the player's castle starts in a random corner (the map is laid out as before and mirrored); the bay lies along the nearest edge
+  // starting castles: in about 4 of 10 games the classic corners (the map is laid out as before and mirrored); otherwise the player's castle and the rivals' capitals
+  // stand at free places, anywhere inland, far enough from each other. The bay lies along the south edge, so the player's castle stays in the southern half.
   const flipX = R() < 0.5, flipY = R() < 0.5, fx = (x) => flipX ? W - 1 - x : x, fy = (y) => flipY ? H - 1 - y : y;
-  const P = { x: fx(5), y: fy(H - 6) };
-  const AIPOS = [{ x: fx(W - 6), y: fy(5) }, { x: fx(5), y: fy(5) }, { x: fx(W - 6), y: fy(H - 6) }, { x: fx(Math.floor(W / 2)), y: fy(4) }];
+  const bayRowsMax = 5, minSep = Math.max(W, H) * 0.42, nAi = Math.max(1, aiFacs.length);
+  let P = { x: fx(5), y: fy(H - 6) };
+  let AIPOS = [{ x: fx(W - 6), y: fy(5) }, { x: fx(5), y: fy(5) }, { x: fx(W - 6), y: fy(H - 6) }, { x: fx(Math.floor(W / 2)), y: fy(4) }];
+  if (R() >= 0.4) {
+    const hd = (a, b2) => Math.max(Math.abs(a.x - b2.x), Math.abs(a.y - b2.y));
+    const ri = (lo, hi) => lo + Math.floor(R() * (hi - lo + 1));
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const p = { x: fx(ri(6, W - 7)), y: fy(ri(Math.round(H * 0.45), H - bayRowsMax - 3)) }, ais = [];
+      for (let k = 0; k < nAi; k++) {
+        let got = null;
+        for (let t = 0; t < 80 && !got; t++) {
+          const c = { x: fx(ri(5, W - 6)), y: fy(ri(5, H - bayRowsMax - 3)) };
+          if (hd(c, p) >= minSep * (k ? 0.85 : 1) && ais.every(o => hd(o, c) >= minSep * 0.7)) got = c;
+        }
+        if (!got) break; ais.push(got);
+      }
+      if (ais.length === nAi) { P = p; AIPOS = ais; break; }
+    }
+  }
   const aiStarts = aiFacs.map((f, i) => AIPOS[i]);
   const E = aiStarts[0];
   // the bay along the southern edge, reachable by boat from the player's port

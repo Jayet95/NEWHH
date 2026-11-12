@@ -833,7 +833,7 @@
     if (b.dataset.qx) { Settings.mem('quickOpen', !Settings.mem('quickOpen')); renderQuick(); return; }
     if (b.dataset.qt !== undefined) { const t = myTowns()[+b.dataset.qt]; if (t) { centerOn(t.x, t.y); openTown(t); } return; }
     const i = +b.dataset.qh, h = G.heroes[i]; if (!h) return;
-    if (h === G.hero) return openHeroInfo(h);
+    if (h === G.hero) return (matchMedia('(max-width: 760px), (orientation: landscape) and (max-height: 540px)').matches ? $('mHero').click() : openHeroInfo(h));   // on a phone the map hero opens the same Hero screen as the bottom button
     setActive(i); G.path = null; centerOn(h.x, h.y); renderAll();
   });
   function nextHero() {
@@ -1590,7 +1590,7 @@
   }
   // clicking a plot in the picture opens the matching warriors / buildings card below and flashes it
   function townSlotClick(t, i) {
-    townTab = i === 13 ? 'gar' : (i < 7 && slotInfo(t, i).built) ? 'war' : 'bld';
+    townTab = (i < 7 && slotInfo(t, i).built) ? 'war' : 'bld';
     openTown(t);
     const el = $('mbox').querySelector('[data-slot="' + i + '"]');
     if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('slotflash'); setTimeout(() => el.classList.remove('slotflash'), 1600); }
@@ -1716,8 +1716,8 @@
     curTown = t; (G.flags = G.flags || {}).town = true; Assets.need(['ui/town_' + t.fac, 'ui/town_scene_' + t.fac, 'ui/town_scene_' + t.fac + '_s'].concat(Assets.list('buildings/'))).then(() => { try { TownArt.reload(); } catch (e) { /* ignore */ } }); if (typeof Sfx !== 'undefined' && Sfx.ambience) Sfx.ambience(t.fac); // quiet per-castle ambience while the town screen is open
     const th = townHero(t), here = !!th, mt = myTowns(), coastal = !!G.dock && t === mt[0];
     const tabs = mt.length > 1 ? `<div class="hlist"><button class="hbtn tnav" data-tnav="-1" title="Previous town">‹</button>${mt.map((x, i) => `<button class="hbtn${x === t ? ' on' : ''}" data-tab="${i}" title="${x.name}">${FACTIONS[x.fac].icon}</button>`).join('')}<button class="hbtn tnav" data-tnav="1" title="Next town">›</button></div>` : '';
-    let html = `${tabs}<h2>🏰 ${t.name} <span class="small">${FACTIONS[t.fac].name} · ${t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Settlement'}</span></h2><span class="townwide"></span><canvas id="tcv" width="1040" height="470" style="width:100%;height:auto;aspect-ratio:1040/470;border-radius:8px;border:2px solid #8c6a33;display:block;touch-action:manipulation"></canvas>
-      <div class="small">${here ? `${th.name} is in town — recruits join the hero's army.` : 'No hero in this town — recruits join the town garrison (a hero can pick them up later).'} Higher Town Hall levels unlock new dwellings and creature upgrades.</div>`;
+    let html = `${tabs}<h2>🏰 ${t.name} <span class="small">${FACTIONS[t.fac].name} · ${t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Settlement'}</span></h2><span class="townwide"></span>`;
+    const cvHtml = `<canvas id="tcv" width="1040" height="470" style="width:100%;height:auto;aspect-ratio:1040/470;border-radius:8px;border:2px solid #8c6a33;display:block;touch-action:manipulation"></canvas>`;
     let war = '', dwc = '', wc = '';
     tiersOf(t).forEach((id, i) => {
       const tier = i + 1, lv = t.up[tier], c = C[lineType(id, lv)], built = t.b[tier], av = t.avail[tier] || 0;
@@ -1771,16 +1771,13 @@
     const garrRow = `      <div class="trow big" data-slot="13"><div class="ic">${TownArt.pic('garrison', 1, t.fac, 64)}</div><div><b>Garrison</b><br><span class="small">${armyList(t.garrison, false) || 'No troops stationed.'} The garrison defends the town when no hero is inside${here ? '' : ' (bring a hero to move troops)'}.</span></div>
         <div class="acts"><button data-garr="1">Manage garrison</button></div></div>
 `;
-    const gcount = t.garrison.reduce((n, a) => n + (a ? a.n : 0), 0);
-    const tabBar = `<div class="ttabs"><button class="ttab${townTab === 'war' ? ' on' : ''}" data-ttab="war">⚔️ Warriors</button><button class="ttab${townTab === 'gar' ? ' on' : ''}" data-ttab="gar">🛡️ Garrison${gcount ? ` <small>${gcount}</small>` : ''}</button><button class="ttab${townTab === 'bld' ? ' on' : ''}" data-ttab="bld">🏗️ Buildings</button></div>`;
-    // the garrison tab: the castle's own troops and the hero's army side by side; click a stack, then a slot, to move, merge or swap
+    const tabBar = `<div class="ttabs"><button class="ttab${townTab !== 'bld' ? ' on' : ''}" data-ttab="war">⚔️ Warriors</button><button class="ttab${townTab === 'bld' ? ' on' : ''}" data-ttab="bld">🏗️ Buildings</button></div>`;
+    // like the original: the town's garrison above the picture, the visiting hero's army below it; click a stack, then a slot, to move, merge or swap
     const garSlot = (a, rk, i) => `<button class="slot${a ? '' : ' empty'}${garSel && garSel.r === rk && garSel.i === i && garSel.t === t ? ' sel' : ''}" data-gr="${rk}" data-gi="${i}" title="${a ? C[a.t].n + ' — ' + a.n : 'Empty slot'}">${a ? `${Art.pic(a.t, 52)}<small>${a.n}</small>` : ''}</button>`;
-    const garTab = `<h4>🛡️ ${t.name} garrison</h4><div class="small">The garrison defends the town when no hero is inside.</div><div class="armyrow garrow">${t.garrison.map((a, i) => garSlot(a, 'g', i)).join('')}</div>`
-      + (th ? `<h4>${th.name} — hero army</h4><div class="armyrow garrow">${th.army.map((a, i) => garSlot(a, 'h', i)).join('')}</div>
-        <div class="acts" style="margin-top:8px"><button data-gmove="toHero">⬆ All to hero</button><button data-gmove="toGarr">⬇ All to garrison</button><button data-garr="1">Split / disband…</button></div>`
-        : `<div class="small" style="margin:8px 0">No hero is in this town: bring one here to move troops. Recruits bought here go to the garrison.</div>`)
-      + `<div class="small" style="margin-top:6px">${garSel && garSel.t === t ? 'Now click another slot: an empty one moves the stack, the same creature merges, another creature swaps.' : 'Click a stack, then another slot, to move, merge or swap.'}</div>` + caravanHtml(t, mt);
-    html += tabBar + (townTab === 'war' ? `<div class="bgrid wgrid">${wc}</div>` + outpostHtml(t) : townTab === 'gar' ? garTab : `<h4>Creature dwellings</h4><div class="bgrid">${dwc}</div><h4>Town buildings</h4><div class="bgrid">${cardify(bld + smithy)}</div>`) + `<div class="small" style="margin-top:8px">${RES.map(k => RES_ICON[k] + ' ' + G.res[k]).join('  ')}</div>
+    const gTop = `<div class="glabel">🛡️ ${t.name} garrison</div><div class="armyrow garrow">${t.garrison.map((a, i) => garSlot(a, 'g', i)).join('')}</div>`;
+    const gHero = th ? `<div class="armyrow garrow">${th.army.map((a, i) => garSlot(a, 'h', i)).join('')}</div><div class="glabel">⚔️ ${th.name} — hero army</div><div class="gacts"><button data-gmove="toHero">⬆ All to hero</button><button data-gmove="toGarr">⬇ To garrison</button><button data-garr="1">Split…</button></div>`
+      : `<div class="small gnohero">No hero in this town — recruits join the garrison. Bring a hero to move troops.</div>`;
+    html += gTop + cvHtml + gHero + tabBar + (townTab !== 'bld' ? `<div class="bgrid wgrid">${wc}</div>` + outpostHtml(t) : `<h4>Creature dwellings</h4><div class="bgrid">${dwc}</div><h4>Town buildings</h4><div class="bgrid">${cardify(bld + smithy)}</div>` + caravanHtml(t, mt)) + `<div class="small" style="margin-top:8px">${RES.map(k => RES_ICON[k] + ' ' + G.res[k]).join('  ')}</div>
       <div class="mb"><button class="primary" id="tClose">Leave town</button></div>`;
     $('mbox').innerHTML = html; $('modal').classList.remove('hide'); townHover = -1;
     { const cv = $('tcv'), at = (e) => { const r = cv.getBoundingClientRect(); return TownArt.slotAt((e.clientX - r.left) * TW / r.width, (e.clientY - r.top) * TH / r.height, TW, TH); };

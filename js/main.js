@@ -216,7 +216,8 @@
     const preset = map.preset || 'plains', size = map.size || 'medium', seed = seedFrom(map.seed);
     const nAI = Math.max(1, Math.min(4, map.ais || { small: 1, medium: 2, large: 3, huge: 4, giant: 4 }[size] || 1));
     const aiFacs = shuffle(Object.keys(FACTIONS).filter(f => f !== faction)).slice(0, nAI);
-    const wrap = map.wrap === true, m = genMap(seed, aiFacs, diff, { preset, size, biome: map.biome, wrap });
+    const wrap = map.wrap === true, food = map.food === true; setFoodMode(food);
+    const m = genMap(seed, aiFacs, diff, { preset, size, biome: map.biome, wrap, food });
     setFaction(faction); applyTheme(faction);
     G = { seed, preset, size, W: m.W, H: m.H, scn: map.scn ? { id: map.scn.id, name: map.scn.name, goal: map.scn.goal } : null, tiles: m.tiles, biome: m.biome, river: m.river, zone: m.zone, objs: m.objs, dock: m.dock, boats: [], nextBoat: 1, day: 1, over: false, path: null, faction, diff,
       res: { gold: D.gold, wood: r(20), ore: r(20), mercury: r(5), sulfur: r(5), crystal: r(5), gems: r(5) }, spells: [...START_SPELLS],
@@ -225,6 +226,7 @@
       ais: aiFacs.map((f, i) => ({ id: i + 1, fac: f, name: FACTIONS[f].name, gold: Math.round(3000 * D.aiInc), heroes: [], alive: true, spawnWait: 0, team: ({ ally: 1, bloc: 2 }[(map.teams || [])[i]] || 3 + i) })) };
     if (G.ais.every(a => a.team === 1)) G.ais[0].team = 3;
     G.wrap = wrap; WRAP_W = wrap ? G.W : 0;
+    G.food = food; G.tunnels = []; if (food) G.res.food = FOOD.start;
     for (const o of G.objs) if (o.t === 'town') {
       if (o.owner === 0) { o.fac = faction; o.name = FACTIONS[faction].town; initTown(o, 0); }
       else initTown(o, o.owner ? 1 : 0);
@@ -248,7 +250,7 @@
     try {
       const s = localStorage.getItem(key); if (!s) return false;
       G = JSON.parse(s); if (!G.zone || !G.heroes || !G.ais) return false;
-      WRAP_W = G.wrap ? G.W : 0;
+      WRAP_W = G.wrap ? G.W : 0; setFoodMode(!!G.food); if (G.food && G.res.food == null) G.res.food = FOOD.start;
       G.tavern = (G.tavern || []).filter(id => HEROES[id]);
       G.path = null; G.boats = G.boats || []; setFaction(G.faction); applyTheme(G.faction); setActive(Math.min(G.sel, G.heroes.length - 1));
       initFog(); reindex(G); buildTerrain(); sizeMini(); centerOn(G.hero.x, G.hero.y); renderAll(); recentreSoon(); return true;
@@ -265,6 +267,9 @@
     const c = terrain.getContext('2d'); c.scale(tsc, tsc);
     for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) Art.tile(c, G.tiles[y][x], x, y, G);
     for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) Art.tileOverlay(c, G.tiles[y][x], x, y, G);
+    for (const tn of (G.tunnels || [])) {   // a dug tunnel: a dark arch in the rock
+      const cxp = (tn.x + .5 + (tn.y & 1) * .5) * TS, cyp = tn.y * RH + HR; c.save(); c.fillStyle = '#0c0804'; c.beginPath(); c.moveTo(cxp - 10, cyp + 10); c.lineTo(cxp - 10, cyp - 2); c.quadraticCurveTo(cxp, cyp - 16, cxp + 10, cyp - 2); c.lineTo(cxp + 10, cyp + 10); c.closePath(); c.fill(); c.strokeStyle = '#9a8a68'; c.lineWidth = 2.4; c.stroke(); c.restore();
+    }
   }
   // ---------- fog of war ----------
   let vis = null, fogDirty = true, miniFog = null;
@@ -408,6 +413,9 @@
       case 'keytent': return '⛺';
       case 'gate': return '🚪';
       case 'mine': return MINE_ICON[o.kind];
+      case 'farm': return '🌾';
+      case 'deposit': return RES_ICON[o.kind];
+      case 'site': return '🔨';
       case 'pile': return RES_ICON[o.kind];
       case 'chest': return '🧰';
       case 'art': return ART[o.art].i;
@@ -632,7 +640,7 @@
         if (o.owner === 0 && gn) { cx.font = 'bold 11px sans-serif'; cx.fillStyle = '#000b'; cx.fillRect(px - 14, py + 10, 28, 13); cx.fillStyle = '#fff'; cx.fillText(gn, px, py + 17); }
       }
       if (o.col && (o.t === 'keytent' || o.t === 'gate')) { cx.beginPath(); cx.arc(px + 13, py - 14, 6, 0, 7); cx.fillStyle = { red: '#e03a3a', blue: '#3a8aff', green: '#46b84a', gold: '#ffd24a' }[o.col] || '#fff'; cx.fill(); cx.lineWidth = 2; cx.strokeStyle = '#140a04'; cx.stroke(); }
-      if (o.t === 'mine' || o.t === 'dwelling' || o.t === 'lair') drawFlag(px + 11, py - 4, ownCol(o.owner), relOf(o.owner), 0.85);
+      if (o.t === 'mine' || o.t === 'dwelling' || o.t === 'lair' || o.t === 'farm') drawFlag(px + 11, py - 4, ownCol(o.owner), relOf(o.owner), 0.85);
       if (o.t === 'town') drawFlag(px + 15, py - 10, ownCol(o.owner), relOf(o.owner), 1.25);
       { const df = defenderOf(o); if (df && (o.t !== 'monster' || vis[o.y * G.W + o.x] || !fogOn())) { const th = threatOfDef(df); if (th) drawThreatBadge(px - 15, py + 11, th); } }
       if (o.t === 'town' || o.t === 'fort') {
@@ -721,7 +729,7 @@
     if (!G) return;
     recomputeVision();
     const gn = computeGain();
-    const resHtml = RES.map(k => `<span class="chip" title="${k[0].toUpperCase() + k.slice(1)}: ${G.res[k]}${gn[k] ? ` (+${gn[k]}/day)` : ''}">${RES_ICON[k]} <b>${fmtN(G.res[k])}</b>${gn[k] ? `<small class="inc">+${fmtN(gn[k])}</small>` : ''}</span>`).join('');
+    const resHtml = RES.map(k => `<span class="chip" title="${k[0].toUpperCase() + k.slice(1)}: ${G.res[k]}${gn[k] ? ` (+${gn[k]}/day)` : ''}${k === 'food' && G.food ? ` · upkeep −${foodUpkeep()}/day` : ''}">${RES_ICON[k]} <b>${fmtN(G.res[k])}</b>${gn[k] ? `<small class="inc">+${fmtN(gn[k])}</small>` : ''}</span>`).join('');
     $('res').innerHTML = resHtml; $('mres').innerHTML = resHtml; syncMres();
     renderQuick();
     $('income').innerHTML = `📈 ${RES.filter(k => gn[k]).map(k => `+${fmtN(gn[k])}${RES_ICON[k]}`).join(' ') || 'no income'}<small>/day</small>`;
@@ -750,12 +758,14 @@
       <div class="hacts">
         <button id="bEquip" class="small-btn" title="Equip artifacts (${Object.values(h.arts).filter(Boolean).length} worn, ${h.pack.length} in pack)">🎒 Equipment <span class="bcnt">${Object.values(h.arts).filter(Boolean).length}/${h.pack.length}</span></button>
         <button id="bPortal" class="small-btn" title="Teleport to your castle (${PORTAL_COST} mana)">🌀 Portal <span class="bcnt">${PORTAL_COST}</span></button>
+        ${G.food ? '<button id="bBuild" class="small-btn" title="Build a farm, mine, road or tunnel here">🔨 Build</button>' : ''}
         <button id="bNext" class="small-btn" title="Select the next hero (Tab)">⏭ Next hero</button>
         <button id="bSleep" class="small-btn" title="A sleeping hero is skipped by the end-turn reminder">${h.sleep ? '⏰ Wake' : '💤 Sleep'}</button>
       </div>`;
     $('hero').querySelectorAll('[data-h]').forEach(b => b.onclick = () => { if (busy) return; setActive(+b.dataset.h); G.path = null; centerOn(G.hero.x, G.hero.y); renderAll(); });
     $('bPortal').onclick = townPortal;
     $('bNext').onclick = nextHero;
+    if ($('bBuild')) $('bBuild').onclick = () => { if (!busy) openBuildMenu(G.hero); };
     $('bSleep').onclick = () => { h.sleep = !h.sleep; toast(h.sleep ? `${h.name} is resting — no more reminders.` : `${h.name} is awake.`); renderAll(); };
     $('bEquip').onclick = () => { if (!busy) openEquip(G.hero); };
     const zs = G.objs.filter(o => o.t === 'fort' || o.t === 'town').sort((a, b) => a.zone - b.zone);
@@ -936,6 +946,9 @@
       case 'seer': return `<b>Seer's Hut</b><br>Wants ${o.amt} ${o.need} for an artifact.`;
       case 'spring': return `<b>${SPRING[o.kind].n}</b><br>${SPRING[o.kind].d}<br><span class="small">Once per week per hero.</span>`;
       case 'wreck': return `<b>Shipwreck</b><br>Salvage: ${RES_ICON.gold}${o.gold} + ${RES_ICON[o.res]}${g}`;
+      case 'farm': return `<b>Farm</b> (${o.owner === 0 ? 'yours' : 'unclaimed'}) +${o.built ? FOOD.field : FOOD.mapFarm} 🌾/day${o.built ? '' : '<br>Pays only if you hold its zone'}`;
+      case 'deposit': return `<b>${o.kind[0].toUpperCase() + o.kind.slice(1)} deposit</b><br>Step here to build a mine.`;
+      case 'site': return `<b>Under construction</b><br>${SITE_NAME[o.build]} — ${o.left} day(s) left`;
       case 'mine': {
         const supplied = o.owner === 0 && zoneOwner(G, G.zone[o.y][o.x]) === 0;
         return `<b>${o.kind[0].toUpperCase() + o.kind.slice(1)} mine</b> (${o.owner === 0 ? 'yours' : o.owner ? 'held by a rival' : 'unclaimed'}) +${MINE_YIELD[o.kind]}/day` +
@@ -1276,6 +1289,13 @@
       G.res.gold += o.gold; G.res[o.res] += n; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); renderAll();
       return showModal(`<h2>🚢 Shipwreck salvaged</h2><p>${h.name}'s crew recovers ${RES_ICON.gold}${o.gold} and ${RES_ICON[o.res]}${n} from the wreck.</p>`);
     }
+    if (o.t === 'site') return toast(`${SITE_NAME[o.build] || 'Building'} under construction — ${o.left} day(s) left.`);
+    if (o.t === 'farm') {
+      if (o.owner === 0) return toast('This farm is already yours.');
+      if (o.guard && o.guard.length) { if (!(await fight(h, o.guard, { att: 0, def: 0 }, 'Farm guardians'))) return; o.guard = []; }
+      o.owner = 0; renderAll(); return toast(`You now own the farm! +${FOOD.mapFarm} 🌾/day while you hold its zone.`);
+    }
+    if (o.t === 'deposit') { toast('A rich deposit — build a mine here.'); return openBuildMenu(h); }
     if (o.t === 'spring') return drinkSpring(o, h);
     if (o.t === 'dwelling') return visitDwelling(o, h);
     if (o.t === 'lair') return visitLair(o, h);
@@ -1839,6 +1859,8 @@
       <div class="trow big" data-slot="15"><div class="ic">${TownArt.pic('mines', t.minel || 0, t.fac, 64)}</div><div><b>${MINE_LEVELS[t.minel || 0].n}</b> <span class="stars">${starStr(t.minel || 0, 3)}</span><br>
         <span class="small">Hidden mines (${MINE_LEVELS[t.minel || 0].stock}) in front of the walls hurt and halt attackers. A defending hero can lay ${EMERGENCY_MINES} extra mines even without a minefield${(t.minel || 0) < 3 ? ` — next: ${MINE_LEVELS[(t.minel || 0) + 1].n} (${MINE_LEVELS[(t.minel || 0) + 1].stock} mines)` : ''}.</span></div>
         <div class="acts">${(t.minel || 0) < 3 ? `<button data-minefield="1" title="${Art.fmtCostTxt(MINE_LEVELS[(t.minel || 0) + 1].cost)}">⬆ ${fmtCost(MINE_LEVELS[(t.minel || 0) + 1].cost)}</button>` : '<span class="small">MAX</span>'}</div></div>
+      ${G.food ? `<div class="trow big"><div class="ic" style="display:flex;align-items:center;justify-content:center;font-size:44px">🌾</div><div><b>${FOOD.town[t.farm || 0].n}</b> <span class="stars">${starStr(t.farm || 0, 3)}</span><br><span class="small">Feeds your warriors: +${FOOD.town[t.farm || 0].inc || 0} 🌾 per day${(t.farm || 0) < 3 ? ` — next: ${FOOD.town[(t.farm || 0) + 1].n} (+${FOOD.town[(t.farm || 0) + 1].inc}/day)` : ''}. Building takes 3 days.</span></div>
+        <div class="acts">${t.farmBuild ? `<span class="small">🔨 ${t.farmBuild.left} day(s) left</span>` : (t.farm || 0) < 3 ? `<button data-farm="1" title="${Art.fmtCostTxt(FOOD.town[(t.farm || 0) + 1].cost)}">⬆ ${fmtCost(FOOD.town[(t.farm || 0) + 1].cost)}</button>` : '<span class="small">MAX</span>'}</div></div>` : ''}
       <div class="trow big" data-slot="11"><div class="ic">${TownArt.pic('tavern', 1, t.fac, 64)}</div><div><b>Tavern</b><br><span class="small">Heroes ${G.heroes.length}/${MAX_HEROES}. Hire more heroes and exchange troops between heroes in town.</span></div>
         <div class="acts"><button data-tavern="1">Hire heroes</button>${heroesAt(t.x, t.y).length > 1 ? '<button data-xhero="1">Exchange troops</button>' : ''}</div></div>
       `;
@@ -1943,6 +1965,10 @@
       toast(`Recruited ${n} ${c.n}${n > 1 ? 's' : ''} from your outpost.`); sfx('build'); again();
     });
     q('[data-caravan]', b => b.onclick = () => openCaravan(t));
+    q('[data-farm]', b => b.onclick = () => {
+      const nx = FOOD.town[(t.farm || 0) + 1]; if (t.farmBuild) return; if (!canAfford(G.res, nx.cost)) return toast('Not enough resources.');
+      pay(G.res, nx.cost); t.farmBuild = { left: 3 }; sfx('build'); toast(`🔨 ${nx.n} started — 3 days.`); again();
+    });
     q('[data-fortify]', b => b.onclick = () => {
       const nx = FORT_LEVELS[(t.fort || 0) + 1]; if (!canAfford(G.res, nx.cost)) return toast('Not enough resources.');
       pay(G.res, nx.cost); t.fort = (t.fort || 0) + 1; Ach.event('fort', { lv: t.fort }); sfx('build'); toast(`${nx.n} built — the walls are stronger.`); again();
@@ -2254,6 +2280,62 @@
     checkVictory();
   }
 
+  // ---------- Food mode: farms, upkeep and the things a hero can build ----------
+  const SITE_NAME = { farm: 'Farm', mine: 'Mine', road: 'Road', tunnel: 'Tunnel' };
+  const BUILD_DAYS = { farm: 3, mine: 3, road: 1, tunnel: 3 };
+  const ROAD_COST = { gold: 200, wood: 3 }, TUNNEL_COST = { gold: 2000, ore: 20, wood: 10 };
+  const mineCost = (k) => (k === 'wood' || k === 'ore' ? { gold: 1000, wood: 5 } : k === 'gold' ? { gold: 1500, wood: 5, ore: 5 } : { gold: 2500, wood: 5, ore: 5 });
+  function foodIncome() {
+    let f = 0;
+    for (const t of myTowns()) f += (FOOD.town[t.farm || 0].inc || 0);
+    for (const o of G.objs) if (o.t === 'farm' && o.owner === 0) f += o.built ? FOOD.field : (zoneOwner(G, G.zone[o.y][o.x]) === 0 ? FOOD.mapFarm : 0);
+    return f;
+  }
+  function foodUpkeep() {
+    let w = 0;
+    for (const h of G.heroes) for (const a of h.army) if (a) w += a.n * foodOf(a.t);
+    for (const t of myTowns()) for (const a of (t.garrison || [])) if (a) w += a.n * foodOf(a.t);
+    return Math.floor(w / FOOD.upkeepDiv);
+  }
+  function completeSite(o) {
+    G.objs.splice(G.objs.indexOf(o), 1); let tilesChanged = false, msg = '';
+    if (o.build === 'farm') { G.objs.push({ t: 'farm', owner: 0, built: true, x: o.x, y: o.y, guard: [] }); msg = `The farm is finished: +${FOOD.field} 🌾/day.`; }
+    else if (o.build === 'mine') { G.objs.push({ t: 'mine', kind: o.kind, owner: 0, built: true, x: o.x, y: o.y, guard: [] }); msg = `The ${o.kind} mine is open.`; }
+    else if (o.build === 'road') { if (G.tiles[o.y][o.x] === T.GRASS || G.tiles[o.y][o.x] === T.SAND) { G.tiles[o.y][o.x] = T.ROAD; tilesChanged = true; } msg = 'The road is finished.'; }
+    else if (o.build === 'tunnel') { G.tiles[o.y][o.x] = T.ROAD; (G.tunnels = G.tunnels || []).push({ x: o.x, y: o.y }); tilesChanged = true; msg = 'The tunnel is dug through the mountain!'; }
+    reindex(G); if (tilesChanged) buildTerrain(); renderAll(); toast('🔨 ' + msg); note('🔨 ' + msg, o.x, o.y);
+  }
+  function advanceBuilds() {
+    for (const o of G.objs.filter(x => x.t === 'site')) { o.left--; if (o.left <= 0) completeSite(o); }
+    for (const t of myTowns()) if (t.farmBuild && --t.farmBuild.left <= 0) { t.farm = (t.farm || 0) + 1; t.farmBuild = null; toast(`🌾 ${t.name}: ${FOOD.town[t.farm].n} is ready.`); }
+  }
+  // the hero's Build menu: what can be built on this tile (or into the mountain next to it)
+  function openBuildMenu(h) {
+    if (!G.food) return;
+    const x = h.x, y = h.y, o = objAt(G, x, y), tile = G.tiles[y][x], opts = [];
+    const farms = G.objs.filter(f => (f.t === 'farm' && f.built) || (f.t === 'site' && f.build === 'farm')).length;
+    if (o && o.t === 'deposit') opts.push({ id: 'mine', icon: '⛏️', name: `${o.kind[0].toUpperCase() + o.kind.slice(1)} mine`, desc: `Opens the rich ${o.kind} deposit: a mine of your own.`, cost: mineCost(o.kind), days: BUILD_DAYS.mine, at: o, tx: x, ty: y });
+    else if (!o && (tile === T.GRASS || tile === T.SAND)) {
+      opts.push({ id: 'farm', icon: '🌾', name: 'Farm', desc: `Grows +${FOOD.field} 🌾/day wherever you build it (${farms}/${FOOD.maxField}).`, cost: FOOD.fieldCost, days: BUILD_DAYS.farm, tx: x, ty: y, block: farms >= FOOD.maxField ? 'Farm limit reached' : '' });
+      opts.push({ id: 'road', icon: '🛤️', name: 'Road', desc: 'Makes this tile cheap to cross.', cost: ROAD_COST, days: BUILD_DAYS.road, tx: x, ty: y });
+    }
+    const tunnels = (G.tunnels || []).length + G.objs.filter(f => f.t === 'site' && f.build === 'tunnel').length;
+    hexNb(x, y).forEach(([nx, ny], i) => {
+      if (ny < 0 || ny >= G.H || G.tiles[ny][nx] !== T.MOUNT || objAt(G, nx, ny)) return;
+      opts.push({ id: 'tunnel', icon: '⛰️', name: `Tunnel ${['east', 'south-east', 'south-west', 'west', 'north-west', 'north-east'][i]}`, desc: 'Dig through the mountain: the tile becomes walkable for everyone.', cost: TUNNEL_COST, days: BUILD_DAYS.tunnel, tx: nx, ty: ny, block: tunnels >= 6 ? 'Tunnel limit reached' : '' });
+    });
+    $('mbox').innerHTML = `<h2>🔨 Build</h2><p class="small">${h.name} at (${x}, ${y}). Work takes a few days; the site is marked on the map.</p>` +
+      (opts.length ? opts.map((p, i) => `<div class="trow" style="grid-template-columns:34px 1fr auto"><div class="ic" style="font-size:26px">${p.icon}</div><div><b>${p.name}</b> <span class="small">${p.days} day${p.days > 1 ? 's' : ''}</span><br><span class="small">${p.desc}${p.block ? ' — ' + p.block : ''}</span></div><div class="acts"><button data-bd="${i}" ${p.block || !canAfford(G.res, p.cost) ? 'disabled' : ''} title="${Art.fmtCostTxt(p.cost)}">${fmtCost(p.cost)}</button></div></div>`).join('') : '<p>Nothing can be built here. Stand on open grass or sand, on a deposit, or next to a mountain.</p>') +
+      '<div class="mb"><button id="bdClose">Close</button></div>';
+    $('mbox').querySelectorAll('[data-bd]').forEach(b => b.onclick = () => {
+      const p = opts[+b.dataset.bd]; if (!canAfford(G.res, p.cost)) return toast('Not enough resources.');
+      pay(G.res, p.cost); if (p.at) G.objs.splice(G.objs.indexOf(p.at), 1);
+      G.objs.push({ t: 'site', build: p.id, kind: p.at ? p.at.kind : undefined, left: p.days, owner: 0, x: p.tx, y: p.ty });
+      reindex(G); sfx('build'); toast(`🔨 ${p.name} started — ${p.days} day${p.days > 1 ? 's' : ''}.`); $('modal').classList.add('hide'); renderAll();
+    });
+    $('bdClose').onclick = () => $('modal').classList.add('hide');
+    $('modal').classList.remove('hide');
+  }
   function computeGain() {
     const gain = Object.fromEntries(RES.map(k => [k, 0]));
     for (const t of myTowns()) if (t.b.hall) gain.gold += HALL_LEVELS[t.b.hall].inc;
@@ -2262,6 +2344,7 @@
       if (o.t === 'mine' && o.owner === 0 && zoneOwner(G, G.zone[o.y][o.x]) === 0) gain[o.kind] += MINE_YIELD[o.kind] * ((G.wk && G.wk.mineMul) || 1);
       if (o.t === 'fort' && o.owner === 0) gain.gold += FORT_INCOME;
     }
+    if (G.food) gain.food = foodIncome();
     RES.forEach(k => { gain[k] = Math.round(gain[k] * DF().income); });
     return gain;
   }
@@ -2369,6 +2452,8 @@
     for (const h of G.heroes) { h.move = maxMove(h); h.mana = Math.min(maxMana(h), h.mana + 4 + 2 * perk(h, 'mysticism')); if (heroAtTown(h)) h.mana = maxMana(h); }
     const gain = computeGain();
     RES.forEach(k => { G.res[k] += gain[k]; });
+    if (G.food) { G.res.food = Math.max(0, G.res.food - foodUpkeep()); }
+    advanceBuilds();
     if (await goalCheck()) return;
     gst('gold', gain.gold || 0);
     Ach.event('day', { day: G.day, gold: gain.gold || 0, towns: myTowns().length, mines: G.objs.filter(x => x.t === 'mine' && x.owner === 0).length, azure: G.heroes.some(x => x.army.some(a => a && a.t === 'azured')) });
@@ -2437,8 +2522,8 @@
     $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => { Settings.mem('lastDiff', c.dataset.d); showMapSelect(c.dataset.d); });
     $('modal').classList.remove('hide');
   }
-  function showMapSelect(diff, st = Object.assign({ preset: 'plains', size: 'medium', seed: '', wrap: true }, Settings.mem('lastMap') || {})) {
-    Settings.mem('lastMap', { preset: st.preset, size: st.size, fog: st.fog, ais: st.ais, color: st.color, wrap: st.wrap });     // the next game starts with the same options
+  function showMapSelect(diff, st = Object.assign({ preset: 'plains', size: 'medium', seed: '', wrap: true, food: false }, Settings.mem('lastMap') || {})) {
+    Settings.mem('lastMap', { preset: st.preset, size: st.size, fog: st.fog, ais: st.ais, color: st.color, wrap: st.wrap, food: st.food });     // the next game starts with the same options
     const cards = Object.entries(MAPS).map(([k, m]) => `<div class="card${st.preset === k ? ' on' : ''}" data-m="${k}"><img class="mprev" src="${mapPreview(k, undefined, k)}" alt="" draggable="false"><b>${m.name}</b><div class="small">${m.desc}</div></div>`).join('');
     const sizes = Object.entries(SIZES).map(([k, s]) => `<button class="${st.size === k ? 'primary' : ''}" data-s="${k}">${s.name} (${s.w}×${s.h})</button>`).join(' ');
     $('mbox').innerHTML = `<div class="setup"><span data-bg="map_select"></span><h2>Choose your map<span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid two">${cards}</div>
@@ -2446,6 +2531,7 @@
         <div class="opt"><label>Map size</label><div class="optc"><div class="opts">${Object.entries(SIZES).map(([k, s]) => `<button class="${st.size === k ? 'primary' : ''}" data-s="${k}"><b>${s.name}</b><small>${s.w}×${s.h}</small></button>`).join('')}</div></div></div>
         <div class="opt"><label>Fog of war</label><div class="optc"><div class="opts">${[[true, 'On'], [false, 'Off']].map(([v, n]) => `<button class="${(st.fog !== false) === v ? 'primary' : ''}" data-fog="${v}"><b>${n}</b></button>`).join('')}</div><small>Unexplored land is hidden; scouts, towers and your heroes reveal it.</small></div></div>
         <div class="opt"><label>Map edges</label><div class="optc"><div class="opts">${[[true, 'Globe'], [false, 'Walled']].map(([v, n]) => `<button class="${(st.wrap !== false) === v ? 'primary' : ''}" data-wrap="${v}"><b>${n}</b></button>`).join('')}</div><small>Globe: the world has no edge, walk east to come out in the west. Walled: the edges cannot be crossed.</small></div></div>
+        <div class="opt"><label>Food &amp; building</label><div class="optc"><div class="opts">${[[false, 'Off'], [true, 'On']].map(([v, n]) => `<button class="${(st.food === true) === v ? 'primary' : ''}" data-food="${v}"><b>${n}</b></button>`).join('')}</div><small>On: recruits cost food from farms; heroes build farms, mines, roads and tunnels.</small></div></div>
         <div class="opt"><label>Rivals</label><div class="optc"><div class="opts">${[0, 1, 2, 3, 4].map(n => `<button class="${(st.ais || 0) === n ? 'primary' : ''}" data-a="${n}"><b>${n ? n : 'Auto'}</b></button>`).join('')}</div><small>AI players that expand and fight you.</small></div></div>
         <div class="opt"><label>Seed</label><div class="optc"><div class="seedrow"><input id="mSeed" placeholder="empty = random map" value="${st.seed}"><button id="mDice" title="Pick a random seed">🎲 Random</button></div><small>Share a seed to replay the same map.</small></div></div>
         <div class="opt"><label>Your flag</label><div class="optc"><div class="flags">${PALETTE.map((p, i) => `<button class="swatch flagbtn${(st.color || 0) === i ? ' on' : ''}" data-col="${i}" title="${p[0]}">${flagImg(i, 34)}</button>`).join('')}</div></div></div>
@@ -2459,6 +2545,7 @@
     $('mbox').querySelectorAll('[data-tm]').forEach(b => b.onclick = () => { keep(); const [i, v] = b.dataset.tm.split(':'); (st.teams = st.teams || [])[+i] = v; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-m]').forEach(c => c.onclick = () => { keep(); st.preset = c.dataset.m; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-s]').forEach(b => b.onclick = () => { keep(); st.size = b.dataset.s; showMapSelect(diff, st); });
+    $('mbox').querySelectorAll('[data-food]').forEach(b => b.onclick = () => { keep(); st.food = b.dataset.food === 'true'; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-wrap]').forEach(b => b.onclick = () => { keep(); st.wrap = b.dataset.wrap === 'true'; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-fog]').forEach(b => b.onclick = () => { keep(); st.fog = b.dataset.fog === 'true'; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-a]').forEach(b => b.onclick = () => { keep(); st.ais = +b.dataset.a; showMapSelect(diff, st); });
@@ -2863,7 +2950,7 @@
     });
     [home, ...towns].forEach(t => markView(t.x, t.y, 9, false)); G.res.gold += 20000; renderAll();
   }
-  if (/[?&]demo/.test(location.search)) Assets.ready.then(() => setTimeout(() => { try { newGame('castle', 'Orrin', 'normal', { size: 'medium', seed: 'demo', wrap: true }); $('title').classList.add('hide'); demo(); } catch (e) { console.error('demo failed', e); } }, 400));
+  if (/[?&]demo/.test(location.search)) Assets.ready.then(() => setTimeout(() => { try { newGame('castle', 'Orrin', 'normal', { size: 'medium', seed: 'demo', wrap: true, food: /[?&]food/.test(location.search) }); $('title').classList.add('hide'); demo(); } catch (e) { console.error('demo failed', e); } }, 400));
   window.__G = () => G;
   window.__dbg = { demo, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
 })();

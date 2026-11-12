@@ -14,6 +14,12 @@ const Art = (() => {
 
   // ---------- resources (64x64 design space) ----------
   const RES_DRAW = {
+    food(g) {   // a golden wheat sheaf
+      shadow(g, 32, 54, 20, 4);
+      for (const [x, a] of [[22, -0.25], [32, 0], [42, 0.25]]) { g.save(); g.translate(x, 52); g.rotate(a); g.strokeStyle = '#b8872a'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -34); g.stroke();
+        for (let k = 0; k < 6; k++) { ell(g, -3.2, -34 + k * 4.2, 2.6, 4.2, '#f0c445'); ell(g, 3.2, -31 + k * 4.2, 2.6, 4.2, '#e2a92b'); } ell(g, 0, -40, 2.6, 4.4, '#f6d45e'); g.restore(); }
+      rect(g, 17, 38, 30, 6, '#8a5a2b', '#2b1808');
+    },
     gold(g) {
       for (let i = 2; i >= 0; i--) {
         const y = 44 - i * 10;
@@ -103,6 +109,26 @@ const Art = (() => {
       g.beginPath(); g.moveTo(16, 56); g.lineTo(16, 36); g.quadraticCurveTo(16, 26, 28, 26); g.quadraticCurveTo(40, 26, 40, 36); g.lineTo(40, 56); g.closePath(); g.fillStyle = '#120c06'; g.fill();
       g.strokeStyle = '#8a5a2b'; g.lineWidth = 3; g.beginPath(); g.moveTo(14, 56); g.lineTo(14, 35); g.quadraticCurveTo(14, 24, 28, 24); g.quadraticCurveTo(42, 24, 42, 35); g.lineTo(42, 56); g.stroke();
       g.save(); g.translate(40, 34); g.scale(.55, .55); (RES_DRAW[o.kind] || RES_DRAW.gold)(g); g.restore();
+    },
+    farm(g, o) {   // a barn, a haystack and a ploughed field
+      shadow(g, 32, 56, 28, 5);
+      for (let i = 0; i < 4; i++) rect(g, 6 + i * 14, 46, 10, 9, i % 2 ? '#7a5a2a' : '#8d6a32', '#3a2a12');
+      rect(g, 14, 26, 30, 22, lin(g, 14, 26, 14, 48, '#b5452f', '#7a2a1c'), '#2b1208');
+      poly(g, [[10, 28], [29, 10], [48, 28]], lin(g, 10, 10, 48, 28, '#8a4a2a', '#4a2412'), '#2b1208');
+      rect(g, 25, 34, 8, 14, '#2a1a0c'); ell(g, 52, 44, 9, 8, '#e2b83c'); ell(g, 52, 40, 6, 5, '#f4d45e');
+    },
+    deposit(g, o) {   // a rock outcrop with a glint of the resource inside
+      shadow(g, 32, 56, 26, 5);
+      poly(g, [[8, 54], [14, 30], [26, 20], [40, 24], [54, 36], [56, 54]], lin(g, 8, 20, 56, 54, '#9a9284', '#4e483e'), '#2a251d');
+      poly(g, [[20, 54], [26, 36], [38, 34], [46, 54]], 'rgba(0,0,0,.18)');
+      g.save(); g.translate(18, 12); g.scale(.6, .6); (RES_DRAW[o.kind] || RES_DRAW.gold)(g); g.restore();
+      for (const [x, y] of [[16, 40], [44, 42], [32, 28]]) ell(g, x, y, 2, 2, 'rgba(255,255,255,.8)');
+    },
+    site(g, o) {   // a building site: stakes, a plank and a hammer
+      shadow(g, 32, 56, 24, 4);
+      rect(g, 10, 44, 44, 10, '#8d6a32', '#3a2a12'); for (const x of [12, 26, 40, 52]) rect(g, x, 26, 3, 28, '#6a4a22', '#2b1808');
+      poly(g, [[10, 30], [54, 30], [54, 36], [10, 36]], '#b08a48', '#3a2a12');
+      g.fillStyle = '#e8d9ac'; g.font = 'bold 18px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🔨', 32, 16);
     },
     pile(g, o) { (RES_DRAW[o.kind] || RES_DRAW.gold)(g); },
     chest(g) {

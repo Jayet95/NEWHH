@@ -328,6 +328,15 @@ function genMapOnce(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
       guaranteed++;
     });
   });
+  if (mo.food) {   // Food mode: farms feed the army (two close to every capital, more scattered about); rich deposits invite a mine of your own
+    [P, ...aiStarts].forEach((s) => {
+      const near = cand.filter(o => hexDist(o, s) >= 4 && hexDist(o, s) <= 9);
+      for (let k = 0; k < 2 && near.length; k++) { const c = near.splice(Math.floor(R() * near.length), 1)[0]; cand = cand.filter(o => Math.abs(o.x - c.x) + Math.abs(o.y - c.y) > 1); objs.push({ t: 'farm', owner: null, x: c.x, y: c.y, guard: [] }); }
+    });
+    for (let i = 0, n = Math.max(2, Math.round(4 * Math.pow(sc, 0.8))); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'farm', owner: null, x: c.x, y: c.y, guard: R() < 0.5 ? [] : [guard(c, 0.7)] }); }
+    const dk = ['wood', 'ore', 'gold', 'mercury', 'sulfur', 'crystal', 'gems'];
+    for (let i = 0, n = Math.max(3, Math.round(5 * Math.pow(sc, 0.8))); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'deposit', kind: dk[Math.floor(R() * dk.length)], x: c.x, y: c.y }); }
+  }
   const mineKinds = Array.from({ length: Math.max(4, nMines - guaranteed) }, (_, i) => kindsBase[i % kindsBase.length]);
   for (const k of mineKinds) { const c = pick(); if (!c) break; objs.push({ t: 'mine', kind: k, owner: null, x: c.x, y: c.y, guard: R() < (k === 'gold' ? 0.3 : 0.5) ? [] : [guard(c, 0.8)] }); }
   for (let i = 0, n = sc < 0.8 ? 2 : Math.round(3 * Math.sqrt(sc)); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'merchant', x: c.x, y: c.y }); }

@@ -1866,7 +1866,7 @@
     const tabBtn = (k, label, ico) => { const u = bsrc(k === 'war' ? 'war' : 'bld'); return `<button class="ttab${townTab === k ? ' on' : ''}${u ? ' tbtn' : ''}" data-ttab="${k}" title="${label}">${u ? `<img src="${u}" alt="${label}" draggable="false">` : ico + ' ' + label}</button>`; };
     // the whole screen is the town picture (like the original); the troops, two buttons and a panel for Warriors / Buildings sit on top of it
     const panel = townTab ? `<div class="tpanel"><div class="tphead"><b>${townTab === 'bld' ? '🏗️ Buildings' : '⚔️ Warriors'}</b><span class="tpr">${townTab === 'bld' ? '' : '<button id="tBuyAll" class="tpall" title="Recruit as many of every creature as you can afford, strongest first">Recruit all</button>'}<button id="tpClose" class="tpx" title="Close">✕</button></span></div><div class="tpbody">${townTab !== 'bld' ? `<div class="bgrid wgrid">${wc}</div>` + outpostHtml(t) : `<h4>Creature dwellings</h4><div class="bgrid">${dwc}</div><h4>Town buildings</h4><div class="bgrid">${cardify(bld + smithy)}</div>` + caravanHtml(t, mt)}</div></div>` : '';
-    const html = cvHtml + `<div class="tui"><div class="ttop">${topHtml}</div><div class="tfill"></div><div class="gstack">` + gTop + gHero + `</div><div class="tbar">${tabBtn('war', 'Warriors', '⚔️')}${tabBtn('bld', 'Buildings', '🏗️')}<button class="primary" id="tClose">Leave town</button></div>${panel}</div>`;
+    const html = cvHtml + `<div class="tui">${mt.length > 1 ? `<button class="tarrow l" data-tnav="-1" title="Previous town: ${mt[(mt.indexOf(t) + mt.length - 1) % mt.length].name}">‹</button><button class="tarrow r" data-tnav="1" title="Next town: ${mt[(mt.indexOf(t) + 1) % mt.length].name}">›</button>` : ''}<div class="ttop">${topHtml}</div><div class="tfill"></div><div class="gstack">` + gTop + gHero + `</div><div class="tbar">${tabBtn('war', 'Warriors', '⚔️')}${tabBtn('bld', 'Buildings', '🏗️')}<button class="primary" id="tClose">Leave town</button></div>${panel}</div>`;
     $('mbox').innerHTML = html; $('mbox').classList.add('townfull'); $('modal').classList.remove('hide'); townHover = -1;
     { const cv = $('tcv'), at = (e) => { const r = cv.getBoundingClientRect(); return TownArt.slotAt((e.clientX - r.left - townV.x) / townV.k, (e.clientY - r.top - townV.y) / townV.k, TW, TH); };
       let pd = null;
@@ -2566,7 +2566,16 @@
   $('bHelp').onclick = () => openHelp();
   $('bSave').onclick = () => G && !busy && openSlots();
   $('bEnd').onclick = endTurn;
-  $('bTown').onclick = () => G && !busy && openTown();
+  // with several towns the Town button asks which one to open
+  function chooseTown() {
+    const mt = myTowns(); if (mt.length < 2) return openTown();
+    const pic = (t) => { const u = Assets.has('ui/town_' + t.fac) ? Assets.src('ui/town_' + t.fac) : ''; return u ? `<img src="${u}" alt="" draggable="false">` : ''; };
+    $('mbox').innerHTML = `<h2>🏰 Which town?</h2><div class="townpick">${mt.map((t, i) => `<button class="tcard" data-pt="${i}">${pic(t)}<span class="tcn">${t.name}</span><span class="tci">${FACTIONS[t.fac].icon} ${FACTIONS[t.fac].name}${heroesAt(t.x, t.y).length ? ' · 🏇 hero inside' : ''}</span></button>`).join('')}</div><div class="mb"><button id="ptClose">Close</button></div>`;
+    $('mbox').querySelectorAll('[data-pt]').forEach(b => b.onclick = () => { const t = mt[+b.dataset.pt]; centerOn(t.x, t.y); openTown(t); });
+    $('ptClose').onclick = () => $('modal').classList.add('hide');
+    $('modal').classList.remove('hide');
+  }
+  $('bTown').onclick = () => G && !busy && chooseTown();
   function fitZoom() { if (!G) return; setZoom(Math.min(cmap.clientWidth / ((G.W + 0.5) * TS), cmap.clientHeight / (G.H * RH + HR * 0.5)), 0, 0); clampCam(); }
   $('mEnd').onclick = endTurn;
   $('mapEnd').onclick = endTurn;
@@ -2575,7 +2584,7 @@
     el.addEventListener('click', (e) => { if (!e.target.closest('h3')) return; const f = el.classList.toggle('folded'); try { Settings.mem(key, f ? 1 : 0); } catch (err) { /* ignore */ } }); });
   { const tog = $('mTog'), apply = (v) => { document.body.classList.toggle('barhid', v); tog.firstChild.textContent = v ? '▲' : '▼'; try { Settings.mem('barhid', v ? 1 : 0); } catch (e) { /* ignore */ } };
     apply(!!(Settings.mem('barhid'))); tog.onclick = () => apply(!document.body.classList.contains('barhid')); }
-  $('mTown').onclick = () => G && !busy && openTown();
+  $('mTown').onclick = () => G && !busy && chooseTown();
   // phone action bar: the side panels open as sheets (the real elements are moved into the dialog and back, so they stay live)
   let sheetBack = null;
   const sheetOpen = (title, els) => {

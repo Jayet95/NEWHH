@@ -2570,6 +2570,9 @@
   function fitZoom() { if (!G) return; setZoom(Math.min(cmap.clientWidth / ((G.W + 0.5) * TS), cmap.clientHeight / (G.H * RH + HR * 0.5)), 0, 0); clampCam(); }
   $('mEnd').onclick = endTurn;
   $('mapEnd').onclick = endTurn;
+  // the right-hand panels fold down to their title (click it); the choice is remembered
+  ['terr', 'townsPanel'].forEach(id => { const el = $(id); if (!el) return; const key = 'fold_' + id; if (Settings.mem(key)) el.classList.add('folded');
+    el.addEventListener('click', (e) => { if (!e.target.closest('h3')) return; const f = el.classList.toggle('folded'); try { Settings.mem(key, f ? 1 : 0); } catch (err) { /* ignore */ } }); });
   { const tog = $('mTog'), apply = (v) => { document.body.classList.toggle('barhid', v); tog.firstChild.textContent = v ? '▲' : '▼'; try { Settings.mem('barhid', v ? 1 : 0); } catch (e) { /* ignore */ } };
     apply(!!(Settings.mem('barhid'))); tog.onclick = () => apply(!document.body.classList.contains('barhid')); }
   $('mTown').onclick = () => G && !busy && openTown();

@@ -1459,3 +1459,25 @@ body.skin #mbox .gacts button, #mbox .gacts button { flex: 1 1 0; min-width: 0; 
   .tpbody .wcard .bacts { margin-top: auto; }
 }
 .tpbody .wcard .bacts input, .tpbody .wcard .bacts button { flex: 0 0 auto !important; }
+
+/* Warriors popup: the seven creatures stacked on top of each other, one row each (picture, details, recruit) */
+#mbox .tpbody .bgrid.wgrid { grid-template-columns: 1fr !important; grid-auto-rows: minmax(0, 1fr); gap: 6px; }
+.tpbody .wcard { display: grid !important; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; padding: 4px 10px !important; flex-direction: row; }
+.tpbody .wcard .bpic.wpic { flex: none; min-height: 0; padding: 0; width: clamp(56px, 11vh, 92px); height: clamp(56px, 11vh, 92px); aspect-ratio: 1; }
+.tpbody .wcard .wpic img.pic:first-child { width: 100% !important; height: 100% !important; }
+.tpbody .wcard .wpic .bcr { width: 28px; height: 28px; right: 0; top: 0; }
+.tpbody .wcard .wpic .wav { position: absolute; left: 0; top: 0; }
+.tpbody .wcard > div:nth-child(2) { min-width: 0; }
+.tpbody .wcard .bacts { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; align-items: center; margin: 0; gap: 6px; max-width: 360px; }
+.tpbody .wcard .bacts input { width: 64px !important; flex: 0 0 auto !important; }
+.tpbody .wcard .bacts button { width: auto; min-width: 84px; }
+@media (max-width: 760px) {
+  .tpbody .wcard { grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px 8px; padding: 3px 6px !important; }
+  .tpbody .wcard .wstats, .tpbody .wcard .small { display: flex; font-size: 10px; }
+  .tpbody .wcard .wstats > span { font-size: 9px; padding: 0 3px; }
+  .tpbody .wcard b { font-size: 13px; }
+  .tpbody .wcard .bacts { flex-direction: column; align-items: stretch; max-width: 96px; gap: 3px; }
+  .tpbody .wcard .bacts input { width: 100% !important; height: 24px !important; }
+  .tpbody .wcard .bacts button { width: 100%; min-width: 0; height: 26px; min-height: 26px !important; }
+  .tpbody .wcard .wpic .bcr { width: 20px; height: 20px; }
+}

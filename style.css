@@ -1418,3 +1418,19 @@ body.skin #mbox .gacts button, #mbox .gacts button { flex: 1 1 0; min-width: 0; 
 .tbar .ttab.tbtn:active img { transform: translateY(1px); }
 @media (max-width: 760px) { .gpanel { max-width: none; } .gpanel .slot.gs small { font-size: 9px; } }
 @media (min-width: 761px) { .gpanel { max-width: 500px; } .tui .gstack { width: min(calc(100% - 16px), 520px); } }
+/* Warriors / Buildings popups fill most of the screen */
+.tpanel { top: calc(var(--ttopY, 70px) + 8px) !important; bottom: var(--tbarH, 60px) !important; max-height: none !important; }
+@media (min-width: 761px) { .tpanel { width: min(calc(100% - 24px), 1500px); } #mbox .bgrid.wgrid > .wcard { flex-basis: clamp(230px, 24vw, 330px); } .tpbody .bgrid:not(.wgrid) { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); } }
+.tpbody .bgrid.wgrid { align-items: stretch; min-height: 100%; }
+.tpbody .bgrid.wgrid { align-items: flex-start; min-height: 0; }
+.tpbody .wcard .wpic { height: auto; padding: 6px 0; } .tpbody .wcard .wpic img.pic { width: min(100%, 190px) !important; height: auto !important; aspect-ratio: 1; }
+@media (min-width: 761px) { .tpbody .wcard { font-size: 15px; } .tpbody .wcard b { font-size: 17px; } .tpbody .wstats > span { font-size: 12px; padding: 2px 6px; } .tpbody .wcard .bacts button, .tpbody .wcard .bacts input { font-size: 14px !important; min-height: 38px !important; } }
+/* Warriors popup: tall cards, the creature picture takes the free height */
+.tpbody { display: flex; flex-direction: column; }
+.tpbody .bgrid.wgrid { flex: 1 1 auto; min-height: 0; align-items: stretch; }
+.tpbody .wcard { display: flex; flex-direction: column; min-height: 0; }
+.tpbody .wcard .bpic.wpic { flex: 1 1 auto; min-height: 120px; display: grid; place-items: center; position: relative; overflow: hidden; padding: 4px 0; }
+.tpbody .wcard .wpic img.pic:first-child { width: auto !important; height: 100% !important; max-width: 100%; aspect-ratio: 1; object-fit: contain; }
+.tpbody .wcard .wpic .bcr { position: absolute; right: 6px; top: 6px; }
+.tpbody .wcard .wpic .bcr { position: absolute !important; right: 6px; top: 6px; width: 52px; height: 52px; z-index: 2; }
+.tpbody .wcard .wpic .bcr img.pic { width: 100% !important; height: 100% !important; max-width: none; aspect-ratio: auto; object-fit: contain; }

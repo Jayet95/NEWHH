@@ -32,7 +32,17 @@ function noise(R, W, H, sc) {
 const NEUTRAL_BY_DEPTH = [['goblin', 'wolf'], ['orc', 'golem'], ['ogre', 'wolf'], ['troll', 'naga'], ['naga', 'dragon'], ['dragon', 'troll']];
 
 // mo = { preset: key of MAPS, size: key of SIZES }
-function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
+// a seed that walls the player's castle into a tiny pocket (mountains, lakes) is replaced by the next one, so every game has room to play
+function genMap(seed, aiFacs, diff, mo = {}) {
+  const SZ = SIZES[mo.size] || SIZES.medium, sc = (SZ.w * SZ.h) / 1120;
+  let G = null;
+  for (let k = 0; k < 6; k++) {
+    G = genMapOnce(k ? (seed + k * 7919) >>> 0 : seed, aiFacs, diff, mo);
+    if (G.objs.filter(o => o.t === 'mine').length >= 8 && G.objs.length >= 70 * Math.min(sc, 4)) break;
+  }
+  return G;
+}
+function genMapOnce(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
   const DM = DIFFICULTY[diff] || DIFFICULTY.normal;
   const MP = MAPS[mo.preset] || MAPS.plains, SZ = SIZES[mo.size] || SIZES.medium;
   const R = rng(seed), W = SZ.w, H = SZ.h, sc = (W * H) / 1120;
@@ -164,11 +174,15 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
     const t = tiles[yy][xx];
     if ((t === T.GRASS || t === T.SAND) && seen.has(yy * W + xx) && !reserved.has(yy * W + xx) && dist({ x: xx, y: yy }, P) > 3 && aiStarts.every(a => dist({ x: xx, y: yy }, a) > 3)) cand.push({ x: xx, y: yy });
   }
+  const blocked = new Set();   // tiles next to a placed object stay free (checked lazily: no list rebuilt per pick, which made big maps slow)
   const pick = () => {
-    if (!cand.length) return null;
-    const i = Math.floor(R() * cand.length), c = cand[i];
-    cand = cand.filter(o => Math.abs(o.x - c.x) + Math.abs(o.y - c.y) > 1);
-    return c;
+    while (cand.length) {
+      const i = Math.floor(R() * cand.length), c = cand[i]; cand[i] = cand[cand.length - 1]; cand.pop();
+      if (blocked.has(c.y * W + c.x)) continue;
+      blocked.add(c.y * W + c.x); blocked.add(c.y * W + c.x + 1); blocked.add(c.y * W + c.x - 1); blocked.add((c.y + 1) * W + c.x); blocked.add((c.y - 1) * W + c.x);
+      return c;
+    }
+    return null;
   };
   const depthOf = (c) => Math.min(1, dist(c, P) / dist(P, E));
   const guard = (c, mul = 1) => {

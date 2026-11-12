@@ -40,8 +40,8 @@ const MAPS = {
 };
 // mv: movement/enemy-march multiplier so big maps stay playable
 const SIZES = {
-  small: { name: 'Small', w: 32, h: 22, mv: 1 }, medium: { name: 'Medium', w: 40, h: 28, mv: 1 }, large: { name: 'Large', w: 60, h: 42, mv: 1.25 },
-  huge: { name: 'Huge', w: 90, h: 64, mv: 1.6 }, giant: { name: 'Giant', w: 128, h: 90, mv: 2 },
+  small: { name: 'Small', w: 40, h: 40, mv: 1.2 }, medium: { name: 'Medium', w: 80, h: 80, mv: 1.7 }, large: { name: 'Large', w: 120, h: 120, mv: 2.2 },
+  huge: { name: 'Huge', w: 160, h: 160, mv: 2.7 }, giant: { name: 'Giant', w: 200, h: 200, mv: 3.2 },
 };
 const SHIPYARD_COST = { gold: 2000, wood: 20 }, BOAT_COST = { gold: 1000, wood: 10 }, MAX_BOATS = 2;
 

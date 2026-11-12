@@ -214,7 +214,7 @@
   function newGame(faction, heroId, diff = 'normal', map = {}) {
     const D = DIFFICULTY[diff], r = (n) => Math.max(1, Math.round(n * D.res));
     const preset = map.preset || 'plains', size = map.size || 'medium', seed = seedFrom(map.seed);
-    const nAI = Math.max(1, Math.min(4, map.ais || { small: 1, medium: 1, large: 2, huge: 3, giant: 4 }[size] || 1));
+    const nAI = Math.max(1, Math.min(4, map.ais || { small: 1, medium: 2, large: 3, huge: 4, giant: 4 }[size] || 1));
     const aiFacs = shuffle(Object.keys(FACTIONS).filter(f => f !== faction)).slice(0, nAI);
     const m = genMap(seed, aiFacs, diff, { preset, size, biome: map.biome });
     setFaction(faction); applyTheme(faction);
@@ -2409,7 +2409,7 @@
         <div class="opt"><label>Rivals</label><div class="optc"><div class="opts">${[0, 1, 2, 3, 4].map(n => `<button class="${(st.ais || 0) === n ? 'primary' : ''}" data-a="${n}"><b>${n ? n : 'Auto'}</b></button>`).join('')}</div><small>AI players that expand and fight you.</small></div></div>
         <div class="opt"><label>Seed</label><div class="optc"><div class="seedrow"><input id="mSeed" placeholder="empty = random map" value="${st.seed}"><button id="mDice" title="Pick a random seed">🎲 Random</button></div><small>Share a seed to replay the same map.</small></div></div>
         <div class="opt"><label>Your flag</label><div class="optc"><div class="flags">${PALETTE.map((p, i) => `<button class="swatch flagbtn${(st.color || 0) === i ? ' on' : ''}" data-col="${i}" title="${p[0]}">${flagImg(i, 34)}</button>`).join('')}</div></div></div>
-        ${(() => { const n = st.ais || ({ small: 1, medium: 1, large: 2, huge: 3, giant: 4 }[st.size] || 1), free = PALETTE.map((p, i) => i).filter(i => i !== (st.color || 0)); st.teams = st.teams || []; return Array.from({ length: n }, (_, i) => `<div class="opt"><label class="rivlab">${flagImg(free[i % free.length], 24)}<span>Rival ${i + 1}</span></label><div class="optc"><div class="opts">${[['enemy', '⚔ Enemy'], ['ally', '🤝 Ally'], ['bloc', '⚔⚔ Bloc']].map(([v, l]) => `<button data-tm="${i}:${v}" class="${(st.teams[i] || 'enemy') === v ? 'primary' : ''}"><b>${l}</b></button>`).join('')}</div></div></div>`).join(''); })()}
+        ${(() => { const n = st.ais || ({ small: 1, medium: 2, large: 3, huge: 4, giant: 4 }[st.size] || 1), free = PALETTE.map((p, i) => i).filter(i => i !== (st.color || 0)); st.teams = st.teams || []; return Array.from({ length: n }, (_, i) => `<div class="opt"><label class="rivlab">${flagImg(free[i % free.length], 24)}<span>Rival ${i + 1}</span></label><div class="optc"><div class="opts">${[['enemy', '⚔ Enemy'], ['ally', '🤝 Ally'], ['bloc', '⚔⚔ Bloc']].map(([v, l]) => `<button data-tm="${i}:${v}" class="${(st.teams[i] || 'enemy') === v ? 'primary' : ''}"><b>${l}</b></button>`).join('')}</div></div></div>`).join(''); })()}
         <div class="optnote">Allies never attack you, share vision and let you swap troops; an enemy bloc fights together. You win when every enemy realm is gone.</div>
       </div>
       <div class="mb"><button id="sBack">Back</button><button class="primary" id="sNext">Next: castle</button></div></div>`;

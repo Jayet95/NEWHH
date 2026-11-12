@@ -476,7 +476,7 @@ const Art = (() => {
       const j0 = jit(x, y), wv = jw(x, y); const cxj = cxp + j0[0], cyj = cyp + j0[1];
       c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
       for (let i = 0; i < 6; i++) { const p = nb[i]; if (p[0] < 0 || p[1] < 0 || p[0] >= G.W || p[1] >= G.H) continue; const rv = G.river[y][x], isR = rv > 1 ? (rv & (1 << i)) : ((G.river[p[1]] && G.river[p[1]][p[0]]) || G.tiles[p[1]][p[0]] === T.WATER); if (!isR) continue; any = true;      // new maps link only the real stream; old saves (value 1) keep the old look
-        const nx = (p[0] + .5 + (p[1] & 1) * .5) * 32, ny = p[1] * HR * 1.5 + HR, jn = G.tiles[p[1]][p[0]] === T.WATER ? [0, 0] : jit(p[0], p[1]), mx = (cxj + nx + jn[0]) / 2, my = (cyj + ny + jn[1]) / 2;
+        const ux = x + [1, y & 1, (y & 1) - 1, -1, (y & 1) - 1, y & 1][i], nx = (ux + .5 + (p[1] & 1) * .5) * 32, ny = p[1] * HR * 1.5 + HR, jn = G.tiles[p[1]][p[0]] === T.WATER ? [0, 0] : jit(p[0], p[1]), mx = (cxj + nx + jn[0]) / 2, my = (cyj + ny + jn[1]) / 2;
         c.beginPath(); c.moveTo(cxj, cyj); c.quadraticCurveTo((cxj + mx) / 2 + (j0[1] * .35), (cyj + my) / 2 - (j0[0] * .35), mx, my); c.lineWidth = 8 * wv; c.strokeStyle = 'rgba(60,48,28,.3)'; c.stroke();                    // muddy bank
         c.lineWidth = 5.8 * wv; c.strokeStyle = groundPat(c, 'water') || '#2f6f9c'; c.stroke(); c.lineWidth = 1.6; c.strokeStyle = 'rgba(190,226,246,.28)'; c.stroke(); }   // water, with a faint glint
       c.beginPath(); c.arc(cxj, cyj, (any ? 3.8 : 4.8) * wv, 0, 7); c.fillStyle = groundPat(c, 'water') || '#2f6f9c'; c.fill(); c.lineWidth = 1.2; c.strokeStyle = 'rgba(60,48,28,.4)'; c.stroke();

@@ -1564,3 +1564,23 @@ body.skin #mbox .gacts button, #mbox .gacts button { flex: 1 1 0; min-width: 0; 
   #townsPanel .tcn { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 8px 15px; font-weight: bold; font-size: 13px; color: #fff3cf; text-shadow: 0 1px 2px #000; background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, .8)); }
   #townsPanel .tci { position: absolute; left: 8px; right: 8px; bottom: 2px; font-size: 10px; color: #e8d9ac; text-shadow: 0 1px 2px #000; }
 }
+
+/* foldable right-hand panels: click the title */
+#side > #terr > h3, #side > #townsPanel > h3 { cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center; }
+#side > #terr > h3::after, #side > #townsPanel > h3::after { content: '▾'; font-size: 12px; opacity: .8; transition: transform .15s; }
+#side > #terr.folded > h3::after, #side > #townsPanel.folded > h3::after { transform: rotate(-90deg); }
+#side > #terr.folded > :not(h3), #side > #townsPanel.folded > :not(h3) { display: none !important; }
+#side > #terr.folded, #side > #townsPanel.folded { padding-bottom: 6px; }
+#side > #terr.folded > h3, #side > #townsPanel.folded > h3 { margin-bottom: 0; }
+
+/* town screen: big arrows at the screen edges switch between your towns */
+.tarrow { position: fixed; top: 50%; transform: translateY(-50%); z-index: 45; width: 44px; height: 84px; padding: 0; font-size: 34px; line-height: 1; border-radius: 12px; background: rgba(12, 8, 4, .62); color: #f3d98a; border: 2px solid #8c6a33; }
+.tarrow.l { left: 6px; } .tarrow.r { right: 6px; }
+.tarrow:hover { background: rgba(60, 40, 10, .85); border-color: var(--gold); }
+@media (max-width: 760px) { .tarrow { width: 30px; height: 64px; font-size: 26px; opacity: .85; } .tarrow.l { left: 2px; } .tarrow.r { right: 2px; } }
+.townpick { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin: 8px 0; }
+.townpick .tcard { position: relative; display: block; width: 100%; height: 96px; padding: 0; overflow: hidden; border-radius: 10px; border: 2px solid var(--edge); background: #120a04; text-align: left; }
+.townpick .tcard img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; }
+.townpick .tcard:hover { border-color: var(--gold); }
+.townpick .tcn { position: absolute; left: 0; right: 0; bottom: 0; padding: 22px 10px 18px; font-weight: bold; font-size: 15px; color: #fff3cf; text-shadow: 0 1px 2px #000; background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, .82)); }
+.townpick .tci { position: absolute; left: 10px; right: 10px; bottom: 4px; font-size: 11px; color: #e8d9ac; text-shadow: 0 1px 2px #000; }

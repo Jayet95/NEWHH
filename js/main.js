@@ -81,7 +81,7 @@
   const need = (l) => 150 * l * l;
   const heroesAt = (x, y) => G.heroes.filter(h => h.x === x && h.y === y);
   const heroAtTown = (h) => !!townAt(h.x, h.y);
-  const dist = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+  const dist = (a, b) => { let dx = Math.abs(a.x - b.x); if (WRAP_W && dx > WRAP_W / 2) dx = WRAP_W - dx; return Math.max(dx, Math.abs(a.y - b.y)); };
   const setActive = (i) => { G.sel = i; G.hero = G.heroes[i]; };
   const townHero = (t) => { const at = heroesAt(t.x, t.y); return at.includes(G.hero) ? G.hero : at[0] || null; };
   const emptyArmy = () => [null, null, null, null, null, null, null];
@@ -216,7 +216,7 @@
     const preset = map.preset || 'plains', size = map.size || 'medium', seed = seedFrom(map.seed);
     const nAI = Math.max(1, Math.min(4, map.ais || { small: 1, medium: 2, large: 3, huge: 4, giant: 4 }[size] || 1));
     const aiFacs = shuffle(Object.keys(FACTIONS).filter(f => f !== faction)).slice(0, nAI);
-    const m = genMap(seed, aiFacs, diff, { preset, size, biome: map.biome });
+    const wrap = map.wrap === true, m = genMap(seed, aiFacs, diff, { preset, size, biome: map.biome, wrap });
     setFaction(faction); applyTheme(faction);
     G = { seed, preset, size, W: m.W, H: m.H, scn: map.scn ? { id: map.scn.id, name: map.scn.name, goal: map.scn.goal } : null, tiles: m.tiles, biome: m.biome, river: m.river, zone: m.zone, objs: m.objs, dock: m.dock, boats: [], nextBoat: 1, day: 1, over: false, path: null, faction, diff,
       res: { gold: D.gold, wood: r(20), ore: r(20), mercury: r(5), sulfur: r(5), crystal: r(5), gems: r(5) }, spells: [...START_SPELLS],
@@ -224,6 +224,7 @@
       col: (() => { const pc = Math.max(0, Math.min(7, map.color || 0)), free = PALETTE.map((p, i) => i).filter(i => i !== pc); return [PALETTE[pc][1], ...aiFacs.map((f, i) => PALETTE[free[i % free.length]][1])]; })(),
       ais: aiFacs.map((f, i) => ({ id: i + 1, fac: f, name: FACTIONS[f].name, gold: Math.round(3000 * D.aiInc), heroes: [], alive: true, spawnWait: 0, team: ({ ally: 1, bloc: 2 }[(map.teams || [])[i]] || 3 + i) })) };
     if (G.ais.every(a => a.team === 1)) G.ais[0].team = 3;
+    G.wrap = wrap; WRAP_W = wrap ? G.W : 0;
     for (const o of G.objs) if (o.t === 'town') {
       if (o.owner === 0) { o.fac = faction; o.name = FACTIONS[faction].town; initTown(o, 0); }
       else initTown(o, o.owner ? 1 : 0);
@@ -247,6 +248,7 @@
     try {
       const s = localStorage.getItem(key); if (!s) return false;
       G = JSON.parse(s); if (!G.zone || !G.heroes || !G.ais) return false;
+      WRAP_W = G.wrap ? G.W : 0;
       G.tavern = (G.tavern || []).filter(id => HEROES[id]);
       G.path = null; G.boats = G.boats || []; setFaction(G.faction); applyTheme(G.faction); setActive(Math.min(G.sel, G.heroes.length - 1));
       initFog(); reindex(G); buildTerrain(); sizeMini(); centerOn(G.hero.x, G.hero.y); renderAll(); recentreSoon(); return true;
@@ -277,7 +279,7 @@
       for (let dx = -r - 1; dx <= r + 1; dx++) {
         const ox = dx + ((yy & 1) - (y & 1)) * 0.5, oy = dy * 0.866;
         if (ox * ox + oy * oy > r2) continue;
-        const xx = x + dx; if (xx < 0 || xx >= G.W) continue;
+        let xx = x + dx; if (WRAP_W) xx = wrapX(xx); else if (xx < 0 || xx >= G.W) continue;
         const i = yy * G.W + xx;
         if (seeNow) vis[i] = 1;
         if (G.expl[i] === 0) { G.expl[i] = 1; fogDirty = true; }
@@ -312,7 +314,8 @@
     const WW = (G.W + 0.5) * TS, WH = G.H * RH + HR * 0.5;
     // a little overscroll past the map edge so a hero standing in a corner can still be centred
     const mx = VW * 0.45, my = VH * 0.45;
-    cam.x = WW <= VW ? -(VW - WW) / 2 : Math.max(-mx, Math.min(WW - VW + mx, cam.x));
+    if (WRAP_W) { const P = WRAP_W * TS; cam.x = ((cam.x % P) + P) % P; }   // the globe: sideways the view just goes round
+    else cam.x = WW <= VW ? -(VW - WW) / 2 : Math.max(-mx, Math.min(WW - VW + mx, cam.x));
     cam.y = WH <= VH ? -(VH - WH) / 2 : Math.max(-my, Math.min(WH - VH + my, cam.y));
   }
   // the page layout settles a moment after a game starts (title/dialogs close), so centre on the hero again once it has
@@ -527,6 +530,14 @@
     if (!G) return;
     const ds = cmap.width / (VW * Z), now = performance.now();
     cx.setTransform(1, 0, 0, 1, 0, 0); cx.fillStyle = '#000'; cx.fillRect(0, 0, cmap.width, cmap.height); cx.setTransform(Z * ds, 0, 0, Z * ds, 0, 0);
+    // the globe: when the view crosses the left/right seam the world is drawn a second time, shifted by one world width
+    const camX = cam.x, P = WRAP_W ? WRAP_W * TS : 0;
+    for (let s = 0; ; s++) { cam.x = camX - s * P; drawWorld(ds, now); if (!P || camX + VW <= (s + 1) * P) break; }
+    cam.x = camX;
+    drawTimeOfDay();
+    drawMini();
+  }
+  function drawWorld(ds, now) {
     cx.imageSmoothingEnabled = Z * ds / tsc < 1.4; cx.imageSmoothingQuality = 'high';
     cx.drawImage(terrain, cam.x * tsc, cam.y * tsc, VW * tsc, VH * tsc, 0, 0, VW, VH);
     const x0 = Math.floor(cam.x / TS) - 1, y0 = Math.floor(cam.y / RH) - 1, vx = Math.ceil(VW / TS) + 3, vy = Math.ceil(VH / RH) + 3;
@@ -562,9 +573,11 @@
       // footprints are coloured by the day the hero gets there: gold = today, blue = day 2, red = day 3 or later
       const tintFp = (col) => { if (!fpFar[col]) { const c = document.createElement('canvas'); c.width = fp0.width; c.height = fp0.height; const x = c.getContext('2d'); x.drawImage(fp0, 0, 0); x.globalCompositeOperation = 'source-atop'; x.fillStyle = col; x.fillRect(0, 0, c.width, c.height); fpFar[col] = c; } return fpFar[col]; };
       let cum = 0; const mm = Math.max(1, maxMove(G.hero));
+      let uoff = 0, pux = hcx(prev.x, prev.y); const PP = WRAP_W ? WRAP_W * TS : 0;   // the route is drawn unwrapped, so a step over the seam stays one short segment
       G.path.forEach((s) => {
         left -= s.cost; const ok = left >= 0; cum += s.cost; const dayN = cum <= G.hero.move ? 1 : 1 + Math.ceil((cum - G.hero.move) / mm); const fp = !fp0 || dayN === 1 ? fp0 : tintFp(dayN === 2 ? 'rgba(60,150,255,.8)' : 'rgba(235,45,35,.8)');
-        const ax = hcx(prev.x, prev.y) - cam.x, ay = hcy(prev.y) - cam.y, bx = hcx(s.x, s.y) - cam.x, by = hcy(s.y) - cam.y;
+        let ux = hcx(s.x, s.y) + uoff; if (PP) { while (ux - pux > PP / 2) { uoff -= PP; ux -= PP; } while (ux - pux < -PP / 2) { uoff += PP; ux += PP; } }
+        const ax = pux - cam.x, ay = hcy(prev.y) - cam.y, bx = ux - cam.x, by = hcy(s.y) - cam.y; pux = ux;
         if (fp) { const ang = Math.atan2(by - ay, bx - ax), fw = 21, fh = fp.height * fw / fp.width; cx.save(); cx.translate(bx, by); cx.rotate(ang + Math.PI / 2); cx.globalAlpha = 1; cx.shadowColor = 'rgba(0,0,0,.9)'; cx.shadowBlur = 5; cx.drawImage(fp, -fw / 2, -fh / 2, fw, fh); cx.shadowBlur = 0; cx.shadowColor = 'transparent'; cx.drawImage(fp, -fw / 2, -fh / 2, fw, fh); cx.restore(); prev = s; return; }
         cx.setLineDash([0.1, 7]);
         cx.beginPath(); cx.moveTo(ax, ay); cx.lineTo(bx, by);
@@ -572,7 +585,7 @@
         cx.lineWidth = 3.6; cx.strokeStyle = ok ? '#fff2c4' : '#ff8a70'; cx.stroke();
         cx.setLineDash([]); prev = s;
       });
-      { const e = G.path[G.path.length - 1], ex = hcx(e.x, e.y) - cam.x, ey = hcy(e.y) - cam.y, r = 9;
+      { const e = G.path[G.path.length - 1], ex = pux - cam.x, ey = hcy(e.y) - cam.y, r = 9;
         const eo = objAt(G, e.x, e.y), ahh = aiHeroAt(e.x, e.y), hostile = (ahh && !allyOfPlayer(ahh.ai)) || (eo && eo.owner !== 0 && !allyOfPlayer(eo.owner) && (eo.t === 'monster' || defenderOf(eo))), boat = G.boats.some(b => b.x === e.x && b.y === e.y);
         const mk = hostile ? Assets.get('markers/attack') : boat ? Assets.get('markers/anchor') : null;
         if (mk) { const mw = 30, mh = mk.height * mw / mk.width; cx.drawImage(mk, ex - mw / 2, ey - mh / 2, mw, mh); }
@@ -649,9 +662,7 @@
     drawDust(now);
     if (!RM()) drawAmbient(now);
     if (fogOn()) drawFog(x0, y0, vx, vy);
-    drawTimeOfDay();
     if (hover) { Art.hexPath(cx, hcx(hover.x, hover.y) - cam.x, hcy(hover.y) - cam.y, HR - 1); cx.strokeStyle = 'rgba(255,255,255,.85)'; cx.lineWidth = 2; cx.stroke(); }
-    drawMini();
   }
   const MC = { [T.GRASS]: '#4a7c3a', [T.FOREST]: '#2f5a2a', [T.MOUNT]: '#666', [T.WATER]: '#285c92', [T.ROAD]: '#a88a5a', [T.SAND]: '#c8b26c' };
   function drawMini() {
@@ -886,6 +897,7 @@
     const ddx = Math.abs(rx - q), ddz = Math.abs(rz - rr), ddy = Math.abs(ry + q + rr);
     if (ddx > ddz && ddx > ddy) rx = -ry - rz; else if (ddy > ddz) ry = -rx - rz; else rz = -rx - ry;
     const x = rx + ((rz - (rz & 1)) >> 1), y = rz;
+    if (WRAP_W) return y >= 0 && y < G.H ? { x: wrapX(x), y } : null;
     return x >= 0 && y >= 0 && x < G.W && y < G.H ? { x, y } : null;
   }
   function armyList(arr, vague) { return arr.filter(Boolean).map(a => vague ? `${groupLabel(a.n)} ${C[a.t].n}s` : `${a.n} ${C[a.t].n}`).join(', '); }
@@ -1761,7 +1773,7 @@
       const c = q.shift();
       if (!G.boats.some(b => b.x === c.x && b.y === c.y) && !objAt(G, c.x, c.y) && !heroesAt(c.x, c.y).length) return c;
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-        const nx = c.x + dx, ny = c.y + dy;
+        const nx = wrapX(c.x + dx), ny = c.y + dy;
         if (nx < 0 || ny < 0 || nx >= G.W || ny >= G.H || seen.has(ny * G.W + nx) || G.tiles[ny][nx] !== T.WATER) continue;
         seen.add(ny * G.W + nx); q.push({ x: nx, y: ny });
       }
@@ -1854,7 +1866,7 @@
     const tabBtn = (k, label, ico) => { const u = bsrc(k === 'war' ? 'war' : 'bld'); return `<button class="ttab${townTab === k ? ' on' : ''}${u ? ' tbtn' : ''}" data-ttab="${k}" title="${label}">${u ? `<img src="${u}" alt="${label}" draggable="false">` : ico + ' ' + label}</button>`; };
     // the whole screen is the town picture (like the original); the troops, two buttons and a panel for Warriors / Buildings sit on top of it
     const panel = townTab ? `<div class="tpanel"><div class="tphead"><b>${townTab === 'bld' ? '🏗️ Buildings' : '⚔️ Warriors'}</b><span class="tpr">${townTab === 'bld' ? '' : '<button id="tBuyAll" class="tpall" title="Recruit as many of every creature as you can afford, strongest first">Recruit all</button>'}<button id="tpClose" class="tpx" title="Close">✕</button></span></div><div class="tpbody">${townTab !== 'bld' ? `<div class="bgrid wgrid">${wc}</div>` + outpostHtml(t) : `<h4>Creature dwellings</h4><div class="bgrid">${dwc}</div><h4>Town buildings</h4><div class="bgrid">${cardify(bld + smithy)}</div>` + caravanHtml(t, mt)}</div></div>` : '';
-    const html = cvHtml + `<div class="tui"><div class="ttop">${topHtml}</div><div class="tfill"></div><div class="gstack">` + gTop + gHero + `</div><div class="tbar">${tabBtn('war', 'Warriors', '⚔️')}${tabBtn('bld', 'Buildings', '🏗️')}<button class="primary" id="tClose">Leave town</button></div>${panel}</div>`;
+    const html = cvHtml + `<div class="tui">${mt.length > 1 ? `<button class="tarrow l" data-tnav="-1" title="Previous town: ${mt[(mt.indexOf(t) + mt.length - 1) % mt.length].name}">‹</button><button class="tarrow r" data-tnav="1" title="Next town: ${mt[(mt.indexOf(t) + 1) % mt.length].name}">›</button>` : ''}<div class="ttop">${topHtml}</div><div class="tfill"></div><div class="gstack">` + gTop + gHero + `</div><div class="tbar">${tabBtn('war', 'Warriors', '⚔️')}${tabBtn('bld', 'Buildings', '🏗️')}<button class="primary" id="tClose">Leave town</button></div>${panel}</div>`;
     $('mbox').innerHTML = html; $('mbox').classList.add('townfull'); $('modal').classList.remove('hide'); townHover = -1;
     { const cv = $('tcv'), at = (e) => { const r = cv.getBoundingClientRect(); return TownArt.slotAt((e.clientX - r.left - townV.x) / townV.k, (e.clientY - r.top - townV.y) / townV.k, TW, TH); };
       let pd = null;
@@ -2425,14 +2437,15 @@
     $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => { Settings.mem('lastDiff', c.dataset.d); showMapSelect(c.dataset.d); });
     $('modal').classList.remove('hide');
   }
-  function showMapSelect(diff, st = Object.assign({ preset: 'plains', size: 'medium', seed: '' }, Settings.mem('lastMap') || {})) {
-    Settings.mem('lastMap', { preset: st.preset, size: st.size, fog: st.fog, ais: st.ais, color: st.color });     // the next game starts with the same options
+  function showMapSelect(diff, st = Object.assign({ preset: 'plains', size: 'medium', seed: '', wrap: true }, Settings.mem('lastMap') || {})) {
+    Settings.mem('lastMap', { preset: st.preset, size: st.size, fog: st.fog, ais: st.ais, color: st.color, wrap: st.wrap });     // the next game starts with the same options
     const cards = Object.entries(MAPS).map(([k, m]) => `<div class="card${st.preset === k ? ' on' : ''}" data-m="${k}"><img class="mprev" src="${mapPreview(k, undefined, k)}" alt="" draggable="false"><b>${m.name}</b><div class="small">${m.desc}</div></div>`).join('');
     const sizes = Object.entries(SIZES).map(([k, s]) => `<button class="${st.size === k ? 'primary' : ''}" data-s="${k}">${s.name} (${s.w}×${s.h})</button>`).join(' ');
     $('mbox').innerHTML = `<div class="setup"><span data-bg="map_select"></span><h2>Choose your map<span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid two">${cards}</div>
       <div class="optpanel">
         <div class="opt"><label>Map size</label><div class="optc"><div class="opts">${Object.entries(SIZES).map(([k, s]) => `<button class="${st.size === k ? 'primary' : ''}" data-s="${k}"><b>${s.name}</b><small>${s.w}×${s.h}</small></button>`).join('')}</div></div></div>
         <div class="opt"><label>Fog of war</label><div class="optc"><div class="opts">${[[true, 'On'], [false, 'Off']].map(([v, n]) => `<button class="${(st.fog !== false) === v ? 'primary' : ''}" data-fog="${v}"><b>${n}</b></button>`).join('')}</div><small>Unexplored land is hidden; scouts, towers and your heroes reveal it.</small></div></div>
+        <div class="opt"><label>Map edges</label><div class="optc"><div class="opts">${[[true, 'Globe'], [false, 'Walled']].map(([v, n]) => `<button class="${(st.wrap !== false) === v ? 'primary' : ''}" data-wrap="${v}"><b>${n}</b></button>`).join('')}</div><small>Globe: the world has no edge, walk east to come out in the west. Walled: the edges cannot be crossed.</small></div></div>
         <div class="opt"><label>Rivals</label><div class="optc"><div class="opts">${[0, 1, 2, 3, 4].map(n => `<button class="${(st.ais || 0) === n ? 'primary' : ''}" data-a="${n}"><b>${n ? n : 'Auto'}</b></button>`).join('')}</div><small>AI players that expand and fight you.</small></div></div>
         <div class="opt"><label>Seed</label><div class="optc"><div class="seedrow"><input id="mSeed" placeholder="empty = random map" value="${st.seed}"><button id="mDice" title="Pick a random seed">🎲 Random</button></div><small>Share a seed to replay the same map.</small></div></div>
         <div class="opt"><label>Your flag</label><div class="optc"><div class="flags">${PALETTE.map((p, i) => `<button class="swatch flagbtn${(st.color || 0) === i ? ' on' : ''}" data-col="${i}" title="${p[0]}">${flagImg(i, 34)}</button>`).join('')}</div></div></div>
@@ -2446,6 +2459,7 @@
     $('mbox').querySelectorAll('[data-tm]').forEach(b => b.onclick = () => { keep(); const [i, v] = b.dataset.tm.split(':'); (st.teams = st.teams || [])[+i] = v; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-m]').forEach(c => c.onclick = () => { keep(); st.preset = c.dataset.m; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-s]').forEach(b => b.onclick = () => { keep(); st.size = b.dataset.s; showMapSelect(diff, st); });
+    $('mbox').querySelectorAll('[data-wrap]').forEach(b => b.onclick = () => { keep(); st.wrap = b.dataset.wrap === 'true'; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-fog]').forEach(b => b.onclick = () => { keep(); st.fog = b.dataset.fog === 'true'; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-a]').forEach(b => b.onclick = () => { keep(); st.ais = +b.dataset.a; showMapSelect(diff, st); });
     $('sBack').onclick = showDifficultySelect;
@@ -2465,7 +2479,7 @@
     const full = !!(Assets.get('terrain/grass') && Assets.get('terrain/water'));
     let url = '';
     try {
-      const mp = genMap(20260 + kind0.length * 31 + (biome ? biome.length * 7 : 0), ['necropolis'], 'normal', { preset: kind0, size: 'small', biome: biome || 'mixed' });
+      const mp = genMap(20260 + kind0.length * 31 + (biome ? biome.length * 7 : 0), ['necropolis'], 'normal', { preset: kind0, size: 'small', biome: biome || 'mixed' }); WRAP_W = G && G.wrap ? G.W : 0;
       const PW = (mp.W + 0.5) * 32, PH = mp.H * RH + HR * 0.5, big = document.createElement('canvas'); big.width = Math.ceil(PW); big.height = Math.ceil(PH);
       const bc = big.getContext('2d'), GF = { W: mp.W, H: mp.H, tiles: mp.tiles, biome: mp.biome, river: mp.river, zone: mp.zone, objs: mp.objs };
       for (let y = 0; y < mp.H; y++) for (let x = 0; x < mp.W; x++) Art.tile(bc, mp.tiles[y][x], x, y, GF);
@@ -2552,13 +2566,25 @@
   $('bHelp').onclick = () => openHelp();
   $('bSave').onclick = () => G && !busy && openSlots();
   $('bEnd').onclick = endTurn;
-  $('bTown').onclick = () => G && !busy && openTown();
+  // with several towns the Town button asks which one to open
+  function chooseTown() {
+    const mt = myTowns(); if (mt.length < 2) return openTown();
+    const pic = (t) => { const u = Assets.has('ui/town_' + t.fac) ? Assets.src('ui/town_' + t.fac) : ''; return u ? `<img src="${u}" alt="" draggable="false">` : ''; };
+    $('mbox').innerHTML = `<h2>🏰 Which town?</h2><div class="townpick">${mt.map((t, i) => `<button class="tcard" data-pt="${i}">${pic(t)}<span class="tcn">${t.name}</span><span class="tci">${FACTIONS[t.fac].icon} ${FACTIONS[t.fac].name}${heroesAt(t.x, t.y).length ? ' · 🏇 hero inside' : ''}</span></button>`).join('')}</div><div class="mb"><button id="ptClose">Close</button></div>`;
+    $('mbox').querySelectorAll('[data-pt]').forEach(b => b.onclick = () => { const t = mt[+b.dataset.pt]; centerOn(t.x, t.y); openTown(t); });
+    $('ptClose').onclick = () => $('modal').classList.add('hide');
+    $('modal').classList.remove('hide');
+  }
+  $('bTown').onclick = () => G && !busy && chooseTown();
   function fitZoom() { if (!G) return; setZoom(Math.min(cmap.clientWidth / ((G.W + 0.5) * TS), cmap.clientHeight / (G.H * RH + HR * 0.5)), 0, 0); clampCam(); }
   $('mEnd').onclick = endTurn;
   $('mapEnd').onclick = endTurn;
+  // the right-hand panels fold down to their title (click it); the choice is remembered
+  ['terr', 'townsPanel'].forEach(id => { const el = $(id); if (!el) return; const key = 'fold_' + id; if (Settings.mem(key)) el.classList.add('folded');
+    el.addEventListener('click', (e) => { if (!e.target.closest('h3')) return; const f = el.classList.toggle('folded'); try { Settings.mem(key, f ? 1 : 0); } catch (err) { /* ignore */ } }); });
   { const tog = $('mTog'), apply = (v) => { document.body.classList.toggle('barhid', v); tog.firstChild.textContent = v ? '▲' : '▼'; try { Settings.mem('barhid', v ? 1 : 0); } catch (e) { /* ignore */ } };
     apply(!!(Settings.mem('barhid'))); tog.onclick = () => apply(!document.body.classList.contains('barhid')); }
-  $('mTown').onclick = () => G && !busy && openTown();
+  $('mTown').onclick = () => G && !busy && chooseTown();
   // phone action bar: the side panels open as sheets (the real elements are moved into the dialog and back, so they stay live)
   let sheetBack = null;
   const sheetOpen = (title, els) => {
@@ -2837,7 +2863,7 @@
     });
     [home, ...towns].forEach(t => markView(t.x, t.y, 9, false)); G.res.gold += 20000; renderAll();
   }
-  if (/[?&]demo/.test(location.search)) Assets.ready.then(() => setTimeout(() => { try { newGame('castle', 'Orrin', 'normal', { size: 'medium', seed: 'demo' }); $('title').classList.add('hide'); demo(); } catch (e) { console.error('demo failed', e); } }, 400));
+  if (/[?&]demo/.test(location.search)) Assets.ready.then(() => setTimeout(() => { try { newGame('castle', 'Orrin', 'normal', { size: 'medium', seed: 'demo', wrap: true }); $('title').classList.add('hide'); demo(); } catch (e) { console.error('demo failed', e); } }, 400));
   window.__G = () => G;
   window.__dbg = { demo, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
 })();

@@ -1,6 +1,10 @@
 // hex grid helpers (pointy-top, odd-r offset). Order of neighbours: E, SE, SW, W, NW, NE
-function hexNb(x, y) { const o = y & 1; return [[x + 1, y], [x + o, y + 1], [x + o - 1, y + 1], [x - 1, y], [x + o - 1, y - 1], [x + o, y - 1]]; }
-function hexDist(a, b) { const ax = a.x - ((a.y - (a.y & 1)) >> 1), bx = b.x - ((b.y - (b.y & 1)) >> 1), ay = -ax - a.y, by = -bx - b.y; return Math.max(Math.abs(ax - bx), Math.abs(ay - by), Math.abs(a.y - b.y)); }
+// the world is a globe: when WRAP_W is set, the left and right edges join (x wraps around); the top and bottom stay the poles
+let WRAP_W = 0;
+const wrapX = (x) => (WRAP_W ? ((x % WRAP_W) + WRAP_W) % WRAP_W : x);
+function hexNb(x, y) { const o = y & 1; const r = [[x + 1, y], [x + o, y + 1], [x + o - 1, y + 1], [x - 1, y], [x + o - 1, y - 1], [x + o, y - 1]]; if (WRAP_W) for (const p of r) p[0] = ((p[0] % WRAP_W) + WRAP_W) % WRAP_W; return r; }
+function hexDist1(a, b) { const ax = a.x - ((a.y - (a.y & 1)) >> 1), bx = b.x - ((b.y - (b.y & 1)) >> 1), ay = -ax - a.y, by = -bx - b.y; return Math.max(Math.abs(ax - bx), Math.abs(ay - by), Math.abs(a.y - b.y)); }
+function hexDist(a, b) { if (!WRAP_W) return hexDist1(a, b); return Math.min(hexDist1(a, b), hexDist1(a, { x: b.x + WRAP_W, y: b.y }), hexDist1(a, { x: b.x - WRAP_W, y: b.y })); }
 'use strict';
 function rng(seed) {
   return function () {
@@ -11,9 +15,11 @@ function rng(seed) {
   };
 }
 
-function noise(R, W, H, sc) {
+function noise(R, W, H, sc0) {
+  const cells = Math.max(2, Math.round(W / sc0)), sc = W / cells;   // a whole number of cells across, so the noise joins up at the left and right edges
   const gw = Math.ceil(W / sc) + 2, gh = Math.ceil(H / sc) + 2, g = [];
   for (let y = 0; y < gh; y++) { g[y] = []; for (let x = 0; x < gw; x++) g[y][x] = R(); }
+  for (let y = 0; y < gh; y++) for (let x = cells; x < gw; x++) g[y][x] = g[y][x - cells];
   const out = [];
   for (let y = 0; y < H; y++) {
     out[y] = [];
@@ -46,6 +52,7 @@ function genMapOnce(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
   const DM = DIFFICULTY[diff] || DIFFICULTY.normal;
   const MP = MAPS[mo.preset] || MAPS.plains, SZ = SIZES[mo.size] || SIZES.medium;
   const R = rng(seed), W = SZ.w, H = SZ.h, sc = (W * H) / 1120;
+  WRAP_W = mo.wrap ? W : 0;   // globe: east and west join up
   const fs = Math.max(1, Math.pow(sc, 0.3));
   const n1 = noise(R, W, H, 6 * fs), n2 = noise(R, W, H, 3 * fs);
   const tiles = [];
@@ -168,7 +175,7 @@ function genMapOnce(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
       seen.add(ny * W + nx); q.push({ x: nx, y: ny });
     }
   }
-  const dist = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+  const dist = (a, b) => { let dx = Math.abs(a.x - b.x); if (dx > W / 2) dx = W - dx; return Math.max(dx, Math.abs(a.y - b.y)); };
   let cand = [];
   for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) {
     const t = tiles[yy][xx];
@@ -242,7 +249,7 @@ function genMapOnce(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
     zone[yy] = [];
     for (let xx = 0; xx < W; xx++) {
       let best = 0, bd = 1e9;
-      for (const s of seeds) { const d = (s.x - xx) ** 2 + (s.y - yy) ** 2; if (d < bd) { bd = d; best = s.id; } }
+      for (const s of seeds) { let ddx = Math.abs(s.x - xx); if (ddx > W / 2) ddx = W - ddx; const d = ddx ** 2 + (s.y - yy) ** 2; if (d < bd) { bd = d; best = s.id; } }
       zone[yy][xx] = best;
     }
   }

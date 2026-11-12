@@ -9,9 +9,10 @@ async function bbox(file) {
 }
 (async () => {
   for (const id of (only.length ? only : fs.readdirSync(root))) {
-    const dir = path.join(root, id); if (!fs.existsSync(path.join(dir, 'idle_1.webp'))) continue;
+    const dir = path.join(root, id), ALIAS = { goblin: 'stronghold1', wolf: 'stronghold2', orc: 'stronghold3', ogre: 'stronghold4', golem: 'tower3', naga: 'tower6', dragon: 'rampart7' };   // neutral creatures borrow their idle frames from the town creature
+    const idleFile = fs.existsSync(path.join(dir, 'idle_1.webp')) ? path.join(dir, 'idle_1.webp') : (ALIAS[id] && fs.existsSync(path.join(root, ALIAS[id], 'idle_1.webp')) ? path.join(root, ALIAS[id], 'idle_1.webp') : null); if (!idleFile) continue;
     const mv = fs.readdirSync(dir).filter(f => /^(walk|fly)_\d+\.webp$/.test(f)).sort(); if (!mv.length) continue;
-    const idle = await bbox(path.join(dir, 'idle_1.webp')), rs = [];
+    const idle = await bbox(idleFile), rs = [];
     for (const f of mv) { const b = await bbox(path.join(dir, f)); rs.push({ f, b, r: Math.max(b.h / idle.h, b.w / idle.w * 0.8) }); }
     const hr = rs.map(x => x.b.h / idle.h), avg = hr.reduce((a, c) => a + c, 0) / hr.length;
     if (fix && Math.abs(avg - 1) > 0.04) {

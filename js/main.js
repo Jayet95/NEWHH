@@ -2800,6 +2800,17 @@
 
   refreshTitle();
   requestAnimationFrame(loop);
+  // ?demo opens a ready-made game with several towns and heroes, to see how the screens handle a bigger realm
+  function demo() {
+    const towns = G.objs.filter(o => o.t === 'town' && o.owner === null && o.b).slice(0, 3);
+    towns.forEach(t => takeTown(t, 0));
+    const home = G.objs.find(o => o.t === 'town' && o.owner === 0);
+    Object.keys(HEROES).filter(id => !G.heroes.some(h => h.name === HEROES[id].name)).slice(0, 3).forEach((id, i) => {
+      const t = towns[i] || home, h = makeHero(HEROES[id], t.x, t.y); G.heroes.push(h); learn(HEROES[id].spells);
+    });
+    [home, ...towns].forEach(t => markView(t.x, t.y, 9, false)); G.res.gold += 20000; renderAll();
+  }
+  if (/[?&]demo/.test(location.search)) Assets.ready.then(() => setTimeout(() => { newGame('castle', 'Orrin', 'normal', { size: 'medium', seed: 'demo' }); $('title').classList.add('hide'); demo(); }, 400));
   window.__G = () => G;
-  window.__dbg = { negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
+  window.__dbg = { demo, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
 })();

@@ -209,9 +209,9 @@ function genMapOnce(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
   const seeds = [{ x: P.x, y: P.y, id: 0 }, ...aiStarts.map((a, i) => ({ x: a.x, y: a.y, id: i + 1 }))];
   let nextZone = seeds.length;
   // neutral towns (capturable for new castles)
-  const townNames = ['Oakhaven', 'Stonebridge', 'Redwater', 'Highmoor', 'Silverlake', 'Ashford', 'Wolfsden', 'Ironvale', 'Kingsmere'];
+  const townNames = ['Oakhaven', 'Stonebridge', 'Redwater', 'Highmoor', 'Silverlake', 'Ashford', 'Wolfsden', 'Ironvale', 'Kingsmere', 'Dunmere', 'Eastwatch', 'Falconcrest', 'Greymarch', 'Hollowbrook', 'Ivywood', 'Larkspur', 'Mistral', 'Northgate', 'Pinehurst', 'Quarry Hill', 'Rivenford', 'Summerholt', 'Thornfield', 'Underhill'];
   const facKeys = Object.keys(FACTIONS);
-  const nTowns = Math.min(9, Math.max(1, Math.round(sc * 0.9)));
+  const nTowns = Math.min(24, Math.max(1, Math.round(sc * 0.9)));
   const fortNames = ['Mistvale Keep', 'Ironhold Bastion', 'Sunspire Outpost', 'Grimwatch Tower', 'Stormhaven', 'Ravenmoor Hold', 'Dawnspire Fort', 'Blackfen Redoubt', 'Emberwatch', 'Frostgate', 'Goldcrest Bastion', 'Shadowvale Keep'];
   const spacing = Math.max(7, Math.round(9 * Math.pow(sc, 0.35)));
   const nForts = Math.min(12, Math.max(4, Math.round(4 * Math.sqrt(sc))));
@@ -229,7 +229,7 @@ function genMapOnce(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
     const c = placeSeed(); if (!c) break;
     const f = facKeys[Math.floor(R() * facKeys.length)], zid = nextZone++, d = depthOf(c);
     seeds.push({ x: c.x, y: c.y, id: zid });
-    objs.push({ t: 'town', owner: null, fac: f, x: c.x, y: c.y, name: `${townNames[i % townNames.length]} (${FACTIONS[f].name})`, zone: zid, guard: garrisonOf(f, (0.35 + d * 0.9) * DM.neutral).slice(0, 5), garrison: emptyGar() });
+    objs.push({ t: 'town', owner: null, fac: f, x: c.x, y: c.y, name: `${townNames[i % townNames.length]} (${FACTIONS[f].name})`, zone: zid, guard: i % 3 === 0 ? [] : garrisonOf(f, (0.35 + d * 0.9) * DM.neutral).slice(0, 5), garrison: emptyGar() });   // every third neutral town stands empty: walk in and it is yours
   }
   for (let i = 0; i < nForts; i++) {
     const c = placeSeed(); if (!c) break;

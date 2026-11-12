@@ -1552,3 +1552,15 @@ body.skin #mbox .gacts button, #mbox .gacts button { flex: 1 1 0; min-width: 0; 
   body.barhid:not(.inbattle) #mbar { padding: 0; width: auto; background: none; border: 0; box-shadow: none; }
   body.barhid:not(.inbattle) #mbar #mTog { width: 72px; flex: 0 0 auto; min-height: 22px; height: 22px; border-radius: 10px 10px 0 0; font-size: 14px; }
 }
+
+/* towns list in the right column */
+#townsPanel { display: none; }
+@media (min-width: 1000px) and (min-height: 541px) {
+  body:not(.inbattle) #townsPanel { display: block; padding: 8px 10px; background: linear-gradient(180deg, var(--panel2), var(--panel)); border: 2px solid var(--edge); border-radius: 10px; box-shadow: var(--shadow); max-height: 34vh; overflow-y: auto; scrollbar-width: thin; }
+  #townsPanel h3 { margin: 0 0 6px; font-size: 14px; }
+  #townsPanel .tcard { position: relative; display: block; width: 100%; height: 62px; margin: 0 0 6px; padding: 0; overflow: hidden; border-radius: 8px; border: 2px solid var(--edge); background: #120a04; text-align: left; }
+  #townsPanel .tcard img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; }
+  #townsPanel .tcard:hover { border-color: var(--gold); }
+  #townsPanel .tcn { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 8px 15px; font-weight: bold; font-size: 13px; color: #fff3cf; text-shadow: 0 1px 2px #000; background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, .8)); }
+  #townsPanel .tci { position: absolute; left: 8px; right: 8px; bottom: 2px; font-size: 10px; color: #e8d9ac; text-shadow: 0 1px 2px #000; }
+}

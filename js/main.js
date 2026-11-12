@@ -508,6 +508,19 @@
     else { cx.beginPath(); cx.arc(0, 0.6, 1.7, 0, 7); cx.fill(); }
     cx.restore();
   }
+  const badgeCache = {};
+  function townBadge(o) {
+    const key = 'ui/town_' + (o.fac || ''), img = typeof Assets !== 'undefined' ? Assets.get(key) : null; if (!img) return null;
+    const col = ownCol(o.owner), ck = key + col; if (badgeCache[ck]) return badgeCache[ck];
+    const S = 120, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
+    g.save(); g.beginPath(); g.arc(S / 2, S / 2, S / 2 - 7, 0, 7); g.clip();
+    const side = Math.min(img.width, img.height) * 0.78, sx = img.width * 0.5 - side / 2, sy = img.height * 0.5 - side * 0.62;   // centre on the castle
+    g.drawImage(img, Math.max(0, sx), Math.max(0, sy), side, side, 0, 0, S, S); g.restore();
+    g.lineWidth = 7; g.strokeStyle = col; g.beginPath(); g.arc(S / 2, S / 2, S / 2 - 7, 0, 7); g.stroke();
+    g.lineWidth = 2.5; g.strokeStyle = '#e6bf55'; g.beginPath(); g.arc(S / 2, S / 2, S / 2 - 2.5, 0, 7); g.stroke();
+    g.strokeStyle = '#120a04'; g.lineWidth = 1.5; g.beginPath(); g.arc(S / 2, S / 2, S / 2 - 11, 0, 7); g.stroke();
+    return (badgeCache[ck] = c);
+  }
   const monNeed = new Set(), fpFar = {};
   let reachKey = '', reachSet = new Map();
   function draw() {
@@ -588,7 +601,12 @@
           if (typeof Assets !== 'undefined' && Assets.has(ms) && !monNeed.has(ms)) { monNeed.add(ms); Assets.need([ms, 'poses/left/idle/' + mb]).then(() => draw()); }
         }
       }
-      const spr = o.t === 'monster' ? null : Art.obj(o, o.fac);
+      const badge = o.t === 'town' ? townBadge(o) : null;
+      if (badge) {   // a round picture of the town's own castle, ringed in its owner's colour
+        cx.beginPath(); cx.ellipse(px, py + 17, 24, 7, 0, 0, 7); cx.fillStyle = 'rgba(0,0,0,.3)'; cx.fill();
+        cx.drawImage(badge, px - 30, py - 33, 60, 60);
+      }
+      const spr = o.t === 'monster' || badge ? null : Art.obj(o, o.fac);
       if (spr) {
         const sz = o.t === 'town' ? 50 : o.t === 'fort' || o.t === 'lair' ? 46 : o.t === 'dwelling' ? 44 : o.t === 'pile' ? 30 : 38;
         cx.beginPath(); cx.ellipse(px, py + sz * 0.3, sz * 0.38, sz * 0.12, 0, 0, 7); cx.fillStyle = 'rgba(0,0,0,.26)'; cx.fill();   // soft ground shadow
@@ -732,6 +750,15 @@
     const zs = G.objs.filter(o => o.t === 'fort' || o.t === 'town').sort((a, b) => a.zone - b.zone);
     const mineIncome = G.objs.filter(o => o.t === 'mine' && o.owner === 0 && zoneOwner(G, G.zone[o.y][o.x]) === 0).length;
     const mine = zs.filter(z => z.owner === 0), rest = zs.length - mine.length;
+    { const tp = $('townsPanel'); if (tp) {
+      const mt = myTowns(), cur = (typeof curTown !== 'undefined' && curTown) || null;
+      tp.innerHTML = `<h3>🏰 Towns — ${mt.length}</h3>` + mt.map((t, i) => {
+        const u = typeof Assets !== 'undefined' && Assets.has('ui/town_' + t.fac) ? Assets.src('ui/town_' + t.fac) : '', here = G.heroes.filter(hh => hh.x === t.x && hh.y === t.y).length;
+        const gn = t.garrison ? t.garrison.reduce((s2, a2) => s2 + (a2 ? a2.n : 0), 0) : 0, built = [1, 2, 3, 4, 5, 6, 7].filter(k => t.b && t.b[k]).length;
+        return `<button class="tcard" data-tc="${i}" title="Open ${t.name}">${u ? `<img src="${u}" alt="" draggable="false">` : ''}<span class="tcn">${t.name}</span><span class="tci">${FACTIONS[t.fac] ? FACTIONS[t.fac].icon : ''} ${here ? '🏇' + here + ' ' : ''}🛡${gn} · 🏗${built}/7</span></button>`;
+      }).join('');
+      tp.querySelectorAll('[data-tc]').forEach(b => b.onclick = () => { if (busy) return; const t = mt[+b.dataset.tc]; centerOn(t.x, t.y); openTown(t); });
+    } }
     $('terr').innerHTML = `<h3>🗺 Territory — ${mine.length}/${zs.length} zones</h3>` +
       mine.map(z => { const gn = z.garrison ? z.garrison.reduce((s, a) => s + (a ? a.n : 0), 0) : 0;
         return `<div class="zrow"><span class="zdot" style="background:${ownCol(0)};color:${ownCol(0)}"></span>${z.t === 'town' ? '🏰' : '🏯'} ${z.name} <span class="small">garrison ${gn}</span></div>`; }).join('') +
@@ -2810,7 +2837,7 @@
     });
     [home, ...towns].forEach(t => markView(t.x, t.y, 9, false)); G.res.gold += 20000; renderAll();
   }
-  if (/[?&]demo/.test(location.search)) Assets.ready.then(() => setTimeout(() => { newGame('castle', 'Orrin', 'normal', { size: 'medium', seed: 'demo' }); $('title').classList.add('hide'); demo(); }, 400));
+  if (/[?&]demo/.test(location.search)) Assets.ready.then(() => setTimeout(() => { try { newGame('castle', 'Orrin', 'normal', { size: 'medium', seed: 'demo' }); $('title').classList.add('hide'); demo(); } catch (e) { console.error('demo failed', e); } }, 400));
   window.__G = () => G;
   window.__dbg = { demo, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
 })();

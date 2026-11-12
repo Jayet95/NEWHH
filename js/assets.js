@@ -19,7 +19,7 @@ const Assets = (() => {
       const eager = Object.keys(files); let done = 0, next = 0;   // everything is loaded up front, so no screen shows a second loader later
       const tick = () => { try { document.dispatchEvent(new CustomEvent('assets-progress', { detail: { done, total: eager.length } })); } catch (e) { /* ignore */ } };
       const worker = async () => { while (next < eager.length) { const s = eager[next++]; await loadOne(s); if (++done % 25 === 0 || done === eager.length) tick(); } };
-      await Promise.all(Array.from({ length: 24 }, worker));   // 24 at a time keeps the browser responsive and the bar moving
+      await Promise.all(Array.from({ length: 48 }, worker));   // 48 at a time keeps the browser responsive and the bar moving
       return eager.length;
     })
     .then((n) => { document.documentElement.classList.remove('assets-loading'); if (n) { try { document.dispatchEvent(new Event('assets-ready')); } catch (e) { /* ignore */ } } return n; });

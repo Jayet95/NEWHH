@@ -1263,3 +1263,6 @@ html, body { overflow-x: hidden; max-width: 100vw; }
 .pgbar { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 6px 0; } .pgbar span { min-width: 56px; text-align: center; font-size: 14px; color: var(--mut); }
 .pgbar button { width: 52px; height: 38px; font-size: 22px; line-height: 1; padding: 0; } .pgbar button:disabled { opacity: .35; }
 @media (max-width: 760px) { .ttabs ~ * { } #mbox .townblurb { display: none; } }
+
+/* the splash in index.html is the single loader now: the title screen carries no second bar */
+#loadbar, #loadtip, #loadmsg { display: none !important; }

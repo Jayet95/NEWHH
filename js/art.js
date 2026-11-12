@@ -378,7 +378,9 @@ const Art = (() => {
       const i0 = S * .075; rr(g, i0, i0, S - 2 * i0, S - 2 * i0, S * .12);
       const bg = g.createRadialGradient(S * .38, S * .3, 2, S * .5, S * .55, S * .68); bg.addColorStop(0, hsl(hh, sat, 46)); bg.addColorStop(1, hsl(hh, sat + 6, 13)); g.fillStyle = bg; g.fill();
       const isUp = /_\d$/.test(String(id)), baseId = String(id).replace(/_\d$/, ''), pimg = typeof Assets !== 'undefined' ? Assets.get('portraits/' + baseId + (isUp ? '_up' : ''), 'portraits/' + baseId) : null;
-      const stand = full && typeof Assets !== 'undefined' ? Assets.get('creatures/' + id, 'creatures/' + baseId) : null;   // the full standing figure (256px) for big pictures
+      // the creature's BATTLE art (first idle frame, else its idle pose) is its picture everywhere; the old standing figure / portrait is only the fallback
+      const battle = typeof Assets !== 'undefined' ? Assets.get('anim/' + id + '/idle_1', 'poses/left/idle/' + baseId + (isUp ? '_up' : ''), 'poses/left/idle/' + baseId) : null;
+      const stand = battle || (full && typeof Assets !== 'undefined' ? Assets.get('creatures/' + id, 'creatures/' + baseId) : null);
       if (pimg && !stand) { g.save(); rr(g, i0, i0, S - 2 * i0, S - 2 * i0, S * .12); g.clip(); g.drawImage(pimg, i0, i0, S - 2 * i0, S - 2 * i0); g.restore(); }
       if (!pimg || stand) {
       g.save(); rr(g, i0, i0, S - 2 * i0, S - 2 * i0, S * .12); g.clip();

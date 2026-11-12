@@ -58,7 +58,7 @@ const Assets = (() => {
     })
     .then((n) => {
       // background pass: backdrops, buildings and poses before animation frames; Assets.need() still jumps the queue for what a screen asks for
-      const rank = (k) => (/^buildings\//.test(k) ? 0 : /^anim\//.test(k) ? 3 : /^(poses|mounted)\//.test(k) ? 2 : 1);
+      const rank = (k) => (/^buildings\//.test(k) || /^anim\/[^/]+\/idle_1$/.test(k) || /^poses\/left\/idle\//.test(k) ? 0 : /^anim\//.test(k) ? 3 : /^(poses|mounted)\//.test(k) ? 2 : 1);
       const rest = Object.keys(files).filter(k => !stems[k]).sort((a, b) => (rank(a) - rank(b)) || (a < b ? -1 : 1)); let bi = 0, bLeft = rest.filter(k => rank(k) === 0).length;
       const idle = (fn) => (window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 400 }) : setTimeout(fn, 30));
       const bg = () => { if (bi >= rest.length) return; const k = rest[bi++]; loadOne(k).then(() => { if (rank(k) === 0 && --bLeft === 0) { try { document.dispatchEvent(new Event('assets-ready')); } catch (e) { /* ignore */ } } idle(bg); }); };

@@ -10,6 +10,7 @@ const Assets = (() => {
   let index = null; const packP = {};
   const stem = (f) => f.replace(/\.(png|webp|jpe?g|svg|gif)$/i, '');
   const LATER = /^(poses|mounted|anim|buildings)\/|^ui\/(castle_select|hero_select|adventure|town_)/;
+  const IDLE = /^anim\/[^/]+\/idle_1$|^poses\/left\/idle\//;   // the battle art that stands for a creature in every picture
   const MIME = { webp: 'image/webp', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', svg: 'image/svg+xml', gif: 'image/gif' };
   const progress = (done, total) => { try { document.dispatchEvent(new CustomEvent('assets-progress', { detail: { done, total } })); } catch (e) { /* ignore */ } };
   // download one pack (streamed, so the bar moves with the bytes); resolves to its ArrayBuffer or null
@@ -44,14 +45,14 @@ const Assets = (() => {
       const all = Object.keys(files);
       let eager;
       if (index) {
-        eager = all.filter(s => index.files[s] && index.packs[index.files[s][0]].core).concat(all.filter(s => !index.files[s] && !LATER.test(s)));
+        eager = all.filter(s => index.files[s] && index.packs[index.files[s][0]].core).concat(all.filter(s => !index.files[s] && (!LATER.test(s) || IDLE.test(s))));
         const corePacks = index.packs.map((p, i) => (p.core ? i : -1)).filter(i => i >= 0), total = corePacks.reduce((a, i) => a + index.packs[i].n, 0) * 1.12, got = {};
         const sum = () => Object.values(got).reduce((a, v) => a + v, 0);
         await Promise.all(corePacks.map(i => packBuf(i, (b) => { got[i] = b; progress(sum(), total); })));
         let done = 0;
         await pool(eager, 16, () => { if (++done % 40 === 0) progress(sum() + (total - sum()) * done / eager.length, total); });
       } else {
-        eager = all.filter(s => !LATER.test(s)); let done = 0;
+        eager = all.filter(s => !LATER.test(s) || IDLE.test(s)); let done = 0;
         await pool(eager, 48, () => { if (++done % 25 === 0 || done === eager.length) progress(done, eager.length); });
       }
       return eager.length;

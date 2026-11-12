@@ -12,7 +12,7 @@ function pack(root, outDir) {
   const groups = []; const add = (name, core, files) => { if (files.length) groups.push({ name, core, files }); };
   add('core', true, list.filter(f => !LATER.test(stem(f))));
   const idleSet = new Set(list.filter(f => /^anim\/[^/]+\/idle_1\./.test(f) || /^poses\/left\/idle\//.test(f)));   // the battle art used for creature pictures everywhere: one small pack
-  add('idle', false, [...idleSet]);
+  add('idle', true, [...idleSet]);   // part of the loader: every picture of a creature is its battle art from the first screen
   add('buildings', false, list.filter(f => /^buildings\//.test(f)));
   // each castle's new town paintings, garrison panels and buttons form their own pack, so opening a town downloads only that castle's art
   const townFac = (f) => { const m = /^ui\/town_(?:w|wl|t|tl)_([a-z]+)$/.exec(stem(f)) || /^ui\/town_(?:gar|btn)_([a-z]+)_(?:with|without|war|bld)$/.exec(stem(f)); return m && m[1]; };

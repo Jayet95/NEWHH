@@ -415,7 +415,8 @@ const Art = (() => {
   // paint pictures at the size they are shown (times the screen density, x2 for sharpness), so they never look blurry
   const qpx = (px) => Math.min(384, Math.max(96, Math.ceil(px * Math.min(2.5, window.devicePixelRatio || 1) * 2)));
   const pic = (id, px = 40) => { const full = px >= 48, S = qpx(px); return `<img class="pic" draggable="false" width="${px}" height="${px}" alt="" src="${dataUrl('c' + id + '|' + S + (full ? 'f' : ''), portraitCanvas(id, S, full))}">`; };
-  const heroPic = (icon, col, px = 36, pid) => { const S = qpx(px); return `<img class="pic round" draggable="false" width="${px}" height="${px}" alt="" src="${dataUrl('h' + icon + col + (pid || '') + '|' + S, heroCanvas(icon, col, S, pid))}">`; };
+  // heroes with painted art show it in a square frame (like the hero selection screen); the others keep the drawn round badge
+  const heroPic = (icon, col, px = 36, pid) => { if (pid && typeof Assets !== 'undefined' && Assets.has('heroes/' + pid)) return `<img class="pic hart" draggable="false" width="${px}" height="${px}" alt="" src="${Assets.src('heroes/' + pid)}">`; const S = qpx(px); return `<img class="pic round" draggable="false" width="${px}" height="${px}" alt="" src="${dataUrl('h' + icon + col + (pid || '') + '|' + S, heroCanvas(icon, col, S, pid))}">`; };
 
   // swap the emoji resource icons used throughout the HTML UI for painted ones
   const RES_EMOJI = Object.assign({}, RES_ICON);

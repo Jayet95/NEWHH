@@ -2383,7 +2383,7 @@
   // each castle can have its own hero-selection picture (art/ui/hero_select_<castle>.webp); without one the Castle picture is used for Castle and the castle's town scene for the others
   const heroBg = (f) => typeof Assets !== 'undefined' && Assets.has('ui/hero_select_' + f) ? 'hero_select_' + f : f === 'castle' ? 'hero_select' : 'town_' + f;
   // the hero's full painted art (a framed square, not a round crop); falls back to the round portrait when the art is missing
-  const heroArt = (icon, px, pid) => typeof Assets !== 'undefined' && pid && Assets.has('heroes/' + pid) ? `<img class="hart" draggable="false" width="${px}" height="${px}" alt="" src="${Assets.url('heroes/' + pid)}">` : Art.heroPic(icon, ownCol(0), px, pid);
+  const heroArt = (icon, px, pid) => typeof Assets !== 'undefined' && pid && Assets.has('heroes/' + pid) ? `<img class="hart" draggable="false" width="${px}" height="${px}" alt="" src="${Assets.src('heroes/' + pid)}">` : Art.heroPic(icon, ownCol(0), px, pid);
   function showHeroSelect(f, diff = 'normal', map = {}, pick) {
     const ti = factionTiers(f), list = FACTIONS[f].heroes.map(([n]) => Object.assign({ key: n }, HEROES[n])); pick = pick || Settings.mem('lastHero:' + f) || list[0].key;
     const cur = list.find(d => d.key === pick) || list[0];

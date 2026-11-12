@@ -73,6 +73,8 @@ const Assets = (() => {
     get(...names) { for (const n of names) if (stems[n]) return stems[n]; return null; },
     need: (list) => Promise.all(list.map(loadOne)),
     url: (s) => (files[s] ? BASE + files[s] : null),
+    // the address of a picture that is already in memory (a pack blob) or else its file, so no second download
+    src: (s) => (stems[s] ? stems[s].src : files[s] ? BASE + files[s] : null),
     has: (s) => !!files[s],
     list: (prefix) => Object.keys(files).filter(k => k.startsWith(prefix)),
     count: () => Object.keys(stems).length,

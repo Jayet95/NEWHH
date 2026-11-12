@@ -126,7 +126,7 @@
 (() => {
   const $ = (id) => document.getElementById(id), box = $('mbox'); if (!box || typeof MutationObserver === 'undefined') return;
   const small = () => matchMedia('(max-width: 760px), (orientation: landscape) and (max-height: 540px)').matches;
-  const wanted = () => box.querySelector('.setrow') || /kingdom/i.test((box.querySelector('h2') || {}).textContent || '');
+  const wanted = () => !box.querySelector('.ttabs') && (box.querySelector('.setrow') || /^\s*kingdom/i.test(((box.querySelector('h2') || {}).textContent || '').trim()));   // never the town: it scrolls and keeps its tabs on screen
   let busy = false, pages = [], cur = 0, bar = null;
   const show = () => {
     pages.forEach((units, i) => units.forEach(u => u.classList.toggle('pg-hide', i !== cur)));

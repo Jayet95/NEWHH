@@ -807,22 +807,24 @@
   }
   // quick buttons on the map: your castles (with their picture) and your heroes (with their portrait). A click selects and centres; a second click on the
   // selected hero opens his sheet, and a castle opens its town screen
-  const quickAsked = new Set();
+  const quickAsked = new Set(); let quickTi = null;
   function renderQuick() {
     const q = $('quick'); if (!q || !G) return;
     const towns = myTowns(), heroes = G.heroes;
     if (typeof Assets !== 'undefined') { const todo = towns.map(t => 'ui/town_' + t.fac).filter(k => !quickAsked.has(k)); if (todo.length) { todo.forEach(k => quickAsked.add(k)); Assets.need(todo).then(() => renderQuick()); } }
     // collapsed: only the town that matters (the one the selected hero stands in, else the first) and the selected hero; a toggle expands the full lists
     const open = !!Settings.mem('quickOpen'), extra = Math.max(0, towns.length - 1) + Math.max(0, heroes.length - 1), here = G.hero && towns.findIndex(t => t.x === G.hero.x && t.y === G.hero.y);
-    const tShow = (i) => open || i === (here >= 0 ? here : 0), hShow = (h) => open || h === G.hero;
-    const tBtn = (t, i) => { const u = typeof Assets !== 'undefined' ? Assets.url('ui/town_' + t.fac) : ''; return `<button class="qt" data-qt="${i}" title="${t.name} — open town" style="${u ? `background-image:url(${u})` : ''}">${u ? '' : FACTIONS[t.fac].icon}</button>`; };
+    const cur = quickTi != null && quickTi < towns.length ? quickTi : (here >= 0 ? here : 0), tShow = (i) => open || i === cur, hShow = (h) => open || h === G.hero;
+    const tBtn = (t, i) => { const u = typeof Assets !== 'undefined' && Assets.has('ui/town_' + t.fac) ? Assets.src('ui/town_' + t.fac) : ''; return `<button class="qt" data-qt="${i}" title="${t.name} — open town">${u ? `<img src="${u}" alt="" draggable="false">` : `<span class="qic">${FACTIONS[t.fac].icon}</span>`}<em class="qname">${t.name}</em></button>`; };
     const xBtn = extra ? `<button class="qx" data-qx="1" title="${open ? 'Collapse' : 'Show all castles and heroes'}">${open ? '◂' : '▸'}${open ? '' : '<small>+' + extra + '</small>'}</button>` : '';
-    q.innerHTML = '<div class="qrow">' + towns.map((t, i) => tShow(i) ? tBtn(t, i) : '').join('') + xBtn + '</div><div class="qcol">'
-      + heroes.map((h, i) => hShow(h) ? `<button class="qh${h === G.hero ? ' on' : ''}" data-qh="${i}" title="${h.name} (${clsLabel(h.cls)} L${h.lvl}) — ${h === G.hero ? 'open hero sheet' : 'select'}"${typeof Assets !== 'undefined' && h.pid && Assets.has('heroes/' + h.pid) ? ` style="background-image:url(${Assets.url('heroes/' + h.pid)})"` : ''}>${typeof Assets !== 'undefined' && h.pid && Assets.has('heroes/' + h.pid) ? '' : Art.heroPic(h.icon, ownCol(0), 44, h.pid)}</button>` : '').join('')
+    const nav = (d) => (towns.length > 1 && !open ? `<button class="qa" data-qa="${d}" title="${d < 0 ? 'Previous' : 'Next'} town">${d < 0 ? '‹' : '›'}</button>` : '');
+    q.innerHTML = '<div class="qrow">' + nav(-1) + towns.map((t, i) => tShow(i) ? tBtn(t, i) : '').join('') + nav(1) + xBtn + '</div><div class="qcol">'
+      + heroes.map((h, i) => { if (!hShow(h)) return ''; const has = typeof Assets !== 'undefined' && h.pid && Assets.has('heroes/' + h.pid); return `<button class="qh${h === G.hero ? ' on' : ''}" data-qh="${i}" title="${h.name} (${clsLabel(h.cls)} L${h.lvl}) — ${h === G.hero ? 'open hero sheet' : 'select'}">${has ? `<img src="${Assets.src('heroes/' + h.pid)}" alt="" draggable="false">` : Art.heroPic(h.icon, ownCol(0), 44, h.pid)}</button>`; }).join('')
       + '</div>';
   }
   document.addEventListener('click', (ev) => {
     const b = ev.target.closest && ev.target.closest('#quick button'); if (!b || !G || busy || G.over) return;
+    if (b.dataset.qa) { const ts = myTowns(); if (ts.length > 1) { const here2 = G.hero ? ts.findIndex(t => t.x === G.hero.x && t.y === G.hero.y) : -1, at = quickTi != null && quickTi < ts.length ? quickTi : (here2 >= 0 ? here2 : 0); quickTi = (at + +b.dataset.qa + ts.length) % ts.length; renderQuick(); centerOn(ts[quickTi].x, ts[quickTi].y); } return; }
     if (b.dataset.qx) { Settings.mem('quickOpen', !Settings.mem('quickOpen')); renderQuick(); return; }
     if (b.dataset.qt !== undefined) { const t = myTowns()[+b.dataset.qt]; if (t) { centerOn(t.x, t.y); openTown(t); } return; }
     const i = +b.dataset.qh, h = G.heroes[i]; if (!h) return;
@@ -1708,7 +1710,7 @@
     if (!t) return toast('You do not own a town.');
     curTown = t; (G.flags = G.flags || {}).town = true; Assets.need(['ui/town_' + t.fac, 'ui/town_scene_' + t.fac, 'ui/town_scene_' + t.fac + '_s'].concat(Assets.list('buildings/'))).then(() => { try { TownArt.reload(); } catch (e) { /* ignore */ } }); if (typeof Sfx !== 'undefined' && Sfx.ambience) Sfx.ambience(t.fac); // quiet per-castle ambience while the town screen is open
     const th = townHero(t), here = !!th, mt = myTowns(), coastal = !!G.dock && t === mt[0];
-    const tabs = mt.length > 1 ? `<div class="hlist">${mt.map((x, i) => `<button class="hbtn${x === t ? ' on' : ''}" data-tab="${i}" title="${x.name}">${FACTIONS[x.fac].icon}</button>`).join('')}</div>` : '';
+    const tabs = mt.length > 1 ? `<div class="hlist"><button class="hbtn tnav" data-tnav="-1" title="Previous town">‹</button>${mt.map((x, i) => `<button class="hbtn${x === t ? ' on' : ''}" data-tab="${i}" title="${x.name}">${FACTIONS[x.fac].icon}</button>`).join('')}<button class="hbtn tnav" data-tnav="1" title="Next town">›</button></div>` : '';
     let html = `${tabs}<h2>🏰 ${t.name} <span class="small">${FACTIONS[t.fac].name} · ${t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Settlement'}</span></h2><span class="townwide"></span><canvas id="tcv" width="1040" height="470" style="width:100%;height:auto;aspect-ratio:1040/470;border-radius:8px;border:2px solid #8c6a33;display:block;touch-action:manipulation"></canvas>
       <div class="small">${here ? `${th.name} is in town — recruits join the hero's army.` : 'No hero in this town — recruits join the town garrison (a hero can pick them up later).'} Higher Town Hall levels unlock new dwellings and creature upgrades.</div>`;
     let war = '', dwc = '', wc = '';
@@ -1785,6 +1787,7 @@
     const again = () => { openTown(t); renderAll(); };
     const q = (sel, fn) => $('mbox').querySelectorAll(sel).forEach(fn);
     q('[data-tab]', b => b.onclick = () => openTown(mt[+b.dataset.tab]));
+    q('[data-tnav]', b => b.onclick = () => { const at = Math.max(0, mt.indexOf(t)); openTown(mt[(at + +b.dataset.tnav + mt.length) % mt.length]); });
     q('[data-ttab]', b => b.onclick = () => { townTab = b.dataset.ttab; openTown(t); });
     q('[data-gr]', b => b.onclick = () => {
       const arrOf = (r) => r === 'g' ? t.garrison : th.army, r = b.dataset.gr, i = +b.dataset.gi;

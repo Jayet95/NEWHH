@@ -293,7 +293,21 @@ function genMap(seed, aiFacs = ['necropolis'], diff = 'normal', mo = {}) {
 
   const kindsBase = ['gold', 'gold', 'gold', 'wood', 'wood', 'ore', 'ore', 'mercury', 'sulfur', 'crystal', 'gems'];
   const nMines = Math.max(8, Math.round(11 * Math.pow(sc, 0.8)));
-  const mineKinds = Array.from({ length: nMines }, (_, i) => kindsBase[i % kindsBase.length]);
+  // every capital gets a steady supply close by, like the old games: wood and ore within ~7 hexes, gold within ~9, one rare resource within ~12
+  let guaranteed = 0;
+  [{ s: P, own: true }, ...aiStarts.map(s => ({ s, own: false }))].forEach(({ s, own }, si) => {
+    const rare = ['mercury', 'sulfur', 'crystal', 'gems'][(si + Math.floor(R() * 4)) % 4];
+    [['wood', 7], ['ore', 7], ['gold', 9], [rare, 12]].forEach(([k, maxD]) => {
+      let near = cand.filter(o => hexDist(o, s) >= 4 && hexDist(o, s) <= maxD);
+      if (!near.length) near = cand.filter(o => hexDist(o, s) >= 4 && hexDist(o, s) <= maxD + 5);
+      if (!near.length) return;
+      const c = near[Math.floor(R() * near.length)];
+      cand = cand.filter(o => Math.abs(o.x - c.x) + Math.abs(o.y - c.y) > 1);
+      objs.push({ t: 'mine', kind: k, owner: null, x: c.x, y: c.y, guard: own && k !== 'wood' && k !== 'ore' && R() < 0.5 ? [guard(c, 0.3)] : [] });
+      guaranteed++;
+    });
+  });
+  const mineKinds = Array.from({ length: Math.max(4, nMines - guaranteed) }, (_, i) => kindsBase[i % kindsBase.length]);
   for (const k of mineKinds) { const c = pick(); if (!c) break; objs.push({ t: 'mine', kind: k, owner: null, x: c.x, y: c.y, guard: R() < (k === 'gold' ? 0.3 : 0.5) ? [] : [guard(c, 0.8)] }); }
   for (let i = 0, n = sc < 0.8 ? 2 : Math.round(3 * Math.sqrt(sc)); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'merchant', x: c.x, y: c.y }); }
   for (let i = 0, n = Math.round(28 * sc * MP.density); i < n; i++) { const c = pick(); if (!c) break; objs.push({ t: 'monster', x: c.x, y: c.y, guard: [guard(c)] }); }

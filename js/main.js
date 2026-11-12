@@ -99,6 +99,11 @@
   function toggleFs() { try { if (fsOn()) (document.exitFullscreen || document.webkitExitFullscreen).call(document); else (fsEl.requestFullscreen || fsEl.webkitRequestFullscreen).call(fsEl); } catch (e) { /* ignore */ } }
   if (!(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen) || window.Capacitor || matchMedia('(display-mode: standalone)').matches) $('bFs').style.display = 'none';
   $('bFs').onclick = toggleFs;
+  // phones: the first tap on the game hides the address bar (full screen), once per visit; the full screen button leaves it again
+  if (matchMedia('(pointer: coarse)').matches && (fsEl.requestFullscreen || fsEl.webkitRequestFullscreen) && !window.Capacitor && !matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches) {
+    const auto = () => { document.removeEventListener('pointerup', auto, true); try { if (!fsOn()) { const r = (fsEl.requestFullscreen || fsEl.webkitRequestFullscreen).call(fsEl, { navigationUI: 'hide' }); if (r && r.catch) r.catch(() => {}); } } catch (e) { /* ignore */ } };
+    document.addEventListener('pointerup', auto, true);
+  }
   const fsSync = () => { $('bFs').textContent = fsOn() ? '🗗' : '⛶'; $('bFs').title = fsOn() ? 'Exit full screen (F)' : 'Full screen (F)'; };
   document.addEventListener('fullscreenchange', fsSync); document.addEventListener('webkitfullscreenchange', fsSync);
   document.addEventListener('keydown', (e) => { if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey && !/^(INPUT|TEXTAREA|SELECT)$/.test((e.target || {}).tagName || '')) toggleFs(); });

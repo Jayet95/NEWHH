@@ -1575,7 +1575,7 @@
     if (!cv || $('modal').classList.contains('hide')) { townLoop = false; return; }
     const t = curTown; if (!t) return;
     const now = performance.now(), dpr = DPR();
-    if (townAnim && now - townAnim.t0 > 1600) townAnim = null;
+    if (townAnim && now - townAnim.t0 > 3000) townAnim = null;
     if (cv.width !== Math.round(TW * dpr)) { cv.width = Math.round(TW * dpr); cv.height = Math.round(TH * dpr); }
     const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
     TownArt.scene(g, t, now, townAnim, slotInfo, TW, TH, townHover);

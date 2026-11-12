@@ -201,16 +201,19 @@ const TownArt = (() => {
     }
     g.textAlign = 'center'; g.textBaseline = 'middle';
     for (let i = 0; i < NSLOTS; i++) {
-      const b = slotBox(i, W, H), x = b.x, base = b.base, ws = b.ws, hs = b.hs, s = info(t, i), an = anim && anim.slot === i ? anim : null, p = an ? Math.min(1, (now - an.t0) / 1500) : 1, hov = hover === i;
+      const b = slotBox(i, W, H), x = b.x, base = b.base, ws = b.ws, hs = b.hs, s = info(t, i), an = anim && anim.slot === i ? anim : null, p = an ? Math.min(1, (now - an.t0) / 1500) : 1, ae = an ? (now - an.t0) / 1000 : 9, hov = hover === i;
       const kind = i < 7 ? 'dwell' : SLOT_NAMES[i - 7], spr = sprite(kind, s.built ? s.lv : Math.max(1, s.lv || 1), t.fac, s.id), lift = hov ? -3 : 0;
       // the stone pad every plot stands on
       if (!sceneImg || hov) { g.beginPath(); g.ellipse(x, base - 1, ws * 0.62, ws * 0.17, 0, 0, 7); g.fillStyle = hov ? 'rgba(255,226,150,.5)' : 'rgba(210,196,160,.38)'; g.fill(); g.lineWidth = 1.6; g.strokeStyle = hov ? 'rgba(255,214,110,.95)' : 'rgba(30,20,8,.55)'; g.stroke(); }
       if (hov) { const gl = g.createRadialGradient(x, base - hs * 0.4, 4, x, base - hs * 0.4, ws * 0.95); gl.addColorStop(0, 'rgba(255,226,140,.34)'); gl.addColorStop(1, 'rgba(255,226,140,0)'); g.fillStyle = gl; g.fillRect(x - ws, base - hs * 1.3, ws * 2, hs * 1.5); }
-      // the building (a faint grey ghost while it is not built yet)
-      const hgt = an && an.kind === 'build' ? Math.min(1, p * 1.5) : 1;
+      // the building: nothing is drawn on a plot until it is built (just a faint outline); it then rises out of the ground with a light and sparkles
+      const hidden = !s.built && !(an && an.kind === 'build');
+      if (hidden) { g.save(); g.setLineDash([5, 5]); g.beginPath(); g.ellipse(x, base + (sceneImg ? 0.03 * H : 3) - 2, ws * 0.46, ws * 0.12, 0, 0, 7); g.lineWidth = 1.4; g.strokeStyle = hov ? 'rgba(255,226,150,.9)' : 'rgba(255,255,255,.3)'; g.stroke(); g.restore(); }
+      const hgt = an && an.kind === 'build' ? Math.min(1, ae) : 1;
       let sc = 1; if (an && an.kind === 'upgrade') sc = 1 + 0.18 * Math.sin(p * Math.PI);
       g.save(); g.translate(x, base + (sceneImg ? 0.03 * H : 3) + lift); g.scale(sc, sc);
-      if (sceneImg) {
+      if (hidden) { /* no art until it is built */ }
+      else if (sceneImg) {
         const ghost = !s.built && !(an && an.kind === 'build'), im = ghost ? ghostOf(spr) : spr, bb = bboxOf(spr);
         // scale each picture on its own so its footing is at least as wide as the painted pad (never too tall for the scene), centred on the pad, standing on its front edge
         const padW = W * (b.back ? 0.1 : 0.105), kk = Math.min(padW / bb[2], 2.2 * hs / bb[3]);   // the painted grass base is as wide as the whole picture
@@ -219,13 +222,23 @@ const TownArt = (() => {
         const kh = ghost ? 1 : hgt, sy = (1 - kh) * bb[3];
         g.drawImage(im, bb[0], bb[1] + sy, bb[2], bb[3] - sy, -dw / 2, -dh * kh, dw, dh * kh);
       }
-      else if (!s.built && !(an && an.kind === 'build')) { g.globalAlpha = 0.72; g.drawImage(ghostOf(spr), -ws / 2, -hs, ws, hs); }
       else { const sy = (1 - hgt) * spr.height; g.drawImage(spr, 0, sy, spr.width, spr.height - sy, -ws / 2, -hs * hgt, ws, hs * hgt); }
       g.restore();
+      if (an && (an.kind === 'build' || an.kind === 'upgrade')) {   // completion highlight: a column of light, rings spreading over the pad, a glow on the building and drifting sparkles
+        const e2 = Math.max(0, ae - (an.kind === 'build' ? 0.7 : 0)), fade = Math.max(0, 1 - e2 / 1.9), cy = base - hs * 0.42, by0 = base + (sceneImg ? 0.03 * H : 3);
+        if (e2 > 0 && fade > 0) {
+          g.save();
+          const bm = g.createLinearGradient(0, by0 - hs * 1.5, 0, by0); bm.addColorStop(0, 'rgba(255,236,150,0)'); bm.addColorStop(1, `rgba(255,226,120,${0.55 * fade})`); g.fillStyle = bm; g.fillRect(x - ws * 0.3, by0 - hs * 1.5, ws * 0.6, hs * 1.5);
+          const gl = g.createRadialGradient(x, cy, 4, x, cy, ws * 0.8); gl.addColorStop(0, `rgba(255,240,170,${0.55 * fade * (0.7 + 0.3 * Math.sin(now / 90))})`); gl.addColorStop(1, 'rgba(255,200,60,0)'); g.fillStyle = gl; g.fillRect(x - ws, cy - ws, ws * 2, ws * 2);
+          for (let r = 0; r < 3; r++) { const q = e2 * 0.9 - r * 0.28; if (q <= 0 || q > 1) continue; g.beginPath(); g.ellipse(x, by0 - 2, ws * (0.2 + 0.55 * q), ws * (0.05 + 0.15 * q), 0, 0, 7); g.lineWidth = 2.4 * (1 - q) + 0.6; g.strokeStyle = `rgba(255,224,120,${(1 - q) * 0.95})`; g.stroke(); }
+          for (let k = 0; k < 14; k++) { const ph = (e2 * 0.8 + k * 0.137) % 1, sx = x + Math.sin(k * 5.1) * ws * 0.42, sy2 = by0 - ph * hs * 1.2, sz = 3.6 * (1 - ph) + 1; g.globalAlpha = Math.min(1, fade * 1.3) * (1 - ph); poly(g, [[sx, sy2 - sz], [sx + sz * 0.3, sy2 - sz * 0.3], [sx + sz, sy2], [sx + sz * 0.3, sy2 + sz * 0.3], [sx, sy2 + sz], [sx - sz * 0.3, sy2 + sz * 0.3], [sx - sz, sy2], [sx - sz * 0.3, sy2 - sz * 0.3]], '#fff3b0', null); }
+          g.restore();
+        }
+      }
       if (an && an.kind === 'upgrade') { const rg = g.createRadialGradient(x, base - hs * 0.45, 2, x, base - hs * 0.45, 14 + p * 70); rg.addColorStop(0, `rgba(255,240,150,${0.9 * (1 - p)})`); rg.addColorStop(1, 'rgba(255,200,60,0)'); g.fillStyle = rg; g.beginPath(); g.arc(x, base - hs * 0.45, 14 + p * 70, 0, 7); g.fill(); g.fillStyle = '#ffe680'; for (let k = 0; k < 8; k++) { g.globalAlpha = 1 - p; const sx = x + Math.cos(k * 0.8) * 36 * p, sy2 = base - hs * 0.45 - p * 50 + Math.sin(k * 2.3) * 12; poly(g, [[sx, sy2 - 4], [sx + 1.2, sy2 - 1.2], [sx + 4, sy2], [sx + 1.2, sy2 + 1.2], [sx, sy2 + 4], [sx - 1.2, sy2 + 1.2], [sx - 4, sy2], [sx - 1.2, sy2 - 1.2]], '#ffe680', null); } g.globalAlpha = 1; }
-      if (an && an.kind === 'build') { const hx = x + ws * 0.42, hy2 = base - hs * 0.6 * hgt - 4 + Math.sin(now / 90) * 5; g.save(); g.translate(hx, hy2); g.rotate(Math.sin(now / 90) * 0.5); rect(g, -1.6, -2, 3.2, 14, '#8a5a2b'); rect(g, -7, -8, 14, 6, '#8a8a94'); g.restore(); g.fillStyle = 'rgba(210,200,180,.5)'; for (let k = 0; k < 5; k++) { g.beginPath(); g.arc(x - ws * 0.4 + k * ws * 0.2, base - 3 - p * 8 * (k % 2 + 1), 3 + p * 5, 0, 7); g.fill(); } }
+      if (an && an.kind === 'build' && ae < 1.1) { const hx = x + ws * 0.42, hy2 = base - hs * 0.6 * hgt - 4 + Math.sin(now / 90) * 5; g.save(); g.translate(hx, hy2); g.rotate(Math.sin(now / 90) * 0.5); rect(g, -1.6, -2, 3.2, 14, '#8a5a2b'); rect(g, -7, -8, 14, 6, '#8a8a94'); g.restore(); g.fillStyle = 'rgba(210,200,180,.5)'; for (let k = 0; k < 5; k++) { g.beginPath(); g.arc(x - ws * 0.4 + k * ws * 0.2, base - 3 - p * 8 * (k % 2 + 1), 3 + p * 5, 0, 7); g.fill(); } }
       // badges: hammer (can be built) or padlock (needs a bigger Town Hall / no coast), ready recruits on built dwellings
-      if (!s.built && !(an && an.kind === 'build')) hammerBadge(g, x + ws * 0.36, base - hs * 0.86, !!(s.locked || s.na), 0.5 + 0.5 * Math.sin(now / 420 + i));
+      if (!s.built && !(an && an.kind === 'build')) hammerBadge(g, x + ws * 0.3, base - hs * 0.3, !!(s.locked || s.na), 0.5 + 0.5 * Math.sin(now / 420 + i));
       if (s.built && s.av > 0) { const bx = x - ws * 0.36, by = base - hs * 0.86; g.beginPath(); g.arc(bx, by, 10, 0, 7); g.fillStyle = '#d9a52a'; g.fill(); g.lineWidth = 1.6; g.strokeStyle = '#140a04'; g.stroke(); g.fillStyle = '#1c1204'; g.font = 'bold 11px Cinzel, Georgia, serif'; g.fillText(s.av > 99 ? '99+' : s.av, bx, by + 1); }
       // name plate and level stars
       const nm = s.name || '', pw = Math.max(62, nm.length * 6.6 + 16), py = base + (sceneImg ? 24 : 8);

@@ -2125,13 +2125,13 @@
       const d = dist(o, h); if (d > R) continue;
       let sc = 0;
       switch (o.t) {
-        case 'monster': { const gp = armyPower(o.guard); if (power >= gp * 1.25) sc = (gp * 0.3 + 200) / (d + 6); break; }
+        case 'monster': { const gp = armyPower(o.guard); if (power >= gp * 2.2) sc = (gp * 0.3 + 200) / (d + 6); break; }
         case 'pile': sc = 350 / (d + 4); break;
         case 'chest': sc = 500 / (d + 4); break;
-        case 'mine': { const gp = armyPower(o.guard || []); if (power >= gp * 1.2) sc = 900 / (d + 6); break; }
-        case 'lair': { const gp = armyPower(o.guard || []); if (power >= gp * 1.25 + 1) sc = 3000 / (d + 8); break; }
-        case 'fort': { const dp = defPower(o); if (power >= dp * 1.3 + 1) sc = 1600 / (d + 8); break; }
-        case 'town': { const dp = defPower(o); if (power >= dp * 1.4 + 1) sc = 4000 / (d + 10); break; }
+        case 'mine': { const gp = armyPower(o.guard || []); if (power >= gp * 2) sc = 900 / (d + 6); break; }
+        case 'lair': { const gp = armyPower(o.guard || []); if (power >= gp * 2.2 + 1) sc = 3000 / (d + 8); break; }
+        case 'fort': { const dp = defPower(o); if (power >= dp * 2 + 1) sc = 1600 / (d + 8); break; }
+        case 'town': { const dp = defPower(o); if (power >= dp * 2.2 + 1) sc = 4000 / (d + 10); break; }
       }
       if (sc > 0) list.push({ x: o.x, y: o.y, score: sc });
     }
@@ -2147,7 +2147,9 @@
     if (here) { here.garrison.forEach((s, i) => { if (s && addToArmy(h, s.t, s.n)) here.garrison[i] = null; }); mergeArmy(h); }
     if (G.day < D.ehDay + (ai.id - 1) * 2) return;
     const power = armyPower(h.army), nearest = () => towns.slice().sort((a, b) => dist(a, h) - dist(b, h))[0];
-    if (power < 1200 && towns.length) { if (!here) await aiWalk(ai, h, nearest()); return; }
+    if (here) h.peak = power; else h.peak = Math.max(h.peak || 0, power);
+    // a worn-down army goes home to recruit instead of marching on (fights cost a lot, so it only attacks with clear odds)
+    if ((power < 1200 || power < 0.45 * h.peak) && towns.length) { if (!here) await aiWalk(ai, h, nearest()); return; }
     for (const tg of aiTargets(ai, h, power).slice(0, 5)) { if (await aiWalk(ai, h, tg)) return; }
     if (towns.length && !here) await aiWalk(ai, h, nearest());
   }

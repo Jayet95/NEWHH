@@ -200,3 +200,6 @@
   window.addEventListener('pointermove', (e) => { if (!drag) return; const dx = e.clientX - drag.x; if (Math.abs(dx) > 4) { drag.moved = true; drag.r.classList.add('dragging'); } if (drag.moved) drag.r.scrollLeft = drag.left - dx; });
   window.addEventListener('pointerup', () => { if (drag) { drag.r.classList.remove('dragging'); drag = null; } });
 })();
+
+// the town screen's full-screen frame is dropped as soon as another window replaces it
+(() => { const box = document.getElementById('mbox'); if (!box) return; new MutationObserver(() => { if (box.classList.contains('townfull') && !box.querySelector('#tcv')) box.classList.remove('townfull'); }).observe(box, { childList: true }); })();

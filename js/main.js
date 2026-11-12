@@ -1554,7 +1554,7 @@
   const SLOTS = 11;
   const TIER_HALL = [null, 0, 0, 1, 2, 3, 4, 5];
   const UP_HALL = { 2: 1, 3: 2, 4: 3, 5: 4 };
-  let curTown = null, townTab = 'war', garSel = null;
+  let curTown = null, townTab = null, garSel = null;
   const defaultTown = () => townAt(G.hero.x, G.hero.y) || nearestTown(G.hero.x, G.hero.y);
   const tierType = (t, tier) => lineType(tiersOf(t)[tier - 1], (t.up && t.up[tier]) || 1);
   const starStr = (lv, max = MAX_LV) => '★'.repeat(lv) + '☆'.repeat(max - lv);
@@ -1576,18 +1576,42 @@
     }
   }
   let townHover = -1;
-  const TW = 1040, TH = 470;   // the panorama is painted in these units and backed at screen density
+  let townV = { x: 0, y: 0, k: 1, max: 0 }, townBgC = null, townPan = null;
+  // the picture around the panorama: the same scene, heavily shrunk and darkened, stretched over the whole screen
+  function townBackdrop(g, t, bw, bh) {
+    const key = t.fac + '|' + bw + 'x' + bh;
+    if (!townBgC || townBgC.key !== key) {
+      const sm = document.createElement('canvas'); sm.width = 56; sm.height = Math.max(8, Math.round(56 * bh / bw)); const sg = sm.getContext('2d');
+      sg.fillStyle = '#0b0805'; sg.fillRect(0, 0, sm.width, sm.height);
+      const im = Assets.get('ui/town_scene_' + t.fac + '_s', 'ui/town_scene_' + t.fac, 'ui/town_' + t.fac);
+      if (im) { const k = Math.max(sm.width / im.width, sm.height / im.height); sg.drawImage(im, (sm.width - im.width * k) / 2, (sm.height - im.height * k) / 2, im.width * k, im.height * k); }
+      sg.fillStyle = 'rgba(0,0,0,.45)'; sg.fillRect(0, 0, sm.width, sm.height); townBgC = { key, c: sm };
+    }
+    g.imageSmoothingEnabled = true; g.drawImage(townBgC.c, 0, 0, bw, bh);
+  }
   function drawTown() {
     const cv = $('tcv');
     if (!cv || $('modal').classList.contains('hide')) { townLoop = false; return; }
     const t = curTown; if (!t) return;
-    const now = performance.now(), dpr = DPR();
+    const now = performance.now(), dpr = DPR(), box = $('mbox'), bw = box.clientWidth, bh = box.clientHeight; if (!bw || !bh) return requestAnimationFrame(drawTown);
     if (townAnim && now - townAnim.t0 > 3000) townAnim = null;
-    if (cv.width !== Math.round(TW * dpr)) { cv.width = Math.round(TW * dpr); cv.height = Math.round(TH * dpr); }
+    if (cv.width !== Math.round(bw * dpr) || cv.height !== Math.round(bh * dpr)) { cv.width = Math.round(bw * dpr); cv.height = Math.round(bh * dpr); }
+    const mres = $('mres'), topY = mres && mres.style.display !== 'none' ? Math.max(0, mres.getBoundingClientRect().bottom - box.getBoundingClientRect().top + 4) : 4;
+    const gs = box.querySelector('.gstack'), bar = box.querySelector('.tbar'), tui = box.querySelector('.tui');
+    const uiH = (gs ? gs.offsetHeight : 0) + (bar ? bar.offsetHeight : 0) + 14, kFit = Math.max(0.2, (bh - topY - uiH) / TH);
+    // wide screens: the whole panorama fits; phones held upright: it fills the free height and slides sideways (drag)
+    const pan = bw < 761 && kFit > bw / TW, k = pan ? Math.min(kFit, 1.5) : Math.min(bw / TW, kFit), maxPan = Math.max(0, TW * k - bw);
+    if (townPan == null) townPan = maxPan / 2; townPan = Math.max(0, Math.min(maxPan, townPan));
+    townV = { x: maxPan > 0 ? -townPan : (bw - TW * k) / 2, y: topY + (pan ? Math.max(0, (bh - topY - uiH - TH * k) / 2) : 0), k, max: maxPan };
+    if (tui) { tui.style.paddingTop = topY + 'px'; tui.style.setProperty('--ttopY', topY + 'px'); tui.style.setProperty('--tbarH', (bar ? bar.offsetHeight + 10 : 60) + 'px'); }
     const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    townBackdrop(g, t, bw, bh);
+    g.save(); g.translate(townV.x, townV.y); g.scale(k, k); g.beginPath(); g.rect(0, 0, TW, TH); g.clip();
     TownArt.scene(g, t, now, townAnim, slotInfo, TW, TH, townHover);
+    g.restore();
     requestAnimationFrame(drawTown);
   }
+  const TW = 1040, TH = 470;   // the panorama is painted in these units and backed at screen density
   // clicking a plot in the picture opens the matching warriors / buildings card below and flashes it
   function townSlotClick(t, i) {
     townTab = (i < 7 && slotInfo(t, i).built) ? 'war' : 'bld';
@@ -1716,7 +1740,7 @@
     curTown = t; (G.flags = G.flags || {}).town = true; Assets.need(['ui/town_' + t.fac, 'ui/town_scene_' + t.fac, 'ui/town_scene_' + t.fac + '_s'].concat(Assets.list('buildings/'))).then(() => { try { TownArt.reload(); } catch (e) { /* ignore */ } }); if (typeof Sfx !== 'undefined' && Sfx.ambience) Sfx.ambience(t.fac); // quiet per-castle ambience while the town screen is open
     const th = townHero(t), here = !!th, mt = myTowns(), coastal = !!G.dock && t === mt[0];
     const tabs = mt.length > 1 ? `<div class="hlist"><button class="hbtn tnav" data-tnav="-1" title="Previous town">‹</button>${mt.map((x, i) => `<button class="hbtn${x === t ? ' on' : ''}" data-tab="${i}" title="${x.name}">${FACTIONS[x.fac].icon}</button>`).join('')}<button class="hbtn tnav" data-tnav="1" title="Next town">›</button></div>` : '';
-    let html = `${tabs}<h2>🏰 ${t.name} <span class="small">${FACTIONS[t.fac].name} · ${t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Settlement'}</span></h2><span class="townwide"></span>`;
+    const topHtml = `${tabs}<h2>🏰 ${t.name} <span class="small">${FACTIONS[t.fac].name} · ${t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Settlement'}</span></h2>`;
     const cvHtml = `<canvas id="tcv" width="1040" height="470" style="width:100%;height:auto;aspect-ratio:1040/470;border-radius:8px;border:2px solid #8c6a33;display:block;touch-action:manipulation"></canvas>`;
     let war = '', dwc = '', wc = '';
     tiersOf(t).forEach((id, i) => {
@@ -1777,20 +1801,25 @@
     const gTop = `<div class="glabel">🛡️ ${t.name} garrison</div><div class="armyrow garrow">${t.garrison.map((a, i) => garSlot(a, 'g', i)).join('')}</div>`;
     const gHero = th ? `<div class="glabel">⚔️ ${th.name} — hero army</div><div class="armyrow garrow">${th.army.map((a, i) => garSlot(a, 'h', i)).join('')}</div><div class="gacts"><button data-gmove="toHero">⬆ All to hero</button><button data-gmove="toGarr">⬇ To garrison</button><button data-garr="1">Split…</button></div>`
       : `<div class="small gnohero">No hero in this town — recruits join the garrison. Bring a hero to move troops.</div>`;
-    html += cvHtml + `<div class="gstack">` + gTop + gHero + `</div>` + tabBar + (townTab !== 'bld' ? `<div class="bgrid wgrid">${wc}</div>` + outpostHtml(t) : `<h4>Creature dwellings</h4><div class="bgrid">${dwc}</div><h4>Town buildings</h4><div class="bgrid">${cardify(bld + smithy)}</div>` + caravanHtml(t, mt)) + `<div class="small" style="margin-top:8px">${RES.map(k => RES_ICON[k] + ' ' + G.res[k]).join('  ')}</div>
-      <div class="mb"><button class="primary" id="tClose">Leave town</button></div>`;
-    $('mbox').innerHTML = html; $('modal').classList.remove('hide'); townHover = -1;
-    { const cv = $('tcv'), at = (e) => { const r = cv.getBoundingClientRect(); return TownArt.slotAt((e.clientX - r.left) * TW / r.width, (e.clientY - r.top) * TH / r.height, TW, TH); };
-      cv.onpointermove = (e) => { townHover = at(e); cv.style.cursor = townHover >= 0 ? 'pointer' : 'default'; };
-      cv.onpointerleave = () => { townHover = -1; };
-      cv.onclick = (e) => { const i = at(e); if (i >= 0) townSlotClick(t, i); }; }
+    // the whole screen is the town picture (like the original); the troops, two buttons and a panel for Warriors / Buildings sit on top of it
+    const panel = townTab ? `<div class="tpanel"><div class="tphead"><b>${townTab === 'bld' ? '🏗️ Buildings' : '⚔️ Warriors'}</b><button id="tpClose" class="tpx" title="Close">✕</button></div><div class="tpbody">${townTab !== 'bld' ? `<div class="bgrid wgrid">${wc}</div>` + outpostHtml(t) : `<h4>Creature dwellings</h4><div class="bgrid">${dwc}</div><h4>Town buildings</h4><div class="bgrid">${cardify(bld + smithy)}</div>` + caravanHtml(t, mt)}</div></div>` : '';
+    const html = cvHtml + `<div class="tui"><div class="ttop">${topHtml}</div><div class="tfill"></div><div class="gstack">` + gTop + gHero + `</div><div class="tbar"><button class="ttab${townTab === 'war' ? ' on' : ''}" data-ttab="war">⚔️ Warriors</button><button class="ttab${townTab === 'bld' ? ' on' : ''}" data-ttab="bld">🏗️ Buildings</button><button class="primary" id="tClose">Leave town</button></div>${panel}</div>`;
+    $('mbox').innerHTML = html; $('mbox').classList.add('townfull'); $('modal').classList.remove('hide'); townHover = -1;
+    { const cv = $('tcv'), at = (e) => { const r = cv.getBoundingClientRect(); return TownArt.slotAt((e.clientX - r.left - townV.x) / townV.k, (e.clientY - r.top - townV.y) / townV.k, TW, TH); };
+      let pd = null;
+      cv.onpointerdown = (e) => { pd = { x: e.clientX, pan: townPan, moved: false }; };
+      cv.onpointermove = (e) => { if (pd && townV.max > 0) { const dx = e.clientX - pd.x; if (Math.abs(dx) > 6) pd.moved = true; if (pd.moved) townPan = Math.max(0, Math.min(townV.max, pd.pan - dx)); } townHover = pd && pd.moved ? -1 : at(e); cv.style.cursor = townHover >= 0 ? 'pointer' : (townV.max > 0 ? 'grab' : 'default'); };
+      cv.onpointerup = () => { setTimeout(() => { pd = null; }, 0); };
+      cv.onpointerleave = () => { townHover = -1; pd = null; };
+      cv.onclick = (e) => { if (pd && pd.moved) return; const i = at(e); if (i >= 0) townSlotClick(t, i); }; }
     if (!townLoop) { townLoop = true; requestAnimationFrame(drawTown); }
-    $('tClose').onclick = () => { $('modal').classList.add('hide'); renderAll(); };
+    $('tClose').onclick = () => { townTab = null; townPan = null; $('modal').classList.add('hide'); renderAll(); };
+    if ($('tpClose')) $('tpClose').onclick = () => { townTab = null; openTown(t); };
     const again = () => { openTown(t); renderAll(); };
     const q = (sel, fn) => $('mbox').querySelectorAll(sel).forEach(fn);
     q('[data-tab]', b => b.onclick = () => openTown(mt[+b.dataset.tab]));
     q('[data-tnav]', b => b.onclick = () => { const at = Math.max(0, mt.indexOf(t)); openTown(mt[(at + +b.dataset.tnav + mt.length) % mt.length]); });
-    q('[data-ttab]', b => b.onclick = () => { townTab = b.dataset.ttab; openTown(t); });
+    q('[data-ttab]', b => b.onclick = () => { townTab = townTab === b.dataset.ttab ? null : b.dataset.ttab; openTown(t); });
     q('[data-gr]', b => b.onclick = () => {
       const arrOf = (r) => r === 'g' ? t.garrison : th.army, r = b.dataset.gr, i = +b.dataset.gi;
       if (r === 'h' && !th) return;

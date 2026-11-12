@@ -1804,6 +1804,33 @@
       }
       garSel = null; openTown(t); renderAll();
     });
+    // drag a stack from one slot to another (garrison and hero army): an empty slot moves it, the same creature merges, another creature swaps; a click still works too
+    q('.slot[data-gr]', b => b.addEventListener('pointerdown', (ev) => {
+      if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+      const r0 = b.dataset.gr, i0 = +b.dataset.gi; if (r0 === 'h' && !th) return;
+      const X = r0 === 'g' ? t.garrison : th.army; if (!X[i0]) return;
+      let ghost = null, started = false, over = null; const x0 = ev.clientX, y0 = ev.clientY;
+      const move = (e) => {
+        if (!started && Math.hypot(e.clientX - x0, e.clientY - y0) > 8) { started = true; ghost = b.cloneNode(true); ghost.className = 'slot slot-ghost'; document.body.appendChild(ghost); b.classList.add('drag-src'); }
+        if (!started) return;
+        ghost.style.left = e.clientX + 'px'; ghost.style.top = e.clientY + 'px';
+        const el = document.elementFromPoint(e.clientX, e.clientY), tgt = el && el.closest ? el.closest('.slot[data-gr]') : null;
+        if (over !== tgt) { if (over) over.classList.remove('drop'); over = tgt; if (over && over !== b) over.classList.add('drop'); }
+        e.preventDefault();
+      };
+      const end = (e) => {
+        window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', end); window.removeEventListener('pointercancel', end);
+        if (!started) return;
+        ghost.remove(); b.classList.remove('drag-src'); if (over) over.classList.remove('drop');
+        const swallow = (c) => { c.stopPropagation(); c.preventDefault(); }; window.addEventListener('click', swallow, { capture: true, once: true }); setTimeout(() => window.removeEventListener('click', swallow, true), 80);
+        if (e.type === 'pointercancel' || !over || over === b) return;
+        const r = over.dataset.gr, i = +over.dataset.gi; if (r === 'h' && !th) return;
+        const Y = r === 'g' ? t.garrison : th.army, src = X[i0];
+        if (!Y[i]) { Y[i] = src; X[i0] = null; } else if (Y[i].t === src.t) { Y[i].n += src.n; X[i0] = null; } else { X[i0] = Y[i]; Y[i] = src; }
+        sfx('click'); garSel = null; openTown(t); renderAll();
+      };
+      window.addEventListener('pointermove', move, { passive: false }); window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end);
+    }));
     q('[data-gmove]', b => b.onclick = () => {
       if (!th) return;
       const from = b.dataset.gmove === 'toHero' ? t.garrison : th.army, to = b.dataset.gmove === 'toHero' ? th.army : t.garrison;

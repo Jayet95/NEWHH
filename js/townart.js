@@ -140,9 +140,21 @@ const TownArt = (() => {
     dungeon: ['#3e3048', '#171020'], stronghold: ['#82703c', '#3a2c16'], fortress: ['#5e8248', '#223c1a'], conflux: ['#6e8cac', '#2a405c'],
   };
   let scn = false;   // a painted scene is showing: its plots sit a little higher in the front row
+  let layout = null; // full-screen scenes: the 16 plots in canvas pixels [{x, y(base), w}]
+  let PLOTS = null;  // art/ui/town_plots.json: per castle and screen shape, 16 [x, y, w] fractions of the painting
+  if (typeof fetch !== 'undefined') fetch('art/ui/town_plots.json').then(r => (r.ok ? r.json() : null)).then(j => { PLOTS = j; }).catch(() => {});
+  // the full-screen painting for this screen shape (wide: desktop scene, upright: phone scene), or null while it is missing
+  function fullScene(t, W, H) {
+    if (typeof Assets === 'undefined' || !PLOTS || !PLOTS[t.fac]) return null;
+    const wide = W / H >= 1.2, tag = wide ? 'w' : 't', img = Assets.get('ui/town_' + tag + '_' + t.fac, 'ui/town_' + tag + 'l_' + t.fac);
+    if (!img) return null;
+    const k = Math.max(W / img.width, H / img.height), iw = img.width * k, ih = img.height * k, x = (W - iw) / 2, y = (H - ih) * 0.3;
+    return { img, x, y, iw, ih, plots: PLOTS[t.fac][wide ? 'desktop' : 'phone'] };
+  }
   const ROW_BACK = 0.62, ROW_FRONT = 0.925, ROW_FRONT_ART = 0.90, SLOT_NAMES = ['hall', 'guild', 'market', 'ship', 'tavern', 'smithy', 'garrison', 'fort', 'mines'], NSLOTS = 16;
   // where slot i stands: x centre, y of the ground under it, picture width/height (the back row is smaller, so it reads as further away)
   function slotBox(i, W, H) {
+    if (layout) { const p = layout[i]; return { x: p.x, base: p.y, ws: p.w, hs: p.w * 1.125, back: i < 7 }; }
     const back = i < 7, n = back ? 7 : 9, j = back ? i : i - 7, ws = scn ? (back ? W * 0.118 : W * 0.116) : back ? Math.min(84, W / 12.4) : Math.min(92, W / 11.2);
     return { x: W * (j + 0.5) / n, base: H * (back ? ROW_BACK : scn ? ROW_FRONT_ART : ROW_FRONT), ws, hs: ws * 1.125, back };
   }
@@ -174,11 +186,12 @@ const TownArt = (() => {
     else { g.rotate(-0.6); rect(g, -1.2, -2, 2.4, 10, '#b07a3a', '#140a04'); rect(g, -5.5, -6, 11, 5, '#c4c8d0', '#140a04'); }
     g.restore();
   }
-  function scene(g, t, now, anim, info, W, H, hover = -1) {
-    const sceneImg = typeof Assets !== 'undefined' ? (innerWidth < 700 && Assets.get('ui/town_scene_' + t.fac + '_s')) || Assets.get('ui/town_scene_' + t.fac) : null; scn = !!sceneImg;
+  function scene(g, t, now, anim, info, W, H, hover = -1, full = null) {
+    layout = full ? full.plots.map(([px, py, pw]) => ({ x: full.x + px * full.iw, y: full.y + py * full.ih, w: pw * full.iw })) : null;
+    const sceneImg = full ? full.img : typeof Assets !== 'undefined' ? (innerWidth < 700 && Assets.get('ui/town_scene_' + t.fac + '_s')) || Assets.get('ui/town_scene_' + t.fac) : null; scn = !!sceneImg;
     const hue = hueOf(t.fac), fort = t.fort || 0, sky = SKY[t.fac] || [hsl(hue, 40, 22), hsl(hue, 45, 62)], mea = MEADOW[t.fac] || [hsl(hue, 30, 38), hsl(hue, 34, 16)];
     const hy = H * 0.5;
-    if (sceneImg) g.drawImage(sceneImg, 0, 0, W, H); else {
+    if (full) g.drawImage(full.img, full.x, full.y, full.iw, full.ih); else if (sceneImg) g.drawImage(sceneImg, 0, 0, W, H); else {
     // sky, a low sun glow, drifting clouds
     g.fillStyle = (() => { const q = g.createLinearGradient(0, 0, 0, hy + 30); q.addColorStop(0, sky[0]); q.addColorStop(1, sky[1]); return q; })(); g.fillRect(0, 0, W, hy + 30);
     { const sg = g.createRadialGradient(W * 0.16, hy - 10, 4, W * 0.16, hy - 10, 190); sg.addColorStop(0, 'rgba(255,236,170,.55)'); sg.addColorStop(1, 'rgba(255,220,140,0)'); g.fillStyle = sg; g.fillRect(0, 0, W, hy + 30); }
@@ -208,15 +221,15 @@ const TownArt = (() => {
       if (hov) { const gl = g.createRadialGradient(x, base - hs * 0.4, 4, x, base - hs * 0.4, ws * 0.95); gl.addColorStop(0, 'rgba(255,226,140,.34)'); gl.addColorStop(1, 'rgba(255,226,140,0)'); g.fillStyle = gl; g.fillRect(x - ws, base - hs * 1.3, ws * 2, hs * 1.5); }
       // the building: nothing is drawn on a plot until it is built (just a faint outline); it then rises out of the ground with a light and sparkles
       const hidden = !s.built && !(an && an.kind === 'build');
-      if (hidden) { g.save(); g.setLineDash([5, 5]); g.beginPath(); g.ellipse(x, base + (sceneImg ? 0.03 * H : 3) - 2, ws * 0.46, ws * 0.12, 0, 0, 7); g.lineWidth = 1.4; g.strokeStyle = hov ? 'rgba(255,226,150,.9)' : 'rgba(255,255,255,.3)'; g.stroke(); g.restore(); }
+      if (hidden) { g.save(); g.setLineDash([5, 5]); g.beginPath(); g.ellipse(x, base + (layout ? 0 : sceneImg ? 0.03 * H : 3) - 2, ws * 0.46, ws * 0.12, 0, 0, 7); g.lineWidth = 1.4; g.strokeStyle = hov ? 'rgba(255,226,150,.9)' : 'rgba(255,255,255,.3)'; g.stroke(); g.restore(); }
       const hgt = an && an.kind === 'build' ? Math.min(1, ae) : 1;
       let sc = 1; if (an && an.kind === 'upgrade') sc = 1 + 0.18 * Math.sin(p * Math.PI);
-      g.save(); g.translate(x, base + (sceneImg ? 0.03 * H : 3) + lift); g.scale(sc, sc);
+      g.save(); g.translate(x, base + (layout ? 0 : sceneImg ? 0.03 * H : 3) + lift); g.scale(sc, sc);
       if (hidden) { /* no art until it is built */ }
       else if (sceneImg) {
         const ghost = !s.built && !(an && an.kind === 'build'), im = ghost ? ghostOf(spr) : spr, bb = bboxOf(spr);
         // scale each picture on its own so its footing is at least as wide as the painted pad (never too tall for the scene), centred on the pad, standing on its front edge
-        const padW = W * (b.back ? 0.1 : 0.105), kk = Math.min(padW / bb[2], 2.2 * hs / bb[3]);   // the painted grass base is as wide as the whole picture
+        const padW = layout ? ws * 0.95 : W * (b.back ? 0.1 : 0.105), kk = Math.min(padW / bb[2], 2.2 * hs / bb[3]);   // the painted grass base is as wide as the whole picture
         let dw = bb[2] * kk, dh = bb[3] * kk;
         if (ghost) g.globalAlpha = 0.72;
         const kh = ghost ? 1 : hgt, sy = (1 - kh) * bb[3];
@@ -225,7 +238,7 @@ const TownArt = (() => {
       else { const sy = (1 - hgt) * spr.height; g.drawImage(spr, 0, sy, spr.width, spr.height - sy, -ws / 2, -hs * hgt, ws, hs * hgt); }
       g.restore();
       if (an && (an.kind === 'build' || an.kind === 'upgrade')) {   // completion highlight: a column of light, rings spreading over the pad, a glow on the building and drifting sparkles
-        const e2 = Math.max(0, ae - (an.kind === 'build' ? 0.7 : 0)), fade = Math.max(0, 1 - e2 / 1.9), cy = base - hs * 0.42, by0 = base + (sceneImg ? 0.03 * H : 3);
+        const e2 = Math.max(0, ae - (an.kind === 'build' ? 0.7 : 0)), fade = Math.max(0, 1 - e2 / 1.9), cy = base - hs * 0.42, by0 = base + (layout ? 0 : sceneImg ? 0.03 * H : 3);
         if (e2 > 0 && fade > 0) {
           g.save();
           const bm = g.createLinearGradient(0, by0 - hs * 1.5, 0, by0); bm.addColorStop(0, 'rgba(255,236,150,0)'); bm.addColorStop(1, `rgba(255,226,120,${0.55 * fade})`); g.fillStyle = bm; g.fillRect(x - ws * 0.3, by0 - hs * 1.5, ws * 0.6, hs * 1.5);
@@ -241,7 +254,7 @@ const TownArt = (() => {
       if (!s.built && !(an && an.kind === 'build')) hammerBadge(g, x + ws * 0.3, base - hs * 0.3, !!(s.locked || s.na), 0.5 + 0.5 * Math.sin(now / 420 + i));
       if (s.built && s.av > 0) { const bx = x - ws * 0.36, by = base - hs * 0.86; g.beginPath(); g.arc(bx, by, 10, 0, 7); g.fillStyle = '#d9a52a'; g.fill(); g.lineWidth = 1.6; g.strokeStyle = '#140a04'; g.stroke(); g.fillStyle = '#1c1204'; g.font = 'bold 11px Cinzel, Georgia, serif'; g.fillText(s.av > 99 ? '99+' : s.av, bx, by + 1); }
       // name plate and level stars
-      const nm = s.name || '', pw = Math.max(62, nm.length * 6.6 + 16), py = base + (sceneImg ? 24 : 8);
+      const nm = s.name || '', pw = Math.max(62, nm.length * 6.6 + 16), py = base + (layout ? 4 : sceneImg ? 24 : 8);
       g.font = 'bold 11px Cinzel, Georgia, serif'; roundRect(g, x - pw / 2, py, pw, 17, 5); g.fillStyle = hov ? 'rgba(48,32,10,.95)' : 'rgba(14,9,5,.84)'; g.fill(); g.lineWidth = 1.2; g.strokeStyle = s.built ? (hov ? '#ffd766' : '#c9a24a') : 'rgba(255,255,255,.28)'; g.stroke();
       g.fillStyle = s.built ? '#f6ebc8' : '#aaa59a'; g.fillText(nm, x, py + 9);
       if (s.max > 1 && s.built) { g.font = 'bold 11px sans-serif'; g.lineWidth = 3; g.strokeStyle = '#000'; g.fillStyle = '#ffd24a'; const st = '★'.repeat(s.lv) + '☆'.repeat(Math.max(0, s.max - s.lv)); g.strokeText(st, x, py + 25); g.fillText(st, x, py + 25); }
@@ -250,5 +263,5 @@ const TownArt = (() => {
     if (!sceneImg) { const vg = g.createRadialGradient(W / 2, H / 2, H * 0.55, W / 2, H / 2, W * 0.62); vg.addColorStop(0, 'rgba(8,4,0,0)'); vg.addColorStop(1, 'rgba(8,4,0,.38)'); g.fillStyle = vg; g.fillRect(0, 0, W, H); }
   }
   const reload = () => { for (const k in cache) delete cache[k]; for (const k in url) delete url[k]; };
-  return { reload, sprite, pic, scene, drawFort, hueOf, slotAt, slotBox, NSLOTS };
+  return { reload, sprite, pic, scene, fullScene, drawFort, hueOf, slotAt, slotBox, NSLOTS };
 })();

@@ -1554,7 +1554,9 @@
   const SLOTS = 11;
   const TIER_HALL = [null, 0, 0, 1, 2, 3, 4, 5];
   const UP_HALL = { 2: 1, 3: 2, 4: 3, 5: 4 };
-  let curTown = null, townTab = null, garSel = null;
+  let curTown = null, townTab = null, garSel = null, GAR = null;
+  fetch('art/ui/garrison_sockets.json').then(r => (r.ok ? r.json() : null)).then(j => { GAR = j; }).catch(() => {});
+  const townNeeded = new Set();
   const defaultTown = () => townAt(G.hero.x, G.hero.y) || nearestTown(G.hero.x, G.hero.y);
   const tierType = (t, tier) => lineType(tiersOf(t)[tier - 1], (t.up && t.up[tier]) || 1);
   const starStr = (lv, max = MAX_LV) => '★'.repeat(lv) + '☆'.repeat(max - lv);
@@ -1598,6 +1600,15 @@
     if (cv.width !== Math.round(bw * dpr) || cv.height !== Math.round(bh * dpr)) { cv.width = Math.round(bw * dpr); cv.height = Math.round(bh * dpr); }
     const mres = $('mres'), topY = mres && mres.style.display !== 'none' ? Math.max(0, mres.getBoundingClientRect().bottom - box.getBoundingClientRect().top + 4) : 4;
     const gs = box.querySelector('.gstack'), bar = box.querySelector('.tbar'), tui = box.querySelector('.tui');
+    const full = TownArt.fullScene(t, bw, bh);
+    if (full) {   // the new full-screen painting: the canvas is the screen, the 16 plots come from the painting's own layout
+      townV = { x: 0, y: 0, k: 1, max: 0 };
+      if (tui) { tui.style.paddingTop = topY + 'px'; tui.style.setProperty('--ttopY', topY + 'px'); tui.style.setProperty('--tbarH', (bar ? bar.offsetHeight + 10 : 60) + 'px'); }
+      const g0 = cv.getContext('2d'); g0.setTransform(dpr, 0, 0, dpr, 0, 0); g0.fillStyle = '#0b0805'; g0.fillRect(0, 0, bw, bh);
+      TownArt.scene(g0, t, now, townAnim, slotInfo, bw, bh, townHover, full);
+      requestAnimationFrame(drawTown); return;
+    }
+
     const uiH = (gs ? gs.offsetHeight : 0) + (bar ? bar.offsetHeight : 0) + 14, kFit = Math.max(0.2, (bh - topY - uiH) / TH);
     // wide screens: the whole panorama fits; phones held upright: it fills the free height and slides sideways (drag)
     const pan = bw < 761 && kFit > bw / TW, k = pan ? Math.min(kFit, 1.5) : Math.min(bw / TW, kFit), maxPan = Math.max(0, TW * k - bw);
@@ -1737,7 +1748,9 @@
   function openTown(t) {
     t = t || (curTown && curTown.owner === 0 ? curTown : defaultTown());
     if (!t) return toast('You do not own a town.');
-    curTown = t; (G.flags = G.flags || {}).town = true; Assets.need(['ui/town_' + t.fac, 'ui/town_scene_' + t.fac, 'ui/town_scene_' + t.fac + '_s'].concat(Assets.list('buildings/'))).then(() => { try { TownArt.reload(); } catch (e) { /* ignore */ } }); if (typeof Sfx !== 'undefined' && Sfx.ambience) Sfx.ambience(t.fac); // quiet per-castle ambience while the town screen is open
+    curTown = t; (G.flags = G.flags || {}).town = true;
+    { const need = ['ui/town_' + t.fac, 'ui/town_scene_' + t.fac, 'ui/town_scene_' + t.fac + '_s'].concat(['w', 'wl', 't', 'tl'].map(x => 'ui/town_' + x + '_' + t.fac), ['with', 'without'].map(x => 'ui/town_gar_' + t.fac + '_' + x), ['war', 'bld'].map(x => 'ui/town_btn_' + t.fac + '_' + x), Assets.list('buildings/'));
+      Assets.need(need).then(() => { try { TownArt.reload(); } catch (e) { /* ignore */ } if (!townNeeded.has(t.fac)) { townNeeded.add(t.fac); if (curTown === t && !$('modal').classList.contains('hide') && $('mbox').querySelector('#tcv')) openTown(t); } }); } if (typeof Sfx !== 'undefined' && Sfx.ambience) Sfx.ambience(t.fac); // quiet per-castle ambience while the town screen is open
     const th = townHero(t), here = !!th, mt = myTowns(), coastal = !!G.dock && t === mt[0];
     const tabs = mt.length > 1 ? `<div class="hlist"><button class="hbtn tnav" data-tnav="-1" title="Previous town">‹</button>${mt.map((x, i) => `<button class="hbtn${x === t ? ' on' : ''}" data-tab="${i}" title="${x.name}">${FACTIONS[x.fac].icon}</button>`).join('')}<button class="hbtn tnav" data-tnav="1" title="Next town">›</button></div>` : '';
     const topHtml = `${tabs}<h2>🏰 ${t.name} <span class="small">${FACTIONS[t.fac].name} · ${t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Settlement'}</span></h2>`;
@@ -1798,12 +1811,22 @@
     const tabBar = `<div class="ttabs"><button class="ttab${townTab !== 'bld' ? ' on' : ''}" data-ttab="war">⚔️ Warriors</button><button class="ttab${townTab === 'bld' ? ' on' : ''}" data-ttab="bld">🏗️ Buildings</button></div>`;
     // like the original: the town's garrison above the picture, the visiting hero's army below it; click a stack, then a slot, to move, merge or swap
     const garSlot = (a, rk, i) => `<button class="slot${a ? '' : ' empty'}${garSel && garSel.r === rk && garSel.i === i && garSel.t === t ? ' sel' : ''}" data-gr="${rk}" data-gi="${i}" title="${a ? C[a.t].n + ' — ' + a.n : 'Empty slot'}">${a ? `${Art.pic(a.t, 52)}<small>${a.n}</small>` : ''}</button>`;
-    const gTop = `<div class="glabel">🛡️ ${t.name} garrison</div><div class="armyrow garrow">${t.garrison.map((a, i) => garSlot(a, 'g', i)).join('')}</div>`;
-    const gHero = th ? `<div class="glabel">⚔️ ${th.name} — hero army</div><div class="armyrow garrow">${th.army.map((a, i) => garSlot(a, 'h', i)).join('')}</div><div class="gacts"><button data-gmove="toHero">⬆ All to hero</button><button data-gmove="toGarr">⬇ To garrison</button><button data-garr="1">Split…</button></div>`
+    // the garrison and the hero's army use the painted panels (a socket for every stack); without the art they fall back to plain slot rows
+    const gp = GAR && GAR[t.fac], gsrc = (k) => (Assets.has('ui/town_gar_' + t.fac + '_' + k) && Assets.src('ui/town_gar_' + t.fac + '_' + k)) || null;
+    const gSel = (rk, i) => garSel && garSel.r === rk && garSel.i === i && garSel.t === t ? ' sel' : '';
+    const garPanel = (kind, arr, rk, hero) => {
+      const g = gp && gp[kind], src = g && gsrc(kind); if (!g || !src) return null;
+      const pc = (b) => `left:${(b[0] * 100).toFixed(2)}%;top:${(b[1] * 100).toFixed(2)}%;width:${(b[2] * 100).toFixed(2)}%;height:${(b[3] * 100).toFixed(2)}%`;
+      return `<div class="gpanel" style="aspect-ratio:${g.aspect};background-image:url(${src})">${g.slots.map((b, i) => { const a = arr[i]; return `<button class="slot gs${a ? '' : ' empty'}${gSel(rk, i)}" data-gr="${rk}" data-gi="${i}" style="${pc(b)}" title="${a ? C[a.t].n + ' — ' + a.n : 'Empty slot'}">${a ? `${Art.pic(a.t, 60)}<small>${a.n}</small>` : ''}</button>`; }).join('')}${kind === 'with' && g.hero && hero ? `<div class="gshero" style="${pc(g.hero)}">${Art.heroPic(hero.icon, ownCol(0), 64, hero.pid)}</div>` : ''}</div>`;
+    };
+    const gTop = `<div class="glabel">🛡️ ${t.name} garrison</div>` + (garPanel('without', t.garrison, 'g') || `<div class="armyrow garrow">${t.garrison.map((a, i) => garSlot(a, 'g', i)).join('')}</div>`);
+    const gHero = th ? `<div class="glabel">⚔️ ${th.name} — hero army</div>` + (garPanel('with', th.army, 'h', th) || `<div class="armyrow garrow">${th.army.map((a, i) => garSlot(a, 'h', i)).join('')}</div>`) + `<div class="gacts"><button data-gmove="toHero">⬆ All to hero</button><button data-gmove="toGarr">⬇ To garrison</button><button data-garr="1">Split…</button></div>`
       : `<div class="small gnohero">No hero in this town — recruits join the garrison. Bring a hero to move troops.</div>`;
+    const bsrc = (k) => (Assets.has('ui/town_btn_' + t.fac + '_' + k) && Assets.src('ui/town_btn_' + t.fac + '_' + k)) || null;
+    const tabBtn = (k, label, ico) => { const u = bsrc(k === 'war' ? 'war' : 'bld'); return `<button class="ttab${townTab === k ? ' on' : ''}${u ? ' tbtn' : ''}" data-ttab="${k}" title="${label}">${u ? `<img src="${u}" alt="${label}" draggable="false">` : ico + ' ' + label}</button>`; };
     // the whole screen is the town picture (like the original); the troops, two buttons and a panel for Warriors / Buildings sit on top of it
     const panel = townTab ? `<div class="tpanel"><div class="tphead"><b>${townTab === 'bld' ? '🏗️ Buildings' : '⚔️ Warriors'}</b><button id="tpClose" class="tpx" title="Close">✕</button></div><div class="tpbody">${townTab !== 'bld' ? `<div class="bgrid wgrid">${wc}</div>` + outpostHtml(t) : `<h4>Creature dwellings</h4><div class="bgrid">${dwc}</div><h4>Town buildings</h4><div class="bgrid">${cardify(bld + smithy)}</div>` + caravanHtml(t, mt)}</div></div>` : '';
-    const html = cvHtml + `<div class="tui"><div class="ttop">${topHtml}</div><div class="tfill"></div><div class="gstack">` + gTop + gHero + `</div><div class="tbar"><button class="ttab${townTab === 'war' ? ' on' : ''}" data-ttab="war">⚔️ Warriors</button><button class="ttab${townTab === 'bld' ? ' on' : ''}" data-ttab="bld">🏗️ Buildings</button><button class="primary" id="tClose">Leave town</button></div>${panel}</div>`;
+    const html = cvHtml + `<div class="tui"><div class="ttop">${topHtml}</div><div class="tfill"></div><div class="gstack">` + gTop + gHero + `</div><div class="tbar">${tabBtn('war', 'Warriors', '⚔️')}${tabBtn('bld', 'Buildings', '🏗️')}<button class="primary" id="tClose">Leave town</button></div>${panel}</div>`;
     $('mbox').innerHTML = html; $('mbox').classList.add('townfull'); $('modal').classList.remove('hide'); townHover = -1;
     { const cv = $('tcv'), at = (e) => { const r = cv.getBoundingClientRect(); return TownArt.slotAt((e.clientX - r.left - townV.x) / townV.k, (e.clientY - r.top - townV.y) / townV.k, TW, TH); };
       let pd = null;
@@ -1840,7 +1863,7 @@
       const X = r0 === 'g' ? t.garrison : th.army; if (!X[i0]) return;
       let ghost = null, started = false, over = null; const x0 = ev.clientX, y0 = ev.clientY;
       const move = (e) => {
-        if (!started && Math.hypot(e.clientX - x0, e.clientY - y0) > 8) { started = true; ghost = b.cloneNode(true); ghost.className = 'slot slot-ghost'; document.body.appendChild(ghost); b.classList.add('drag-src'); }
+        if (!started && Math.hypot(e.clientX - x0, e.clientY - y0) > 8) { started = true; ghost = b.cloneNode(true); ghost.removeAttribute('style'); ghost.className = 'slot slot-ghost'; document.body.appendChild(ghost); b.classList.add('drag-src'); }
         if (!started) return;
         ghost.style.left = e.clientX + 'px'; ghost.style.top = e.clientY + 'px';
         const el = document.elementFromPoint(e.clientX, e.clientY), tgt = el && el.closest ? el.closest('.slot[data-gr]') : null;

@@ -12,7 +12,11 @@ function pack(root, outDir) {
   const groups = []; const add = (name, core, files) => { if (files.length) groups.push({ name, core, files }); };
   add('core', true, list.filter(f => !LATER.test(stem(f))));
   add('buildings', false, list.filter(f => /^buildings\//.test(f)));
-  add('ui', false, list.filter(f => /^ui\/(castle_select|hero_select|adventure|town_)/.test(stem(f))));
+  // each castle's new town paintings, garrison panels and buttons form their own pack, so opening a town downloads only that castle's art
+  const townFac = (f) => { const m = /^ui\/town_(?:w|wl|t|tl)_([a-z]+)$/.exec(stem(f)) || /^ui\/town_(?:gar|btn)_([a-z]+)_(?:with|without|war|bld)$/.exec(stem(f)); return m && m[1]; };
+  const facs = [...new Set(list.map(townFac).filter(Boolean))].sort();
+  facs.forEach(fc => add('town_' + fc, false, list.filter(f => townFac(f) === fc)));
+  add('ui', false, list.filter(f => /^ui\/(castle_select|hero_select|adventure|town_)/.test(stem(f)) && !townFac(f)));
   add('poses', false, list.filter(f => /^(poses|mounted)\//.test(f)));
   // animation frames: whole creature folders together, about 10 MB per pack
   const anim = list.filter(f => /^anim\//.test(f)), byDir = {}; anim.forEach(f => { (byDir[f.split('/')[1]] = byDir[f.split('/')[1]] || []).push(f); });

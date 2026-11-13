@@ -1106,6 +1106,11 @@
   async function moveHero() {
     if (busy || !G.path) return;
     busy = true;
+    try { await moveHero0(); }
+    catch (e) { console.error('move failed', e); toast('Something went wrong on that step — the game carried on.'); try { $('modal').classList.add('hide'); } catch (e2) { /* ignore */ } }   // an error must never leave the game locked
+    finally { busy = false; try { renderAll(); } catch (e) { /* ignore */ } }
+  }
+  async function moveHero0() {
     const h = G.hero, path = G.path; G.path = null;
     for (let i = 0; i < path.length; i++) {
       const s = path[i];
@@ -1134,7 +1139,6 @@
       if (o && (o.t === 'pile' || o.t === 'chest')) { collect(o); continue; }
       if (o && last) { await interact(o, h); break; }
     }
-    busy = false; renderAll();
   }
   function collect(o) {
     sfx('coin');
@@ -2718,6 +2722,11 @@
   }
   async function doEndTurn() {
     if (!G || busy || G.over) return;
+    try { await doEndTurn0(); }
+    catch (e) { console.error('end turn failed', e); toast('Something went wrong ending the turn — the game carried on.'); try { $('modal').classList.add('hide'); } catch (e2) { /* ignore */ } }
+    finally { busy = false; try { renderAll(); } catch (e) { /* ignore */ } }
+  }
+  async function doEndTurn0() {
     busy = true; G.path = null; selSlot = -1;
     G.report = [];
     document.body.classList.add('aiturn', 'night');   // the rivals move at night
@@ -3035,6 +3044,13 @@
     hintTimer = setTimeout(() => done(false), 14000);
   }
   setInterval(checkHints, 2500);
+  // safety net: if the game says it is busy but nothing is happening (no window, no battle, no rival turn) for a while, unlock it
+  let idleBusy = 0;
+  setInterval(() => {
+    const quiet = G && busy && $('modal').classList.contains('hide') && !document.body.classList.contains('inbattle') && !document.body.classList.contains('aiturn') && $('title').classList.contains('hide');
+    idleBusy = quiet ? idleBusy + 1 : 0;
+    if (idleBusy >= 4) { idleBusy = 0; busy = false; console.warn('unlocked a stuck game'); try { renderAll(); toast('The game was stuck and has been unlocked.'); } catch (e) { /* ignore */ } }
+  }, 2500);
 
   // ---- glossary + help ----
   const GLOSSARY = [

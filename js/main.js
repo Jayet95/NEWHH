@@ -1710,6 +1710,30 @@
     g.restore();
     requestAnimationFrame(drawTown);
   }
+  // long-press (or right-click) a dwelling in the town picture, or a creature card, to see that warrior big
+  function showBigCreature(t, tier) {
+    const id = tierType(t, tier), c = C[id], built = !!t.b[tier], lv = (t.up && t.up[tier]) || 1;
+    document.querySelectorAll('.bigcr').forEach(e => e.remove());
+    const ov = document.createElement('div'); ov.className = 'bigcr';
+    ov.innerHTML = `<div class="bcbox"><div class="bcpic">${Art.pic(id, 360)}</div><h3>${c.n} <span class="stars">${built ? starStr(lv) : ''}</span></h3><div class="small">${Art.rarity(id).n}${built ? ` · ${t.avail[tier] || 0} ready to recruit` : ' · dwelling not built yet'}</div>
+      <div class="wstats big"><span>Attack ${c.a}</span><span>Defence ${c.d}</span><span>HP ${c.hp}</span><span>Speed ${c.s}</span><span>Damage ${c.lo}-${c.hi}</span>${c.shoot ? '<span>Archer</span>' : ''}${c.fly ? '<span>Flying</span>' : ''}</div>
+      <div class="small">Cost ${fmtCost(c.cost)} each</div><button class="primary">Close</button></div>`;
+    ov.onclick = () => ov.remove(); document.body.appendChild(ov); sfx('click');
+  }
+  { let lp = null, fired = false;
+    const mb = document.getElementById('mbox'), slotOf = (e) => {
+      const t = curTown; if (!t || !$('tcv')) return -1;
+      const card = e.target.closest && e.target.closest('.wcard[data-slot], .bcard[data-slot]'); if (card) return +card.dataset.slot;
+      const cv = e.target.closest && e.target.closest('#tcv'); if (!cv) return -1;
+      const r = cv.getBoundingClientRect(); return TownArt.slotAt((e.clientX - r.left - townV.x) / townV.k, (e.clientY - r.top - townV.y) / townV.k, TW, TH);
+    };
+    const fire = (e) => { const i = slotOf(e); if (i >= 0 && i < 7 && curTown) { fired = true; showBigCreature(curTown, i + 1); } };
+    mb.addEventListener('pointerdown', (e) => { if (e.button) return; fired = false; clearTimeout(lp); const ev = { target: e.target, clientX: e.clientX, clientY: e.clientY }; lp = setTimeout(() => fire(ev), 450); }, true);
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => mb.addEventListener(n, () => clearTimeout(lp), true));
+    mb.addEventListener('pointermove', (e) => { if (lp && (Math.abs(e.movementX) > 6 || Math.abs(e.movementY) > 6)) clearTimeout(lp); }, true);
+    mb.addEventListener('click', (e) => { if (fired) { fired = false; e.stopPropagation(); e.preventDefault(); } }, true);   // the press that opened the card is not also a tap
+    mb.addEventListener('contextmenu', (e) => { if (curTown && $('tcv') && slotOf(e) >= 0 && slotOf(e) < 7) { e.preventDefault(); fire(e); } });
+  }
   const TW = 1040, TH = 470;   // the panorama is painted in these units and backed at screen density
   // clicking a plot in the picture opens the matching warriors / buildings card below and flashes it
   function townSlotClick(t, i) {

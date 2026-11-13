@@ -2916,7 +2916,7 @@
   $('tHelp').onclick = () => openHelp();
   async function exitToMenu() {
     if (!G || busy) return;
-    const i = await showModal('<h2>Return to the main menu?</h2><p class="small">The game autosaves as you play, so refreshing the page brings you back here.</p>', ['💾 Save & exit', 'Exit', 'Cancel']);
+    const i = await showModal('<h2>Return to the main menu?</h2><p class="small">The game autosaves as you play, so your game is kept for Continue.</p>', ['💾 Save & exit', 'Exit', 'Cancel']);
     if (i === 2) return;
     if (i === 0) save();
     $('title').classList.remove('hide'); refreshTitle();
@@ -3163,6 +3163,7 @@
       ${row('Show walkable tiles', seg('showReach', [[true, 'On'], [false, 'Off']]), 'Lights up every tile your hero can reach today')}
       ${row('Warn before deadly fights', seg('confirmDanger', [[true, 'On'], [false, 'Off']]), 'Asks before attacking something far stronger than you')}
       ${row('Confirm before ending a turn', seg('confirmEnd', [[true, 'On'], [false, 'Off']]), 'Warns about idle heroes and unspent recruits')}
+      ${row('Resume on refresh', seg('resume', [[true, 'On'], [false, 'Off']]), 'Refreshing the page jumps straight back into your game (otherwise you land on the title screen; Continue always works)')}
       ${row('Hints', seg('hints', [[true, 'On'], [false, 'Off']]), '<a href="#" id="stReset">Show all hints again</a>')}
       <div class="mb"><button class="primary" id="stClose">Done</button></div>`);
     $('stClose').onclick = () => { if (G && $('title').classList.contains('hide')) openMenu(); else $('modal').classList.add('hide'); };
@@ -3226,7 +3227,7 @@
     [home, ...towns].forEach(t => markView(t.x, t.y, 9, false)); G.res.gold += 20000; renderAll();
   }
   // refreshing the page picks the game up where it was
-  if (!/[?&]demo/.test(location.search) && localStorage.getItem(SAVE)) Assets.ready.then(() => { if (!G && load()) $('title').classList.add('hide'); });
+  if (!/[?&]demo/.test(location.search) && Settings.resume && localStorage.getItem(SAVE)) Assets.ready.then(() => { if (!G && load()) $('title').classList.add('hide'); });
   if (/[?&]demo/.test(location.search)) Assets.ready.then(() => setTimeout(() => { try { newGame('castle', 'Orrin', 'normal', { size: 'medium', seed: 'demo', wrap: true }); $('title').classList.add('hide'); demo(); } catch (e) { console.error('demo failed', e); } }, 400));
   window.__G = () => G;
   window.__dbg = { borderBlock, canCross, terrOwner, openDiplomacy, aiDiplomacy, declareWar, atWar, realmPower, demo, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };

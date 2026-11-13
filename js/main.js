@@ -2115,6 +2115,23 @@
   // ---------- rival AI players ----------
   const armyPower = (arr) => arr.reduce((s, a) => s + (a ? C[a.t].v * a.n : 0), 0);
   const goldEq = (c) => Object.keys(c).reduce((s, k) => s + c[k] * RES_VALUE[k], 0);
+  // a recruit's price in gold-equivalent without the food part (food is a real stock a rival keeps, like the player's)
+  const goldPrice = (id) => goldEq(Object.fromEntries(Object.entries(C[id].cost).filter(([k]) => k !== 'food')));
+  function aiFoodIncome(ai) {
+    let f = 0;
+    for (const o of G.objs) {
+      if (o.owner !== ai.id) continue;
+      if (o.t === 'town') f += FOOD.town[o.farm || 0].inc || 0;
+      else if (o.t === 'farm') f += o.built ? FOOD.field : (zoneOwner(G, G.zone[o.y][o.x]) === ai.id ? FOOD.mapFarm : 0);
+    }
+    return f;
+  }
+  function aiFoodUpkeep(ai) {
+    let w = 0;
+    for (const h of ai.heroes) for (const a of h.army) if (a) w += a.n * foodOf(a.t);
+    for (const o of G.objs) if (o.t === 'town' && o.owner === ai.id) for (const a of (o.garrison || [])) if (a) w += a.n * foodOf(a.t);
+    return Math.floor(w / FOOD.upkeepDiv);
+  }
   // fast auto-resolve for fights the player is not part of; mutates both armies, returns true if the attacker wins
   function quickBattle(att, def, defBonus = 1) {
     const A = armyPower(att) * (0.85 + Math.random() * 0.3), D = armyPower(def) * defBonus * (0.85 + Math.random() * 0.3);
@@ -2139,8 +2156,6 @@
       if (o.t === 'town') g += 500 + (o.b && o.b.hall ? HALL_LEVELS[o.b.hall].inc : 0);
       else if (o.t === 'fort') g += FORT_INCOME;
       else if (o.t === 'mine' && zoneOwner(G, G.zone[o.y][o.x]) === ai.id) g += MINE_YIELD[o.kind] * RES_VALUE[o.kind];
-      else if (G.food && o.t === 'farm') g += 0.6 * RES_VALUE.food * (o.built ? FOOD.field : (zoneOwner(G, G.zone[o.y][o.x]) === ai.id ? FOOD.mapFarm : 0));
-      if (G.food && o.t === 'town') g += 0.6 * RES_VALUE.food * (FOOD.town[o.farm || 0].inc || 0);
     }
     return Math.round(g * DF().aiInc);
   }
@@ -2161,13 +2176,14 @@
     const hero = ai.heroes.find(h => h.x === t.x && h.y === t.y), army = hero ? hero.army : t.garrison;
     for (let tier = 7; tier >= 1; tier--) {
       if (!t.b[tier]) continue;
-      const type = tierType(t, tier), price = goldEq(C[type].cost);
-      const n = Math.min(t.avail[tier] || 0, Math.floor(ai.gold * (ai.saving ? 0.2 : 0.5) / price));
-      if (n > 0 && addToArmy({ army }, type, n)) { ai.gold -= n * price; t.avail[tier] -= n; }
+      const type = tierType(t, tier), price = goldPrice(type), fd = G.food ? foodOf(type) : 0;
+      const n = Math.min(t.avail[tier] || 0, Math.floor(ai.gold * (ai.saving ? 0.2 : 0.5) / price), fd ? Math.floor(ai.food / fd) : 1e9);
+      if (n > 0 && addToArmy({ army }, type, n)) { ai.gold -= n * price; ai.food -= n * fd; t.avail[tier] -= n; }
     }
   }
   function aiEconomy(ai) {
     ai.gold += aiIncome(ai);
+    if (G.food) { if (ai.food == null) ai.food = FOOD.start; ai.food = Math.max(0, ai.food + aiFoodIncome(ai) - aiFoodUpkeep(ai)); }
     const towns = G.objs.filter(o => o.t === 'town' && o.owner === ai.id);
     if (!towns.length) return;
     if (ai.spawnWait > 0) ai.spawnWait--;
@@ -2177,7 +2193,7 @@
     // a held Dragon Lair: buy the strongest dragons the treasury allows and send them to the home castle
     for (const lr of G.objs) if (lr.t === 'lair' && lr.owner === ai.id) {
       const t = towns[0], hero = ai.heroes.find(h => h.x === t.x && h.y === t.y), army = hero ? hero.army : t.garrison;
-      for (const id of [...LAIR].reverse()) { const price = goldEq(C[id].cost), n = Math.min(lr.avail[id] || 0, Math.floor(ai.gold * 0.6 / price)); if (n > 0 && addToArmy({ army }, id, n)) { ai.gold -= n * price; lr.avail[id] -= n; } }
+      for (const id of [...LAIR].reverse()) { const price = goldPrice(id), fd = G.food ? foodOf(id) : 0, n = Math.min(lr.avail[id] || 0, Math.floor(ai.gold * 0.6 / price), fd ? Math.floor(ai.food / fd) : 1e9); if (n > 0 && addToArmy({ army }, id, n)) { ai.gold -= n * price; ai.food -= n * fd; lr.avail[id] -= n; } }
     }
     const maxH = Math.min(4, 1 + Math.ceil(towns.length / 2) + (G.day > 25 ? 1 : 0));
     if (ai.heroes.length && ai.heroes.length < maxH && ai.spawnWait <= 0 && ai.gold >= HIRE_COST * 1.2) {
@@ -2199,7 +2215,7 @@
         case 'lair': { const gp = armyPower(o.guard || []); if (power >= gp * 2.2 + 1) sc = 3000 / (d + 8); break; }
         case 'fort': { const dp = defPower(o); if (power >= dp * 2 + 1) sc = 1600 / (d + 8); break; }
         case 'town': { const dp = defPower(o); if (power >= dp * 2.2 + 1) sc = 4000 / (d + 10); break; }
-        case 'farm': { const gp = armyPower(o.guard || []); if (power >= gp * 2) sc = (o.owner === 0 ? 2000 : 1500) / (d + 6); break; }
+        case 'farm': { const gp = armyPower(o.guard || []); if (power >= gp * 2) sc = (o.owner === 0 ? 2000 : 1500) * (ai.food < 80 ? 1.8 : 1) / (d + 6); break; }
         case 'deposit': if (ai.gold >= aiCost(mineCost(o.kind)) * 1.2) sc = 700 / (d + 6); break;
       }
       if (sc > 0) list.push({ x: o.x, y: o.y, score: sc });
@@ -2212,7 +2228,7 @@
   function aiSite(ai, build, x, y, kind) { G.objs.push({ t: 'site', build, kind, left: BUILD_DAYS[build], owner: ai.id, x, y }); reindex(G); }
   function aiFarm(ai, t) {
     const lv = t.farm || 0;
-    if (t.farmBuild || lv >= 3 || G.day < 6 * (lv + 1)) return;
+    if (t.farmBuild || lv >= 3 || (G.day < 6 * (lv + 1) && ai.food > 80)) return;
     const nx = FOOD.town[lv + 1]; if (aiCost(nx.cost) > ai.gold * 0.6) return;
     ai.gold -= aiCost(nx.cost); t.farmBuild = { left: 3 };
   }

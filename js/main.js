@@ -2996,7 +2996,7 @@
       <button data-mn="lb">📊 Leaderboard</button><button data-mn="hint">💡 Hints on/off</button>
       <button data-mn="rep">📜 Turn report</button><button data-mn="help">📖 Help & glossary</button>
       <button data-mn="snd">${Sfx.on ? '🔇 Sound off' : '🔊 Sound on'}</button><button data-mn="fit">🗺 Zoom to fit</button>
-      <button data-mn="exit">🚪 Main menu</button></div><div class="mb"><button class="primary" id="mnClose">Resume</button></div>`);
+      </div><div class="mb"><button data-mn="exit" id="mnExit">🚪 Main menu</button><button class="primary" id="mnClose">Resume</button></div>`);
     $('mnClose').onclick = closeModal;
     $('mbox').querySelectorAll('[data-mn]').forEach(b => b.onclick = () => {
       const k = b.dataset.mn;

@@ -185,7 +185,7 @@
   let t = 0; const later = () => { clearTimeout(t); t = setTimeout(() => { cur = 0; build(); }, 80); };
   new MutationObserver((m) => { if (busy || m.every(x => [...x.addedNodes, ...x.removedNodes].every(n => n.classList && n.classList.contains('pgbar')))) return; later(); }).observe(box, { childList: true, subtree: true });
   new MutationObserver(later).observe($('modal'), { attributes: true, attributeFilter: ['class'] });
-  window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => { cur = 0; build(); }, 200); });
+  window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => { build(); }, 200); });   // keep the page you are on (a phone's address bar fires resize while you tap)
   let sx = 0; box.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; }, { passive: true });
   box.addEventListener('touchend', (e) => { if (!pages.length) return; const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 70) { if (dx < 0 && cur < pages.length - 1) cur++; else if (dx > 0 && cur > 0) cur--; show(); } }, { passive: true });
 })();

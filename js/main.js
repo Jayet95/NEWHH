@@ -78,7 +78,7 @@
     return Math.max(-3, Math.min(3, perk(h, 'leadership') - Math.max(0, facs.size - 1) + (h.arts ? artBonus(h).morale : 0) + (h.buff ? h.buff.morale : 0)));
   };
   const heroLuck = (h) => Math.max(-3, Math.min(3, perk(h, 'fortune') + (h.arts ? artBonus(h).luck : 0) + (h.buff ? h.buff.luck : 0)));
-  const capsOf = (h) => ({ forest: perk(h, 'forester'), mount: perk(h, 'mountaineer'), water: perk(h, 'waterwalk'), nav: perk(h, 'navigation') });
+  const capsOf = (h) => ({ forest: perk(h, 'forester'), mount: perk(h, 'mountaineer'), water: perk(h, 'waterwalk'), nav: perk(h, 'navigation'), block: borderBlock(0, h.x, h.y) });
   const sgn = (n) => (n > 0 ? '+' : '') + n;
   const sizeMv = () => (G && SIZES[G.size] && SIZES[G.size].mv) || 1;
   const maxMove = (h) => Math.round(MOVE_PER_DAY * sizeMv() * (1 + 0.1 * perk(h, 'logistics') + (h.arts ? artBonus(h).move : 0) / 100));
@@ -563,7 +563,16 @@
     const TG = terrGrid();
     for (let y = Math.max(0, y0); y < Math.min(G.H, y0 + vy); y++) for (let x = Math.max(0, x0); x < Math.min(G.W, x0 + vx); x++) {
       const z = TG[y * G.W + x], px = hcx(x, y) - cam.x, py = hcy(y) - cam.y;
-      if (z && G.tiles[y][x] !== T.WATER) { Art.hexPath(cx, px, py, HR + 0.5); cx.fillStyle = ownFill(z - 1, 0.2); cx.fill(); }
+      if (z && G.tiles[y][x] !== T.WATER) { Art.hexPath(cx, px, py, HR + 0.5); cx.fillStyle = ownFill(z - 1, 0.3); cx.fill(); }
+      if (z && G.tiles[y][x] !== T.WATER) {   // a bold coloured wall along every edge where one realm's land meets another's (or no one's)
+        const hb = hexNb(x, y);
+        for (let e = 0; e < 6; e++) {
+          const nx = hb[e][0], ny = hb[e][1]; if (nx < 0 || ny < 0 || nx >= G.W || ny >= G.H || TG[ny * G.W + nx] === z || G.tiles[ny][nx] === T.WATER) continue;
+          const a = Art.hexPt(px, py, HR * 0.9, e), b = Art.hexPt(px, py, HR * 0.9, (e + 1) % 6);
+          cx.save(); cx.lineCap = 'round'; cx.beginPath(); cx.moveTo(a[0], a[1]); cx.lineTo(b[0], b[1]);
+          cx.strokeStyle = 'rgba(0,0,0,.6)'; cx.lineWidth = 6.5; cx.stroke(); cx.strokeStyle = ownCol(z - 1); cx.lineWidth = 3.4; cx.stroke(); cx.restore();
+        }
+      }
       const hn = hexNb(x, y);
       for (let e = 0; e < 3; e++) { const nx = hn[e][0], ny = hn[e][1]; if (nx >= 0 && ny >= 0 && nx < G.W && ny < G.H && TG[ny * G.W + nx] !== z) { const p1 = Art.hexPt(px, py, HR, e), p2 = Art.hexPt(px, py, HR, e + 1); cx.beginPath(); cx.moveTo(p1[0], p1[1]); cx.lineTo(p2[0], p2[1]); cx.stroke(); } }
     }
@@ -1049,7 +1058,7 @@
     const last = G.path && G.path[G.path.length - 1];
     if (last && last.x === t.x && last.y === t.y) return moveHero();
     const p = findPath(G, G.hero.x, G.hero.y, t.x, t.y, false, G.hero.boat != null, capsOf(G.hero));
-    if (!p || !p.length) { G.path = null; return toast(G.hero.boat != null ? 'Cannot sail there — disembark on a shore tile.' : "Can't reach there. (Water needs a boat.)"); }
+    if (!p || !p.length) { G.path = null; const tl = terrOwner(t.x, t.y); if (tl !== null && borderBlock(0, G.hero.x, G.hero.y)(t.x, t.y)) return toast(`That land belongs to the ${FN(tl)} realm — their border is closed to you. Ask for open borders in Diplomacy (Menu), or declare war.`); return toast(G.hero.boat != null ? 'Cannot sail there — disembark on a shore tile.' : "Can't reach there. (Water needs a boat.)"); }
     G.path = p;
   });
   { let md = false;
@@ -2213,7 +2222,7 @@
   }
   // walk toward a target tile; returns false if there is no path
   async function aiWalk(ai, h, tg) {
-    const path = findPath(G, h.x, h.y, tg.x, tg.y, false, false);
+    const path = findPath(G, h.x, h.y, tg.x, tg.y, false, false, { block: borderBlock(ai.id, h.x, h.y) });
     if (!path || !path.length) return false;
     for (let i = 0; i < path.length; i++) {
       const s = path[i];
@@ -2288,6 +2297,14 @@
     terrA = a; terrSig = h; terrG = G; return a;
   }
   const terrOwner = (x, y) => { const v = terrGrid()[y * G.W + x]; return v ? v - 1 : null; };
+  // crossing borders: you may not enter another realm's land unless you are allied, at war with them, or they gave you open borders (a hero already standing inside may move about and leave)
+  function pairObj(a, b) { const key = relKey(a, b); G.rel = G.rel || {}; return G.rel[key] || (G.rel[key] = { s: 'peace', since: 0, truce: 0 }); }
+  const pairOb = (a, b) => { const r = (G.rel || {})[relKey(a, b)]; return !!(r && r.s === 'peace' && r.ob); };
+  const canCross = (mover, land) => land === null || land === mover || isAlly(mover, land) || atWar(mover, land) || pairOb(mover, land);
+  function borderBlock(owner, sx, sy) {
+    const home = terrOwner(sx, sy);
+    return (x, y) => { const l = terrOwner(x, y); return !(l === null || l === home || canCross(owner, l)); };
+  }
   // a mine pays the realm that holds the land it stands on
   const mineSupplied = (o) => o.owner !== null && o.owner !== undefined && terrOwner(o.x, o.y) === o.owner;
 
@@ -2318,7 +2335,7 @@
   const relObj = (a, b) => (G.rel = G.rel || {})[relKey(a, b)] || null;
   const hasFlag = (id, k) => { const r = relObj(0, id); return !!(r && r.s === 'peace' && r[k]); };
   const isFriend = (id) => hasFlag(id, 'f');
-  function setFlag(id, k, v) { const key = relKey(0, id); G.rel = G.rel || {}; const r = G.rel[key] || (G.rel[key] = { s: 'peace', since: 0, truce: 0 }); r[k] = v; }
+  function setFlag(id, k, v) { pairObj(0, id)[k] = v; }
   const sharesVision = (id) => allyOfPlayer(id) || (G.dip && hasFlag(id, 'ob'));
   const TRUCE = 10;
   function setRel(a, b, s) { (G.rel = G.rel || {})[relKey(a, b)] = { s, since: G.day, truce: s === 'peace' ? G.day + TRUCE : 0 }; }   // a made peace holds for 10 days: nobody may declare war until then
@@ -2356,6 +2373,8 @@
       G.res[d.t] += d.tq; if (d.t === 'food') ai.food = (ai.food || 0) - d.tq; else ai.gold -= d.t === 'gold' ? d.tq : Math.round(d.tq * RES_VALUE[d.t]);
       d.left--; return d.left > 0;
     });
+    // rivals at peace with each other sometimes open their borders
+    for (const a of live) for (const b of live) if (a.id < b.id && !atWar(a.id, b.id) && !isAlly(a.id, b.id) && !pairOb(a.id, b.id) && Math.random() < 0.04) pairObj(a.id, b.id).ob = true;
     // opinions drift toward what the relationship deserves: long peace warms, war chills
     for (const ai of live) { const tgt = isAlly(ai.id, 0) ? 45 : atWar(ai.id, 0) ? -45 : isFriend(ai.id) ? 30 : 18; ai.op = (ai.op || 0) + Math.sign(tgt - (ai.op || 0)) * Math.min(1, Math.abs(tgt - (ai.op || 0))); }
     // wars wear out: a losing side asks for peace (you are asked, rivals just agree)
@@ -2427,7 +2446,7 @@
       const fr = isFriend(id), ob = hasFlag(id, 'ob'), cw = G.ais.some(o => o.alive && o.id !== id && atWar(0, o.id) && !atWar(id, o.id) && !isAlly(id, o.id));
       const btns = !ai.alive ? '' : ally ? `<button data-d="trade:${id}">⚖ Trade</button><button data-d="gift:${id}">🎁 Gift</button>${cw ? `<button data-d="join:${id}">⚔ Call to war</button>` : ''}<button data-d="break:${id}">Break alliance</button>`
         : war ? `<button data-d="peace:${id}">🕊 Propose peace</button><button data-d="demand:${id}">📜 Demand</button>`
-          : `<button data-d="trade:${id}">⚖ Trade</button><button data-d="gift:${id}">🎁 Gift</button><button data-d="demand:${id}">📜 Demand</button>${fr ? '' : `<button data-d="friend:${id}">🙂 Friendship</button>`}${fr ? `<button data-d="ob:${id}">${ob ? '👁 End shared vision' : '👁 Shared vision'}</button>${cw ? `<button data-d="join:${id}">⚔ Call to war</button>` : ''}<button data-d="ally:${id}">🤝 Alliance</button>` : ''}<button data-d="denounce:${id}">📢 Denounce</button><button data-d="war:${id}"${truceLeft(0, id) ? ' disabled' : ''} title="${truceLeft(0, id) ? 'Peace treaty: no war for ' + truceLeft(0, id) + ' more day(s)' : ''}">⚔ Declare war${truceLeft(0, id) ? ' (truce ' + truceLeft(0, id) + 'd)' : ''}</button>`;
+          : `<button data-d="trade:${id}">⚖ Trade</button><button data-d="gift:${id}">🎁 Gift</button><button data-d="demand:${id}">📜 Demand</button>${fr ? '' : `<button data-d="friend:${id}">🙂 Friendship</button>`}<button data-d="ob:${id}">${ob ? '🚪 Close borders' : '🚪 Open borders'}</button>${fr ? `${cw ? `<button data-d="join:${id}">⚔ Call to war</button>` : ''}<button data-d="ally:${id}">🤝 Alliance</button>` : ''}<button data-d="denounce:${id}">📢 Denounce</button><button data-d="war:${id}"${truceLeft(0, id) ? ' disabled' : ''} title="${truceLeft(0, id) ? 'Peace treaty: no war for ' + truceLeft(0, id) + ' more day(s)' : ''}">⚔ Declare war${truceLeft(0, id) ? ' (truce ' + truceLeft(0, id) + 'd)' : ''}</button>`;
       return `<div class="trow" style="display:block"><div><span class="zdot" style="background:${ownCol(id)};color:${ownCol(id)}"></span> <b>${FACTIONS[ai.fac].icon} ${FACTIONS[ai.fac].name} realm</b> — ${st}${ai.alive ? `<br><span class="small" title="${(ai.opLog || []).map(l => (l.v > 0 ? '+' : '') + l.v + ' ' + l.why).join('\n') || 'Nothing has happened yet.'}">Opinion of you: <b>${opWord(opOf(id))} (${opOf(id) > 0 ? '+' : ''}${Math.round(opOf(id))})</b> · ${PERS[ai.pers].n} — ${PERS[ai.pers].tip}. ${tw} town${tw === 1 ? '' : 's'}, ${ai.heroes.length} hero${ai.heroes.length === 1 ? '' : 'es'} — ${word(realmPower(id) / realmPower(0))}</span>` : ''}</div><div class="acts" style="margin-top:6px">${btns}</div></div>`;
     }).join('');
     const dealsHtml = (G.deals || []).length ? `<h4>Standing deals</h4>` + G.deals.map((d, i) => `<div class="trow" style="display:flex;justify-content:space-between;align-items:center"><span>${RES_ICON[d.g]}${d.gq} ⇄ ${RES_ICON[d.t]}${d.tq} a day with the ${FN(d.id)} realm — ${d.left} day(s) left</span><button data-d="cancel:${i}">Cancel</button></div>`).join('') : '';
@@ -2443,9 +2462,9 @@
         else await showModal(`<h2>✋ Refused</h2><p>"${opOf(id) < 20 ? 'We do not know you well enough — we need to think of you as friendly first (opinion +20).' : 'Give it a little more time.'}"</p>`);
       }
       else if (k === 'ob') {
-        if (hasFlag(id, 'ob')) { setFlag(id, 'ob', false); toast('Shared vision ended.'); }
-        else if (isFriend(id) && opOf(id) >= 20) { setFlag(id, 'ob', true); recomputeVision(); await showModal(`<h2>👁 Shared vision</h2><p>You and the ${FN(id)} realm now see what the other sees.</p>`); }
-        else await showModal(`<h2>✋ Refused</h2><p>"We keep our lands to ourselves."</p>`);
+        if (hasFlag(id, 'ob')) { setFlag(id, 'ob', false); toast('Borders closed again.'); }
+        else if (opOf(id) >= 10) { setFlag(id, 'ob', true); recomputeVision(); await showModal(`<h2>🚪 Open borders</h2><p>Your heroes may cross the ${FN(id)} realm's land and theirs may cross yours. You also share what you see.</p>`); }
+        else await showModal(`<h2>✋ Refused</h2><p>"${opOf(id) < 0 ? 'Keep out of our land.' : 'We do not let strangers cross our land. Earn our goodwill first (opinion +10).'}"</p>`);
       }
       else if (k === 'denounce') {
         const i = await showModal(`<h2>📢 Denounce the ${FN(id)} realm?</h2><p>They will think much less of you, and any friendship or shared vision ends. Realms at war with them approve. It is a step toward war — going to war soon after is seen as justified.</p>`, ['Cancel', '📢 Denounce']);
@@ -3178,5 +3197,5 @@
   }
   if (/[?&]demo/.test(location.search)) Assets.ready.then(() => setTimeout(() => { try { newGame('castle', 'Orrin', 'normal', { size: 'medium', seed: 'demo', wrap: true }); $('title').classList.add('hide'); demo(); } catch (e) { console.error('demo failed', e); } }, 400));
   window.__G = () => G;
-  window.__dbg = { terrOwner, openDiplomacy, aiDiplomacy, declareWar, atWar, realmPower, demo, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
+  window.__dbg = { borderBlock, canCross, terrOwner, openDiplomacy, aiDiplomacy, declareWar, atWar, realmPower, demo, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
 })();

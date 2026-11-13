@@ -379,6 +379,7 @@ function objAt(G, x, y) { return G.omap.get(y * G.W + x); }
 function reachMap(G, sx, sy, budget, sail, caps) {
   const W = G.W, H = G.H, dist = new Map([[sy * W + sx, 0]]), open = [[0, sx, sy]];
   const cost = (nx, ny) => {
+    if (caps && caps.block && caps.block(nx, ny)) return 0;   // a closed border
     const t = G.tiles[ny][nx], c = TCOST[t];
     let v;
     if (sail) v = t === T.WATER ? 100 - 10 * ((caps && caps.nav) || 0) : 0;
@@ -431,6 +432,7 @@ function findPath(G, sx, sy, tx, ty, ignoreObjs, sail, caps) {
   if (tx < 0 || ty < 0 || tx >= W || ty >= H) return null;
   const target = k(tx, ty);
   const tcost0 = (nx, ny, nk) => {
+    if (caps && caps.block && caps.block(nx, ny)) return 0;   // a closed border
     const t = G.tiles[ny][nx], c = TCOST[t];
     if (sail) return t === T.WATER ? 100 - 10 * ((caps && caps.nav) || 0) : (c && nk === target ? c : 0);
     if (t === T.WATER) {

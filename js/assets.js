@@ -9,7 +9,7 @@ const Assets = (() => {
   const BASE = 'art/', stems = {}, files = {}, pending = {};
   let index = null; const packP = {};
   const stem = (f) => f.replace(/\.(png|webp|jpe?g|svg|gif)$/i, '');
-  const LATER = /^(poses|mounted|anim|buildings)\/|^ui\/(castle_select|hero_select|adventure|town_)/;
+  const LATER = /^(poses|mounted|anim|buildings|heroes)\/|^ui\/(castle_select|hero_select|adventure|town_)/;
   const IDLE = /^anim\/[^/]+\/idle_1$|^poses\/left\/idle\//;   // the battle art that stands for a creature in every picture
   const MIME = { webp: 'image/webp', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', svg: 'image/svg+xml', gif: 'image/gif' };
   const progress = (done, total) => { try { document.dispatchEvent(new CustomEvent('assets-progress', { detail: { done, total } })); } catch (e) { /* ignore */ } };
@@ -36,12 +36,13 @@ const Assets = (() => {
     }));
   };
   const pool = async (list, n, each) => { let k = 0; const w = async () => { while (k < list.length) { const s = list[k++]; await loadOne(s); if (each) each(); } }; await Promise.all(Array.from({ length: n }, w)); };
+  const indexP = fetch(BASE + 'packs/index.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).catch(() => null);   // asked for at once, not after the manifest
   const ready = fetch(BASE + 'manifest.json', { cache: 'no-cache' })
     .then(r => (r.ok ? r.json() : null)).catch(() => null)
     .then(async (m) => {
       const list = (m && m.files) || []; if (!list.length) return 0;
       list.forEach(f => { files[stem(f)] = f; });
-      try { const r = await fetch(BASE + 'packs/index.json', { cache: 'no-cache' }); if (r.ok) index = await r.json(); } catch (e) { index = null; }
+      index = await indexP;
       const all = Object.keys(files);
       let eager;
       if (index) {

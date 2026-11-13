@@ -241,7 +241,7 @@
     G.heroes.push(h); setActive(0); learn(def.spells); rollTavern();
     if (map.scn && map.scn.bonus) for (const k in map.scn.bonus) G.res[k] = (G.res[k] || 0) + map.scn.bonus[k];
     G.fog = map.fog !== false; initFog();
-    reindex(G); buildTerrain(); sizeMini(); centerOn(h.x, h.y); renderAll(); recentreSoon();
+    reindex(G); buildTerrain(); sizeMini(); centerOn(h.x, h.y); renderAll(); recentreSoon(); needHeroArt();
     toast(`${MAPS[preset].name} (${SIZES[size].name}, seed ${seed}) · ${D.name}: defeat ${nAI > 1 ? 'all ' + nAI + ' rivals by capturing their towns' : 'the rival by capturing their towns'}. Good luck, ${h.name}!`);
   }
   const saveJSON = () => JSON.stringify(G, (k, v) => (k === 'omap' || k === 'hero' || k[0] === '_') ? undefined : v);
@@ -249,6 +249,10 @@
   function saveTo(key) { try { localStorage.setItem(key, saveJSON()); localStorage.setItem(key + '_meta', JSON.stringify(metaNow())); return true; } catch (e) { return false; } }
   function save() { toast(saveTo(SAVE) ? 'Game saved.' : 'Save failed.'); }
   function autosave() { if (saveTo(SAVE)) { const el = $('autosave'); el.classList.remove('hide'); el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; setTimeout(() => el.classList.add('hide'), 1800); } }
+  // hero busts stream in after the loader: fetch the ones a game in progress shows (its heroes, the tavern's)
+  function needHeroArt() {
+    try { const ids = [...(G.heroes || []).map(h => h.pid), ...(G.tavern || [])].filter(Boolean).map(p => 'heroes/' + p).filter(s => Assets.has(s) && !Assets.get(s)); if (ids.length) Assets.need(ids).then(() => renderAll()); } catch (e) { /* ignore */ }
+  }
   function load(key = SAVE) {
     try {
       const s = localStorage.getItem(key); if (!s) return false;
@@ -256,7 +260,7 @@
       WRAP_W = G.wrap ? G.W : 0;
       G.tavern = (G.tavern || []).filter(id => HEROES[id]);
       G.path = null; G.boats = G.boats || []; setFaction(G.faction); applyTheme(G.faction); setActive(Math.min(G.sel, G.heroes.length - 1));
-      initFog(); reindex(G); buildTerrain(); sizeMini(); centerOn(G.hero.x, G.hero.y); renderAll(); recentreSoon(); return true;
+      initFog(); reindex(G); buildTerrain(); sizeMini(); centerOn(G.hero.x, G.hero.y); renderAll(); recentreSoon(); needHeroArt(); return true;
     } catch (e) { return false; }
   }
 
@@ -2886,6 +2890,7 @@
   const heroArt = (icon, px, pid) => typeof Assets !== 'undefined' && pid && Assets.has('heroes/' + pid) ? `<img class="hart" draggable="false" width="${px}" height="${px}" alt="" src="${Assets.src('heroes/' + pid)}">` : Art.heroPic(icon, ownCol(0), px, pid);
   function showHeroSelect(f, diff = 'normal', map = {}, pick) {
     const ti = factionTiers(f), list = FACTIONS[f].heroes.map(([n]) => Object.assign({ key: n }, HEROES[n])); pick = pick || Settings.mem('lastHero:' + f) || list[0].key;
+    { const miss = list.map(d => 'heroes/' + d.id).filter(s => Assets.has(s) && !Assets.get(s)); if (miss.length) Assets.need(miss).then(() => { if ($('mbox').querySelector('.hsgrid')) showHeroSelect(f, diff, map, pick); }); }
     const cur = list.find(d => d.key === pick) || list[0];
     const tiles = list.map(d => `<button class="htile${d === cur ? ' on' : ''}" data-hid="${d.key}">${heroArt(d.i, 84, d.id)}<span>${d.name}</span><small>${clsLabel(d.cls)}</small></button>`).join('');
     const army = startArmy(cur, f).filter(Boolean).map(a => [a.t, a.n]);

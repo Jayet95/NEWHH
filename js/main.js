@@ -560,12 +560,12 @@
     if (!RM()) drawWaterGlints(x0, y0, vx, vy, now);
     cx.textAlign = 'center'; cx.textBaseline = 'middle';
     cx.lineWidth = 2; cx.strokeStyle = 'rgba(255,255,255,.45)';
-    const zo = {}; for (const o of G.objs) if (o.t === 'fort' || o.t === 'town') zo[o.zone] = o.owner;
+    const TG = terrGrid();
     for (let y = Math.max(0, y0); y < Math.min(G.H, y0 + vy); y++) for (let x = Math.max(0, x0); x < Math.min(G.W, x0 + vx); x++) {
-      const z = G.zone[y][x], ow = zo[z], px = hcx(x, y) - cam.x, py = hcy(y) - cam.y;
-      if (ow !== null && ow !== undefined && G.tiles[y][x] !== T.WATER) { Art.hexPath(cx, px, py, HR + 0.5); cx.fillStyle = ownFill(ow, 0.2); cx.fill(); }
+      const z = TG[y * G.W + x], px = hcx(x, y) - cam.x, py = hcy(y) - cam.y;
+      if (z && G.tiles[y][x] !== T.WATER) { Art.hexPath(cx, px, py, HR + 0.5); cx.fillStyle = ownFill(z - 1, 0.2); cx.fill(); }
       const hn = hexNb(x, y);
-      for (let e = 0; e < 3; e++) { const nx = hn[e][0], ny = hn[e][1]; if (nx >= 0 && ny >= 0 && nx < G.W && ny < G.H && G.zone[ny][nx] !== z) { const p1 = Art.hexPt(px, py, HR, e), p2 = Art.hexPt(px, py, HR, e + 1); cx.beginPath(); cx.moveTo(p1[0], p1[1]); cx.lineTo(p2[0], p2[1]); cx.stroke(); } }
+      for (let e = 0; e < 3; e++) { const nx = hn[e][0], ny = hn[e][1]; if (nx >= 0 && ny >= 0 && nx < G.W && ny < G.H && TG[ny * G.W + nx] !== z) { const p1 = Art.hexPt(px, py, HR, e), p2 = Art.hexPt(px, py, HR, e + 1); cx.beginPath(); cx.moveTo(p1[0], p1[1]); cx.lineTo(p2[0], p2[1]); cx.stroke(); } }
     }
     // tiles the selected hero can still walk to today (soft gold glow with a thin edge)
     if (Settings.showReach && !busy && G.hero && G.hero.move > 0 && !G.over) {
@@ -683,14 +683,13 @@
   const MC = { [T.GRASS]: '#4a7c3a', [T.FOREST]: '#2f5a2a', [T.MOUNT]: '#666', [T.WATER]: '#285c92', [T.ROAD]: '#a88a5a', [T.SAND]: '#c8b26c' };
   function drawMini() {
     const k = MK;
-    const zo = {}; for (const o of G.objs) if (o.t === 'fort' || o.t === 'town') zo[o.zone] = o.owner;
-    const sig = Object.keys(zo).map(z => zo[z]).join(',');
+    const TG = terrGrid(), sig = terrSig + ':' + G.W;
     if (sig !== miniSig) {
       miniSig = sig;
       const c = miniCache.getContext('2d'); c.drawImage(miniTerr, 0, 0);
       for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) {
-        const ow = zo[G.zone[y][x]];
-        if (ow !== null && ow !== undefined) { c.fillStyle = ownFill(ow, 0.4); c.fillRect(mxp(x, y, k), y * MV, k + 0.7, MV + 0.7); }
+        const ow = TG[y * G.W + x] - 1;
+        if (ow >= 0) { c.fillStyle = ownFill(ow, 0.4); c.fillRect(mxp(x, y, k), y * MV, k + 0.7, MV + 0.7); }
       }
     }
     mx.drawImage(miniCache, 0, 0);
@@ -775,7 +774,7 @@
     $('bSleep').onclick = () => { h.sleep = !h.sleep; toast(h.sleep ? `${h.name} is resting — no more reminders.` : `${h.name} is awake.`); renderAll(); };
     $('bEquip').onclick = () => { if (!busy) openEquip(G.hero); };
     const zs = G.objs.filter(o => o.t === 'fort' || o.t === 'town').sort((a, b) => a.zone - b.zone);
-    const mineIncome = G.objs.filter(o => o.t === 'mine' && o.owner === 0 && zoneOwner(G, G.zone[o.y][o.x]) === 0).length;
+    const mineIncome = G.objs.filter(o => o.t === 'mine' && o.owner === 0 && terrOwner(o.x, o.y) === 0).length;
     const mine = zs.filter(z => z.owner === 0), rest = zs.length - mine.length;
     { const tp = $('townsPanel'); if (tp) {
       const mt = myTowns(), cur = (typeof curTown !== 'undefined' && curTown) || null;
@@ -954,9 +953,9 @@
       case 'spring': return `<b>${SPRING[o.kind].n}</b><br>${SPRING[o.kind].d}<br><span class="small">Once per week per hero.</span>`;
       case 'wreck': return `<b>Shipwreck</b><br>Salvage: ${RES_ICON.gold}${o.gold} + ${RES_ICON[o.res]}${g}`;
       case 'mine': {
-        const supplied = o.owner === 0 && zoneOwner(G, G.zone[o.y][o.x]) === 0;
+        const supplied = o.owner === 0 && terrOwner(o.x, o.y) === 0;
         return `<b>${o.kind[0].toUpperCase() + o.kind.slice(1)} mine</b> (${o.owner === 0 ? 'yours' : o.owner ? 'held by a rival' : 'unclaimed'}) +${MINE_YIELD[o.kind]}/day` +
-          (o.owner === 0 && !supplied ? '<br>⚠ Pays nothing: you do not hold this zone' : o.owner !== 0 ? '<br>Pays only if you also hold its zone' : '') + g;
+          (o.owner === 0 && !supplied ? '<br>⚠ Pays nothing: the land around it belongs to someone stronger' : o.owner !== 0 ? '<br>Take it and its land becomes yours — it pays once the border is yours' : '') + g;
       }
       case 'fort': {
         const gn = o.garrison.reduce((s, a) => s + (a ? a.n : 0), 0);
@@ -2132,7 +2131,7 @@
       if (o.owner !== ai.id) continue;
       if (o.t === 'town') g += 500 + (o.b && o.b.hall ? HALL_LEVELS[o.b.hall].inc : 0);
       else if (o.t === 'fort') g += FORT_INCOME;
-      else if (o.t === 'mine' && zoneOwner(G, G.zone[o.y][o.x]) === ai.id) g += MINE_YIELD[o.kind] * RES_VALUE[o.kind];
+      else if (o.t === 'mine' && terrOwner(o.x, o.y) === ai.id) g += MINE_YIELD[o.kind] * RES_VALUE[o.kind];
     }
     return Math.round(g * DF().aiInc);
   }
@@ -2261,6 +2260,36 @@
     }
     return false;
   }
+
+  // ---------- Borders: every building you hold claims the land around it; the strongest claim on a tile wins ----------
+  // [radius, bonus]: towns reach far and win close contests, a captured mine or dwelling claims a small patch of its own. A fort or town also keeps its whole zone as a weak base claim.
+  const CLAIM = { town: [8, 2], fort: [5, 1], mine: [3, 0], dwelling: [3, 0], lair: [4, 0] };
+  let terrA = null, terrSig = 0, terrG = null;
+  function terrGrid() {
+    let h = G.objs.length;
+    for (const o of G.objs) if (CLAIM[o.t] || o.t === 'fort') h = (h * 31 + (o.owner === null || o.owner === undefined ? 0 : o.owner + 1) * 7 + o.x * 13 + o.y * 17) | 0;
+    if (terrA && terrG === G && terrSig === h) return terrA;
+    const W = G.W, H = G.H, a = new Uint8Array(W * H), best = new Float32Array(W * H);
+    const zo = {}; for (const o of G.objs) if ((o.t === 'fort' || o.t === 'town') && o.owner !== null && o.owner !== undefined) zo[o.zone] = o.owner;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const ow = zo[G.zone[y][x]]; if (ow !== undefined && G.tiles[y][x] !== T.WATER) { a[y * W + x] = ow + 1; best[y * W + x] = 0.5; } }
+    for (const o of G.objs) {
+      const c = CLAIM[o.t]; if (!c || o.owner === null || o.owner === undefined) continue;
+      const seen = new Map([[o.y * W + o.x, 0]]); let frontier = [[o.x, o.y]];
+      for (let d = 0; d <= c[0] && frontier.length; d++) {
+        const next = [], s = c[0] + c[1] - d + 0.6;
+        for (const [x, y] of frontier) {
+          const i = y * W + x;
+          if (G.tiles[y][x] !== T.WATER && s > best[i]) { best[i] = s; a[i] = o.owner + 1; }
+          if (d < c[0]) for (const [nx, ny] of hexNb(x, y)) { if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue; const k = ny * W + nx; if (!seen.has(k)) { seen.set(k, d + 1); next.push([nx, ny]); } }
+        }
+        frontier = next;
+      }
+    }
+    terrA = a; terrSig = h; terrG = G; return a;
+  }
+  const terrOwner = (x, y) => { const v = terrGrid()[y * G.W + x]; return v ? v - 1 : null; };
+  // a mine pays the realm that holds the land it stands on
+  const mineSupplied = (o) => o.owner !== null && o.owner !== undefined && terrOwner(o.x, o.y) === o.owner;
 
   // ---------- Diplomacy: everyone starts at peace; war has to be declared; trade, demands, alliances ----------
   const FN = (id) => FACTIONS[aiById(id).fac].name;
@@ -2541,7 +2570,7 @@
     for (const t of myTowns()) if (t.b.hall) gain.gold += HALL_LEVELS[t.b.hall].inc;
     for (const h of G.heroes) gain.gold += 300 * perk(h, 'estates');
     for (const o of G.objs) {
-      if (o.t === 'mine' && o.owner === 0 && zoneOwner(G, G.zone[o.y][o.x]) === 0) gain[o.kind] += MINE_YIELD[o.kind] * ((G.wk && G.wk.mineMul) || 1);
+      if (o.t === 'mine' && o.owner === 0 && terrOwner(o.x, o.y) === 0) gain[o.kind] += MINE_YIELD[o.kind] * ((G.wk && G.wk.mineMul) || 1);
       if (o.t === 'fort' && o.owner === 0) gain.gold += FORT_INCOME;
     }
     RES.forEach(k => { gain[k] = Math.round(gain[k] * DF().income); });
@@ -2703,7 +2732,7 @@
     <b>On a phone:</b> drag to pan, pinch to zoom, tap a tile to preview the path and tap it again to go; in battle, tap a hex twice to confirm. Use the bottom bar for End Turn, Town and heroes.</p>
     <p><b>Sea:</b> build a Shipyard in town, then boats at the port by the bay. Walk a hero onto a boat to sail; collect floating treasures, salvage shipwrecks, fight sea monsters, and disembark on any shore tile. Pick the map type, size and seed when starting a game.</p>
     <p><b>Events:</b> every new week brings a weekly event (double growth for a creature, plague, bountiful harvest, merchant caravans, heroic training...) and most days a random event may strike — treasure, bandits, mercenaries, storms, rumors.</p>
-    <p><b>Territory:</b> the map is split into zones, each ruled by a fort. Capture a fort to own the zone: +${FORT_INCOME} gold/day, your mines there pay, +${MILITIA} militia/week. <b>Station troops in forts</b> — the enemy hero raids undefended forts.</p>
+    <p><b>Borders:</b> every building you hold claims the land around it (towns reach furthest, a captured mine or dwelling claims a small patch); where claims meet, the stronger one wins, and your mines pay when they stand on your land. <b>Territory:</b> the map is split into zones, each ruled by a fort. Capture a fort to own the zone: +${FORT_INCOME} gold/day, your mines there pay, +${MILITIA} militia/week. <b>Station troops in forts</b> — the enemy hero raids undefended forts.</p>
     <p><b>Town:</b> Town Hall levels 1-5 raise income and unlock dwellings (tiers 3-7) and creature upgrades (up to 5 levels). Arcane Lodge teaches spells, the Merchant Row trades resources, the Tavern hires up to ${MAX_HEROES} heroes.</p>
     <p><b>Fog of war:</b> unexplored land is black; explored land you no longer see is dimmed and hides monsters and rival heroes. Heroes see 6 tiles (+1 per Far-Sight rank), towns 9, forts 6. Observation towers and scouts reveal large areas. <b>Adventure sites:</b> dwellings (capture, then recruit weekly), windmills / water wheels / gardens (weekly resources), learning stones (experience), shrines (spells), creature banks (guarded treasure), monoliths (teleport pairs), seers (trade resources for an artifact) and springs (mana, movement or luck).</p>
     <p><b>Defenses:</b> build Fortifications (Citadel → Castle → Fortress) to strengthen walls, gate and arrow towers, and a Minefield for hidden mines in front of the walls — mines hurt and halt attackers. When you defend, you can also lay mines yourself (💣 button, key M); even without a minefield you get ${EMERGENCY_MINES}. Forts can be fortified too.</p>
@@ -3040,7 +3069,7 @@
     for (const t of myTowns()) if (t.b.hall) lines.push({ l: `🏛 ${t.name} — ${HALL_LEVELS[t.b.hall].n}`, r: { gold: HALL_LEVELS[t.b.hall].inc } });
     for (const h of G.heroes) if (perk(h, 'estates')) lines.push({ l: `🏠 ${h.name} — Stewardship`, r: { gold: 300 * perk(h, 'estates') } });
     for (const o of G.objs) {
-      if (o.t === 'mine' && o.owner === 0) { const ok = zoneOwner(G, G.zone[o.y][o.x]) === 0; lines.push({ l: `⛏ ${cap(o.kind)} mine`, r: ok ? { [o.kind]: MINE_YIELD[o.kind] * mm } : {}, warn: ok ? '' : 'pays nothing — you do not hold its zone (capture the fort or town of that zone)', x: o.x, y: o.y }); }
+      if (o.t === 'mine' && o.owner === 0) { const ok = terrOwner(o.x, o.y) === 0; lines.push({ l: `⛏ ${cap(o.kind)} mine`, r: ok ? { [o.kind]: MINE_YIELD[o.kind] * mm } : {}, warn: ok ? '' : 'pays nothing — you do not hold its zone (capture the fort or town of that zone)', x: o.x, y: o.y }); }
       if (o.t === 'fort' && o.owner === 0) lines.push({ l: `🏯 ${o.name}`, r: { gold: FORT_INCOME } });
     }
     const gain = computeGain(), fmt = (r) => Object.keys(r).filter(k => r[k]).map(k => `+${Math.round(r[k] * mul)}${RES_ICON[k]}`).join(' ') || '—';
@@ -3059,7 +3088,7 @@
       return `<div class="trow" style="grid-template-columns:42px 1fr auto"><div class="ic">${TownArt.pic('hall', Math.max(1, t.b.hall), t.fac, 38)}</div><div><b>${t.name}</b> <span class="small">${FACTIONS[t.fac].name} · ${t.b.hall ? HALL_LEVELS[t.b.hall].n : 'Settlement'} · ${FORT_LEVELS[t.fort || 0].n}</span><br><span class="small">Garrison ${gar} · recruits waiting ${rec}</span></div><div class="acts"><button data-kt="${towns.indexOf(t)}">Open</button>${locBtn(t.x, t.y)}</div></div>`; }).join('');
     const hRows = G.heroes.map((h, i) => `<div class="trow" style="grid-template-columns:42px 1fr auto"><div class="ic">${Art.heroPic(h.icon, ownCol(0), 38, h.pid)}</div><div><b>${h.name}</b> <span class="small">${clsLabel(h.cls)} L${h.lvl}${h.sleep ? ' · 💤' : ''}</span><br><span class="small">${armyList(h.army, false) || 'no army'} · move ${Math.round(100 * h.move / maxMove(h))}%</span></div><div class="acts"><button data-kh="${i}">Select</button>${locBtn(h.x, h.y)}</div></div>`).join('');
     const holds = G.objs.filter(o => o.owner === 0 && (o.t === 'mine' || o.t === 'fort' || o.t === 'dwelling' || o.t === 'lair')).map(o => {
-      const nm = o.t === 'mine' ? `⛏ ${cap(o.kind)} mine${zoneOwner(G, G.zone[o.y][o.x]) === 0 ? '' : ' ⚠ not paying'}` : o.t === 'fort' ? `🏯 ${o.name}` : o.t === 'lair' ? '🐲 Dragon Lair' : `🛖 ${C[dwId(o)].n} dwelling (${o.avail})`;
+      const nm = o.t === 'mine' ? `⛏ ${cap(o.kind)} mine${terrOwner(o.x, o.y) === 0 ? '' : ' ⚠ not paying'}` : o.t === 'fort' ? `🏯 ${o.name}` : o.t === 'lair' ? '🐲 Dragon Lair' : `🛖 ${C[dwId(o)].n} dwelling (${o.avail})`;
       return `<div class="trow" style="grid-template-columns:1fr auto"><div>${nm}</div><div class="acts">${locBtn(o.x, o.y)}</div></div>`; }).join('');
     const cars = (G.caravans || []).map(c => `<div class="small">🚚 ${armyList(c.army, false)} → ${(townAt(c.tx, c.ty) || { name: '?' }).name} in ${c.eta} day${c.eta === 1 ? '' : 's'}</div>`).join('');
     modalOpen(`<h2>📋 Kingdom</h2><div class="small">Day ${G.day} · ${towns.length} town${towns.length === 1 ? '' : 's'} · ${G.heroes.length} hero${G.heroes.length === 1 ? '' : 'es'} · army strength ${fmtN(Math.round(power))}</div>
@@ -3149,5 +3178,5 @@
   }
   if (/[?&]demo/.test(location.search)) Assets.ready.then(() => setTimeout(() => { try { newGame('castle', 'Orrin', 'normal', { size: 'medium', seed: 'demo', wrap: true }); $('title').classList.add('hide'); demo(); } catch (e) { console.error('demo failed', e); } }, 400));
   window.__G = () => G;
-  window.__dbg = { openDiplomacy, aiDiplomacy, declareWar, atWar, realmPower, demo, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
+  window.__dbg = { terrOwner, openDiplomacy, aiDiplomacy, declareWar, atWar, realmPower, demo, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
 })();

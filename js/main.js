@@ -226,7 +226,7 @@
       res: { gold: D.gold, wood: r(20), ore: r(20), mercury: r(5), sulfur: r(5), crystal: r(5), gems: r(5) }, spells: [...START_SPELLS],
       wk: {}, heroes: [], sel: 0, hero: null, tavern: [], noTown: 0,
       col: (() => { const pc = Math.max(0, Math.min(7, map.color || 0)), free = PALETTE.map((p, i) => i).filter(i => i !== pc); return [PALETTE[pc][1], ...aiFacs.map((f, i) => PALETTE[free[i % free.length]][1])]; })(),
-      ais: aiFacs.map((f, i) => ({ id: i + 1, fac: f, name: FACTIONS[f].name, gold: Math.round(3000 * D.aiInc), heroes: [], alive: true, spawnWait: 0, team: ({ ally: 1, bloc: 2 }[(map.teams || [])[i]] || 3 + i) })) };
+      ais: aiFacs.map((f, i) => ({ id: i + 1, fac: f, name: FACTIONS[f].name, gold: Math.round(3000 * D.aiInc), heroes: [], alive: true, spawnWait: 0, pers: persPick(), team: ({ ally: 1, bloc: 2 }[(map.teams || [])[i]] || 3 + i) })) };
     if (G.ais.every(a => a.team === 1)) G.ais[0].team = 3;
     G.wrap = wrap; WRAP_W = wrap ? G.W : 0;
     G.dip = !map.scn && map.dip !== false; G.rel = {};   // diplomacy: everyone at peace until war is declared (scenarios keep the old rules)
@@ -291,13 +291,22 @@
       }
     }
   }
+  // with fog of war a realm is unknown until you see one of its heroes or lands: only then can you trade or declare war
+  function meetRealms() {
+    if (!G.dip) return; G.met = G.met || {};
+    for (const a of G.ais) {
+      if (G.met[a.id] || !a.alive) continue;
+      if (!fogOn() || (vis && (G.objs.some(o => o.owner === a.id && isVis(o.x, o.y)) || a.heroes.some(h => isVis(h.x, h.y))))) { G.met[a.id] = true; if (fogOn()) toast(`🕊 You have met the ${FACTIONS[a.fac].name} realm — diplomacy with them is open.`); }
+    }
+  }
   function recomputeVision() {
-    if (!fogOn() || !vis) return;
+    if (!fogOn() || !vis) { meetRealms(); return; }
     vis.fill(0);
     for (const h of G.heroes) markView(h.x, h.y, 6 + perk(h, 'scouting'));
     for (const o of G.objs) if (o.owner === 0 || allyOfPlayer(o.owner)) markView(o.x, o.y, o.t === 'town' ? 9 : o.t === 'fort' ? 6 : 4);
     for (const a of G.ais) if (allyOfPlayer(a.id)) for (const ah of a.heroes) markView(ah.x, ah.y, 6);
     for (const b of G.boats) markView(b.x, b.y, 3);
+    meetRealms();
   }
   let MK = 6, miniTerr = null, miniCache = null, miniSig = '';
   let MV = 5;
@@ -2253,6 +2262,14 @@
 
   // ---------- Diplomacy: everyone starts at peace; war has to be declared; trade, demands, alliances ----------
   const FN = (id) => FACTIONS[aiById(id).fac].name;
+  const met = (id) => !G.dip || !fogOn() || !!(G.met && G.met[id]);
+  // each realm has a temperament: timid ones give in easily, proud ones need a lot of pressure, iron-willed ones never listen to a demand
+  const PERS = { meek: { n: 'Timid', mul: 0.55, aggr: 0.6, peace: 2.5, tip: 'gives in to demands easily' }, balanced: { n: 'Calculating', mul: 1, aggr: 1, peace: 1.6, tip: 'weighs the odds' }, proud: { n: 'Proud', mul: 1.6, aggr: 1.3, peace: 1.2, tip: 'only a crushing army makes them yield' }, stubborn: { n: 'Iron-willed', mul: Infinity, aggr: 1.5, peace: 0.9, tip: 'never listens to a demand' } };
+  const persOf = (id) => PERS[aiById(id).pers] || PERS.balanced;
+  // your diplomacy rank grows with your best hero's level: better trade rates and demands that need less strength
+  const dipRank = () => Math.min(6, 1 + Math.floor((Math.max(1, ...G.heroes.map(h => h.lvl || 1)) - 1) / 4));
+  const dipBonus = () => (dipRank() - 1) * 0.04;
+  function persPick() { const r = Math.random(); return r < 0.25 ? 'meek' : r < 0.6 ? 'balanced' : r < 0.85 ? 'proud' : 'stubborn'; }
   const nm = (id) => id === 0 ? 'you' : `the ${FN(id)} realm`;
   const relWord = (id) => allyOfPlayer(id) ? 'allied' : atWar(0, id) ? 'enemy' : 'neutral';
   function realmPower(id) {
@@ -2293,11 +2310,11 @@
     }
     // a realm that is at peace with everyone may pick a neighbour that looks weak
     for (const ai of live) {
-      if (G.day < 10 + ai.id * 2 || ids.some(o => o !== ai.id && atWar(ai.id, o)) || Math.random() > aggr) continue;
+      if (G.day < 10 + ai.id * 2 || ids.some(o => o !== ai.id && atWar(ai.id, o)) || Math.random() > aggr * (PERS[ai.pers] || PERS.balanced).aggr) continue;
       const mine = realmPower(ai.id), homes = G.objs.filter(t => t.t === 'town' && t.owner === ai.id); if (!homes.length) continue;
       let best = null;
       for (const o of ids) {
-        if (o === ai.id || isAlly(ai.id, o)) continue;
+        if (o === ai.id || isAlly(ai.id, o) || (o === 0 && !met(ai.id))) continue;
         const ot = G.objs.filter(t => t.t === 'town' && t.owner === o); if (!ot.length) continue;
         const them = realmPower(o); if (mine < them * 0.7) continue;
         const d = Math.min(...ot.flatMap(t => homes.map(h => hexDist(t, h)))), sc = (mine / them) * (o === 0 ? 1.15 : 1) / (1 + d / 40);
@@ -2310,7 +2327,7 @@
     }
     // a much stronger neighbour at peace with you may demand tribute
     for (const ai of live) {
-      if (G.day < 15 || !ai.alive || atWar(ai.id, 0) || isAlly(ai.id, 0) || Math.random() > 0.05 || (G.dipLog['t' + ai.id] || -99) > G.day - 12) continue;
+      if (G.day < 15 || !ai.alive || !met(ai.id) || atWar(ai.id, 0) || isAlly(ai.id, 0) || Math.random() > 0.05 || (G.dipLog['t' + ai.id] || -99) > G.day - 12) continue;
       if (realmPower(ai.id) < realmPower(0) * 2.2) continue;
       const gold = Math.round(Math.min(G.res.gold * 0.35, 800 + G.day * 60) / 50) * 50; if (gold < 300) continue;
       G.dipLog['t' + ai.id] = G.day;
@@ -2324,21 +2341,22 @@
     if (!G.dip) return toast('Diplomacy is off in this game: every rival is your enemy.');
     const word = (p) => p < 0.6 ? 'weaker than you' : p < 1.4 ? 'about your strength' : p < 2.5 ? 'stronger than you' : 'far stronger';
     const rows = G.ais.map(ai => {
+      if (!met(ai.id) && ai.alive) return `<div class="trow" style="display:block"><span class="zdot" style="background:#777"></span> <b>❓ An unknown realm</b><br><span class="small">You have not met them yet. Explore until you see their heroes or lands.</span></div>`;
       const id = ai.id, tw = G.objs.filter(o => o.t === 'town' && o.owner === id).length;
       const ally = isAlly(0, id), war = atWar(0, id);
       const st = !ai.alive ? 'eliminated' : ally ? '🤝 allied' : war ? '⚔ at war' : '🕊 at peace';
       const btns = !ai.alive ? '' : ally ? `<button data-d="trade:${id}">⚖ Trade</button><button data-d="break:${id}">Break alliance</button>`
         : war ? `<button data-d="peace:${id}">🕊 Propose peace</button><button data-d="demand:${id}">📜 Demand</button>`
           : `<button data-d="trade:${id}">⚖ Trade</button><button data-d="demand:${id}">📜 Demand</button><button data-d="ally:${id}">🤝 Alliance</button><button data-d="war:${id}">⚔ Declare war</button>`;
-      return `<div class="trow" style="display:block"><div><span class="zdot" style="background:${ownCol(id)};color:${ownCol(id)}"></span> <b>${FACTIONS[ai.fac].icon} ${FACTIONS[ai.fac].name} realm</b> — ${st}${ai.alive ? `<br><span class="small">${tw} town${tw === 1 ? '' : 's'}, ${ai.heroes.length} hero${ai.heroes.length === 1 ? '' : 'es'} — ${word(realmPower(id) / realmPower(0))}</span>` : ''}</div><div class="acts" style="margin-top:6px">${btns}</div></div>`;
+      return `<div class="trow" style="display:block"><div><span class="zdot" style="background:${ownCol(id)};color:${ownCol(id)}"></span> <b>${FACTIONS[ai.fac].icon} ${FACTIONS[ai.fac].name} realm</b> — ${st}${ai.alive ? `<br><span class="small">${PERS[ai.pers].n} — ${PERS[ai.pers].tip}. ${tw} town${tw === 1 ? '' : 's'}, ${ai.heroes.length} hero${ai.heroes.length === 1 ? '' : 'es'} — ${word(realmPower(id) / realmPower(0))}</span>` : ''}</div><div class="acts" style="margin-top:6px">${btns}</div></div>`;
     }).join('');
-    modalOpen(`<h2>🕊 Diplomacy</h2><p class="small">Everyone starts at peace: nobody may attack until war is declared. Trade resources and artifacts, demand towns from the weak, seek an alliance — or break the peace yourself.</p>${rows}<div class="mb"><button class="primary" id="dpClose">Close</button></div>`);
+    modalOpen(`<h2>🕊 Diplomacy</h2><p class="small">Your <b>diplomacy rank ${dipRank()}</b> (from your best hero's level): trades are ${Math.round(dipBonus() * 100)}% fairer and demands need ${Math.round(dipBonus() * 100)}% less strength. It rises as your heroes level up.</p><p class="small">Everyone starts at peace: nobody may attack until war is declared. Trade resources and artifacts, demand towns from the weak, seek an alliance — or break the peace yourself.</p>${rows}<div class="mb"><button class="primary" id="dpClose">Close</button></div>`);
     $('dpClose').onclick = closeModal;
     $('mbox').querySelectorAll('[data-d]').forEach(b => b.onclick = async () => {
       const [k, s] = b.dataset.d.split(':'), id = +s, ai = aiById(id), mine = realmPower(0), theirs = realmPower(id);
       if (k === 'war') { const i = await showModal(`<h2>⚔ Declare war on the ${FN(id)} realm?</h2><p>Their heroes and armies will come for you.</p>`, ['Cancel', '⚔ Declare war']); if (i === 1) declareWar(0, id); }
       else if (k === 'peace') {
-        if (relLen(0, id) >= 2 && theirs < mine * 1.6) { setRel(0, id, 'peace'); await showModal(`<h2>🕊 Peace</h2><p>The ${FN(id)} realm accepts. The war is over.</p>`); }
+        if (relLen(0, id) >= 2 && theirs < mine * PERS[ai.pers].peace) { setRel(0, id, 'peace'); await showModal(`<h2>🕊 Peace</h2><p>The ${FN(id)} realm accepts. The war is over.</p>`); }
         else await showModal(`<h2>✋ Refused</h2><p>"${relLen(0, id) < 2 ? 'The war has hardly begun.' : 'We are winning. There will be no peace.'}"</p>`);
       } else if (k === 'break') { ai.team = 10 + id; setRel(0, id, 'peace'); toast('The alliance is over — you are at peace.'); }
       else if (k === 'ally') {
@@ -2352,21 +2370,22 @@
   }
   function openDemand(id) {
     const ai = aiById(id), fear = realmPower(0) / realmPower(id), mine = G.objs.filter(o => o.t === 'town' && o.owner === id);
-    const tribute = Math.floor(ai.gold * 0.4 / 50) * 50;
+    const tribute = Math.floor(ai.gold * 0.4 / 50) * 50, pm = persOf(id).mul * (1 - dipBonus()), needG = 1.6 * pm, needT = 2.5 * pm, never = pm === Infinity;
+    const fmt = (v) => never ? 'never' : v.toFixed(1) + '×';
     const rows = mine.filter(t => mine.length > 1 && !ai.heroes.some(h => h.x === t.x && h.y === t.y)).map(t => `<div class="trow" style="display:flex;justify-content:space-between;align-items:center"><span><b>${t.name}</b></span><button data-dm="town:${G.objs.indexOf(t)}">Demand this town</button></div>`).join('');
-    modalOpen(`<h2>📜 Demands on the ${FN(id)} realm</h2><p class="small">They give in only to fear: your armies must be clearly stronger than theirs (now <b>${fear.toFixed(1)}×</b>; about 1.6× is enough for tribute, 2.5× for a town). Refusing at peace can end in war.</p>
+    modalOpen(`<h2>📜 Demands on the ${FN(id)} realm</h2><p class="small">They give in only to fear: your armies must be clearly stronger than theirs (now <b>${fear.toFixed(1)}×</b>). The ${persOf(id).n.toLowerCase()} ${FN(id)} realm needs <b>${fmt(needG)}</b> for tribute and <b>${fmt(needT)}</b> for a town${never ? ' — they will not listen to any demand' : ''}. Refusing at peace can end in war.</p>
       <div class="trow" style="display:flex;justify-content:space-between;align-items:center"><span><b>Tribute</b> — ${RES_ICON.gold}${tribute}</span><button data-dm="gold:0"${tribute < 100 ? ' disabled' : ''}>Demand gold</button></div>${rows || '<p class="small">They have no town to spare.</p>'}
       <div class="mb"><button id="dmBack">Back</button></div>`);
     $('dmBack').onclick = openDiplomacy;
     $('mbox').querySelectorAll('[data-dm]').forEach(b => b.onclick = async () => {
-      const [k, s] = b.dataset.dm.split(':'), need = k === 'town' ? 2.5 : 1.6;
+      const [k, s] = b.dataset.dm.split(':'), need = k === 'town' ? needT : needG;
       if (fear >= need) {
         if (k === 'gold') { ai.gold -= tribute; G.res.gold += tribute; sfx('coin'); await showModal(`<h2>💰 Tribute paid</h2><p>The ${FN(id)} realm hands over ${RES_ICON.gold}${tribute}.</p>`); }
         else { const t = G.objs[+s]; takeTown(t, 0); await showModal(`<h2>🏰 ${t.name} surrendered</h2><p>The ${FN(id)} realm cedes the town to you rather than face your armies.</p>`); }
       } else {
-        const war = !atWar(0, id) && fear < 1.1 && Math.random() < 0.5;
+        const war = !atWar(0, id) && (never ? Math.random() < 0.6 : fear < 1.1 && Math.random() < 0.5);
         if (war) declareWar(id, 0);
-        await showModal(`<h2>😠 Refused</h2><p>"You do not frighten us."${war ? ' <b>They declare war!</b>' : ''}</p>`);
+        await showModal(`<h2>😠 Refused</h2><p>"${never ? 'We take no orders from anyone.' : 'You do not frighten us.'}"${war ? ' <b>They declare war!</b>' : ''}</p>`);
       }
       openDiplomacy(); renderAll();
     });
@@ -2379,7 +2398,7 @@
       ...ai.heroes.flatMap((h, hi) => heroArts(h).map(a => ({ k: `a:${hi}:${a.where}:${a.ref}`, art: a, hero: h, label: `${ART[a.id].i} ${ART[a.id].n} (${h.name})` })))];
     const st = openTrade.st = openTrade.st || { g: 0, q: 100, t: 0, r: 1 };
     const sel = (list, cur, idn) => `<select id="${idn}">${list.map((x, i) => `<option value="${i}"${i === cur ? ' selected' : ''}>${x.label}</option>`).join('')}</select>`;
-    modalOpen(`<h2>⚖ Trade with the ${FN(id)} realm</h2><p class="small">${war ? 'They will not trade with an enemy.' : ally ? 'Allies trade at fair value.' : 'They buy at a discount and sell at a premium. Artifacts are worth more to them than the market says.'}</p>
+    modalOpen(`<h2>⚖ Trade with the ${FN(id)} realm</h2><p class="small">${war ? 'They will not trade with an enemy.' : ally ? 'Allies trade at fair value.' : `They buy at a discount and sell at a premium (your rank ${dipRank()} narrows the gap). Artifacts are worth more to them than the market says.`}</p>
       <div class="trow" style="grid-template-columns:1fr 90px"><div>You give<br>${sel(gives, Math.min(st.g, gives.length - 1), 'tgG')}</div><div>Amount<br><input type="number" id="tgQ" min="1" value="${st.q}"></div></div>
       <div class="trow" style="grid-template-columns:1fr 90px"><div>You get<br>${sel(gets, Math.min(st.t, gets.length - 1), 'tgT')}</div><div>Amount<br><input type="number" id="tgR" min="1" value="${st.r}"></div></div>
       <div id="tgV" style="margin:10px 0"></div><div class="mb"><button class="primary" id="tgGo">Offer</button><button id="tgBack">Back</button></div>`);
@@ -2390,8 +2409,8 @@
       if (g.res && g.res === t.res) return { ok: false, why: 'Choose two different things.' };
       const qg = g.art ? 1 : st.q, qt = t.art ? 1 : st.r;
       if (g.res && G.res[g.res] < qg) return { ok: false, why: 'You do not have that much.' };
-      const buy = ally ? 1 : 0.85, sell = ally ? 1 : 1.15;
-      const vg = g.art ? artVal(g.art.id) * (ally ? 1 : 0.8) : qg * RES_VALUE[g.res] * buy, vt = t.art ? artVal(t.art.id) * (ally ? 1 : 1.3) : qt * RES_VALUE[t.res] * sell;
+      const b = dipBonus(), buy = ally ? 1 : 0.85 + b, sell = ally ? 1 : 1.15 - b;
+      const vg = g.art ? artVal(g.art.id) * (ally ? 1 : 0.8 + b) : qg * RES_VALUE[g.res] * buy, vt = t.art ? artVal(t.art.id) * (ally ? 1 : 1.3 - b) : qt * RES_VALUE[t.res] * sell;
       if (t.res) { const have = t.res === 'gold' ? ai.gold : t.res === 'food' ? (ai.food || 0) : ai.gold / RES_VALUE[t.res]; if (have < qt) return { ok: false, why: 'They do not have that much to spare.' }; }
       if (t.art && !G.heroes.some(h => h.pack.length < MAX_PACK || slotFor(h, ART[t.art.id]))) return { ok: false, why: 'No hero of yours can carry another artifact.' };
       return vg >= vt ? { ok: true, why: `✔ They accept (${Math.round(vg)} offered for ${Math.round(vt)}).`, g, t, qg, qt } : { ok: false, why: `✘ Not enough: they value your offer at ${Math.round(vg)}, the price is ${Math.round(vt)}.` };

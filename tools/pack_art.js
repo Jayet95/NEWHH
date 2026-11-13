@@ -30,8 +30,9 @@ function pack(root, outDir) {
   groups.forEach((g, gi) => {
     const bufs = []; let off = 0;
     g.files.forEach(f => { const b = fs.readFileSync(path.join(art, f)); index.files[stem(f)] = [gi, off, b.length, path.extname(f).slice(1).toLowerCase()]; bufs.push(b); off += b.length; });
-    fs.writeFileSync(path.join(outDir, g.name + '.bin'), Buffer.concat(bufs));
-    index.packs.push({ f: g.name + '.bin', n: off, core: g.core });
+    const all = Buffer.concat(bufs), fn = g.name + '.' + require('crypto').createHash('md5').update(all).digest('hex').slice(0, 8) + '.bin';   // the name changes whenever the content does, so a cached copy can never be stale
+    fs.writeFileSync(path.join(outDir, fn), all);
+    index.packs.push({ f: fn, n: off, core: g.core });
   });
   fs.writeFileSync(path.join(outDir, 'index.json'), JSON.stringify(index));
   return index.packs;

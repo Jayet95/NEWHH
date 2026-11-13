@@ -3010,7 +3010,7 @@
       <button data-mn="dip">🕊 Diplomacy</button><button data-mn="kd">📋 Kingdom</button><button data-mn="ach">🏆 Achievements</button>
       <button data-mn="lb">📊 Leaderboard</button><button data-mn="hint">💡 Hints on/off</button>
       <button data-mn="rep">📜 Turn report</button><button data-mn="help">📖 Help & glossary</button>
-      <button data-mn="snd">${Sfx.on ? '🔇 Sound off' : '🔊 Sound on'}</button><button data-mn="fit">🗺 Zoom to fit</button>
+      <button data-mn="snd">${Sfx.on ? '🔇 Sound off' : '🔊 Sound on'}</button><button data-mn="fit">🗺 Zoom to fit</button>${$('bFs').style.display === 'none' ? '' : `<button data-mn="fs">${fsOn() ? '🗗 Exit full screen' : '⛶ Full screen'}</button>`}
       </div><div class="mb"><button data-mn="exit" id="mnExit">🚪 Main menu</button><button class="primary" id="mnClose">Resume</button></div>`);
     $('mnClose').onclick = closeModal;
     $('mbox').querySelectorAll('[data-mn]').forEach(b => b.onclick = () => {
@@ -3018,6 +3018,7 @@
       if (k === 'dip') openDiplomacy(); else if (k === 'save') openSlots(); else if (k === 'set') openSettings(); else if (k === 'kd') openKingdom(); else if (k === 'ach') openAchievements(); else if (k === 'lb') openLeaderboard(); else if (k === 'hint') { Settings.set('hints', !Settings.hints); if (Settings.hints) Settings.resetHints(); toast(Settings.hints ? 'Hints on.' : 'Hints off.'); }
       else if (k === 'rep') openReport(); else if (k === 'help') openHelp();
       else if (k === 'snd') { Sfx.toggle(); $('bSnd').textContent = Sfx.on ? '🔊' : '🔇'; openMenu(); }
+      else if (k === 'fs') { closeModal(); toggleFs(); }
       else if (k === 'fit') { closeModal(); fitZoom(); } else if (k === 'exit') { $('modal').classList.add('hide'); exitToMenu(); }
     });
   }

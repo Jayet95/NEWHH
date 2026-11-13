@@ -220,8 +220,8 @@
     const preset = map.preset || 'plains', size = map.size || 'medium', seed = seedFrom(map.seed);
     const nAI = Math.max(1, Math.min(4, map.ais || { small: 1, medium: 2, large: 3, huge: 4, giant: 4 }[size] || 1));
     const aiFacs = shuffle(Object.keys(FACTIONS).filter(f => f !== faction)).slice(0, nAI);
-    const wrap = map.wrap === true, food = map.food === true; setFoodMode(food);
-    const m = genMap(seed, aiFacs, diff, { preset, size, biome: map.biome, wrap, food });
+    const wrap = map.wrap === true, food = map.food === true && /[?&]food/.test(location.search), build = (map.build !== false && !map.scn) || food; setFoodMode(food);
+    const m = genMap(seed, aiFacs, diff, { preset, size, biome: map.biome, wrap, food, build });
     setFaction(faction); applyTheme(faction);
     G = { seed, preset, size, W: m.W, H: m.H, scn: map.scn ? { id: map.scn.id, name: map.scn.name, goal: map.scn.goal } : null, tiles: m.tiles, biome: m.biome, river: m.river, zone: m.zone, objs: m.objs, dock: m.dock, boats: [], nextBoat: 1, day: 1, over: false, path: null, faction, diff,
       res: { gold: D.gold, wood: r(20), ore: r(20), mercury: r(5), sulfur: r(5), crystal: r(5), gems: r(5) }, spells: [...START_SPELLS],
@@ -230,7 +230,7 @@
       ais: aiFacs.map((f, i) => ({ id: i + 1, fac: f, name: FACTIONS[f].name, gold: Math.round(3000 * D.aiInc), heroes: [], alive: true, spawnWait: 0, pers: persPick(), team: ({ ally: 1, bloc: 2 }[(map.teams || [])[i]] || 3 + i) })) };
     if (G.ais.every(a => a.team === 1)) G.ais[0].team = 3;
     G.wrap = wrap; WRAP_W = wrap ? G.W : 0;
-    G.food = food; G.tunnels = []; if (food) G.res.food = FOOD.start;
+    G.food = food; G.build = build; G.tunnels = []; if (food) G.res.food = FOOD.start;
     G.dip = !map.scn && map.dip !== false; G.rel = {};   // diplomacy: everyone at peace until war is declared (scenarios keep the old rules)
     for (const o of G.objs) if (o.t === 'town') {
       if (o.owner === 0) { o.fac = faction; o.name = FACTIONS[faction].town; initTown(o, 0); }
@@ -765,7 +765,7 @@
   }
   function renderAll() {
     if (!G) return;
-    { const bb = $('mBuild'); if (bb) bb.style.display = G.food ? '' : 'none'; }
+    { const bb = $('mBuild'); if (bb) bb.style.display = G.build ? '' : 'none'; }
     quietSave();
     recomputeVision();
     const gn = computeGain();
@@ -798,7 +798,7 @@
       <div class="hacts">
         <button id="bEquip" class="small-btn" title="Equip artifacts (${Object.values(h.arts).filter(Boolean).length} worn, ${h.pack.length} in pack)">🎒 Equipment <span class="bcnt">${Object.values(h.arts).filter(Boolean).length}/${h.pack.length}</span></button>
         <button id="bPortal" class="small-btn" title="Teleport to your castle (${PORTAL_COST} mana)">🌀 Portal <span class="bcnt">${PORTAL_COST}</span></button>
-        ${G.food ? '<button id="bBuild" class="small-btn" title="Build a farm, mine, road or tunnel here">🔨 Build</button>' : ''}
+        ${G.build ? '<button id="bBuild" class="small-btn" title="Build a mine, road or tunnel here">🔨 Build</button>' : ''}
         <button id="bNext" class="small-btn" title="Select the next hero (Tab)">⏭ Next hero</button>
         <button id="bSleep" class="small-btn" title="A sleeping hero is skipped by the end-turn reminder">${h.sleep ? '⏰ Wake' : '💤 Sleep'}</button>
       </div>`;
@@ -2767,12 +2767,12 @@
   }
   // the hero's Build menu: what can be built on this tile (or into the mountain next to it)
   function openBuildMenu(h) {
-    if (!G.food) return;
+    if (!G.build) return;
     const x = h.x, y = h.y, o = objAt(G, x, y), tile = G.tiles[y][x], opts = [];
     const farms = G.objs.filter(f => (f.t === 'farm' && f.built) || (f.t === 'site' && f.build === 'farm')).length;
     if (o && o.t === 'deposit') opts.push({ id: 'mine', icon: '⛏️', name: `${o.kind[0].toUpperCase() + o.kind.slice(1)} mine`, desc: `Opens the rich ${o.kind} deposit: a mine of your own.`, cost: mineCost(o.kind), days: BUILD_DAYS.mine, at: o, tx: x, ty: y });
     else if (!o && (tile === T.GRASS || tile === T.SAND)) {
-      opts.push({ id: 'farm', icon: '🌾', name: 'Farm', desc: `Grows +${FOOD.field} 🌾/day wherever you build it (${farms}/${FOOD.maxField}).`, cost: FOOD.fieldCost, days: BUILD_DAYS.farm, tx: x, ty: y, block: farms >= FOOD.maxField ? 'Farm limit reached' : '' });
+      if (G.food) opts.push({ id: 'farm', icon: '🌾', name: 'Farm', desc: `Grows +${FOOD.field} 🌾/day wherever you build it (${farms}/${FOOD.maxField}).`, cost: FOOD.fieldCost, days: BUILD_DAYS.farm, tx: x, ty: y, block: farms >= FOOD.maxField ? 'Farm limit reached' : '' });
       opts.push({ id: 'road', icon: '🛤️', name: 'Road', desc: 'Makes this tile cheap to cross.', cost: ROAD_COST, days: BUILD_DAYS.road, tx: x, ty: y });
     }
     const tunnels = (G.tunnels || []).length + G.objs.filter(f => f.t === 'site' && f.build === 'tunnel').length;
@@ -2983,8 +2983,8 @@
     $('mbox').querySelectorAll('.card').forEach(c => c.onclick = () => { Settings.mem('lastDiff', c.dataset.d); showMapSelect(c.dataset.d); });
     $('modal').classList.remove('hide');
   }
-  function showMapSelect(diff, st = Object.assign({ preset: 'plains', size: 'medium', seed: '', wrap: true, food: false, dip: true }, Settings.mem('lastMap') || {})) {
-    Settings.mem('lastMap', { preset: st.preset, size: st.size, fog: st.fog, ais: st.ais, color: st.color, wrap: st.wrap, food: st.food, dip: st.dip });     // the next game starts with the same options
+  function showMapSelect(diff, st = Object.assign({ preset: 'plains', size: 'medium', seed: '', wrap: true, food: false, build: true, dip: true }, Settings.mem('lastMap') || {})) {
+    Settings.mem('lastMap', { preset: st.preset, size: st.size, fog: st.fog, ais: st.ais, color: st.color, wrap: st.wrap, food: st.food, build: st.build, dip: st.dip });     // the next game starts with the same options
     const cards = Object.entries(MAPS).map(([k, m]) => `<div class="card${st.preset === k ? ' on' : ''}" data-m="${k}"><img class="mprev" src="${mapPreview(k, undefined, k)}" alt="" draggable="false"><b>${m.name}</b><div class="small">${m.desc}</div></div>`).join('');
     const sizes = Object.entries(SIZES).map(([k, s]) => `<button class="${st.size === k ? 'primary' : ''}" data-s="${k}">${s.name} (${s.w}×${s.h})</button>`).join(' ');
     $('mbox').innerHTML = `<div class="setup"><span data-bg="map_select"></span><h2>Choose your map<span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid two">${cards}</div>
@@ -2992,7 +2992,8 @@
         <div class="opt"><label>Map size</label><div class="optc"><div class="opts">${Object.entries(SIZES).map(([k, s]) => `<button class="${st.size === k ? 'primary' : ''}" data-s="${k}"><b>${s.name}</b><small>${s.w}×${s.h}</small></button>`).join('')}</div></div></div>
         <div class="opt"><label>Fog of war</label><div class="optc"><div class="opts">${[[true, 'On'], [false, 'Off']].map(([v, n]) => `<button class="${(st.fog !== false) === v ? 'primary' : ''}" data-fog="${v}"><b>${n}</b></button>`).join('')}</div><small>Unexplored land is hidden; scouts, towers and your heroes reveal it.</small></div></div>
         <div class="opt"><label>Map edges</label><div class="optc"><div class="opts">${[[true, 'Globe'], [false, 'Walled']].map(([v, n]) => `<button class="${(st.wrap !== false) === v ? 'primary' : ''}" data-wrap="${v}"><b>${n}</b></button>`).join('')}</div><small>Globe: the world has no edge, walk east to come out in the west. Walled: the edges cannot be crossed.</small></div></div>
-        <div class="opt"><label>Food &amp; building</label><div class="optc"><div class="opts">${[[false, 'Off'], [true, 'On']].map(([v, n]) => `<button class="${(st.food === true) === v ? 'primary' : ''}" data-food="${v}"><b>${n}</b></button>`).join('')}</div><small>On: recruits cost food from farms; heroes build farms, mines, roads and tunnels.</small></div></div>
+        <div class="opt"><label>Hero building</label><div class="optc"><div class="opts">${[[true, 'On'], [false, 'Off']].map(([v, n]) => `<button class="${(st.build !== false) === v ? 'primary' : ''}" data-build="${v}"><b>${n}</b></button>`).join('')}</div><small>On: rich deposits dot the map; your hero can build roads, open mines on deposits and dig tunnels through mountains (🔨 Build).</small></div></div>
+        ${/[?&]food/.test(location.search) ? `<div class="opt"><label>Food (test)</label><div class="optc"><div class="opts">${[[false, 'Off'], [true, 'On']].map(([v, n]) => `<button class="${(st.food === true) === v ? 'primary' : ''}" data-food="${v}"><b>${n}</b></button>`).join('')}</div><small>Work in progress: recruits cost food from farms.</small></div></div>` : ''}
         <div class="opt"><label>Diplomacy</label><div class="optc"><div class="opts">${[[true, 'On'], [false, 'Old rules']].map(([v, n]) => `<button class="${(st.dip !== false) === v ? 'primary' : ''}" data-dip="${v}"><b>${n}</b></button>`).join('')}</div><small>On: everyone starts at peace — war must be declared, and you can trade, make demands and ally. Old rules: every rival is your enemy from the start, no diplomacy.</small></div></div>
         <div class="opt"><label>Rivals</label><div class="optc"><div class="opts">${[0, 1, 2, 3, 4].map(n => `<button class="${(st.ais || 0) === n ? 'primary' : ''}" data-a="${n}"><b>${n ? n : 'Auto'}</b></button>`).join('')}</div><small>AI players that expand and fight you.</small></div></div>
         <div class="opt"><label>Seed</label><div class="optc"><div class="seedrow"><input id="mSeed" placeholder="empty = random map" value="${st.seed}"><button id="mDice" title="Pick a random seed">🎲 Random</button></div><small>Share a seed to replay the same map.</small></div></div>
@@ -3007,6 +3008,7 @@
     $('mbox').querySelectorAll('[data-tm]').forEach(b => b.onclick = () => { keep(); const [i, v] = b.dataset.tm.split(':'); (st.teams = st.teams || [])[+i] = v; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-m]').forEach(c => c.onclick = () => { keep(); st.preset = c.dataset.m; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-s]').forEach(b => b.onclick = () => { keep(); st.size = b.dataset.s; showMapSelect(diff, st); });
+    $('mbox').querySelectorAll('[data-build]').forEach(b => b.onclick = () => { keep(); st.build = b.dataset.build === 'true'; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-food]').forEach(b => b.onclick = () => { keep(); st.food = b.dataset.food === 'true'; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-dip]').forEach(b => b.onclick = () => { keep(); st.dip = b.dataset.dip === 'true'; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-wrap]').forEach(b => b.onclick = () => { keep(); st.wrap = b.dataset.wrap === 'true'; showMapSelect(diff, st); });
@@ -3153,7 +3155,7 @@
   $('mGear').onclick = () => G && !busy && openEquip(G.hero);
   $('mLand').onclick = () => sheetOpen('🗺️ Territory', [$('minipanel'), $('terr')]);
   $('mMenu').onclick = () => openMenu();
-  $('mBuild').onclick = () => { if (G && !busy && G.food) openBuildMenu(G.hero); };
+  $('mBuild').onclick = () => { if (G && !busy && G.build) openBuildMenu(G.hero); };
   $('mDip').onclick = $('bDip').onclick = () => G && !busy && (G.dip ? openDiplomacy() : toast('Diplomacy is off in this game (old rules: everyone is an enemy).'));
 
   // custom art from art/ finished loading: rebuild every cached picture, set the title artwork
@@ -3187,7 +3189,7 @@
       <button data-mn="dip">🕊 Diplomacy</button><button data-mn="kd">📋 Kingdom</button><button data-mn="ach">🏆 Achievements</button>
       <button data-mn="lb">📊 Leaderboard</button><button data-mn="hint">💡 Hints on/off</button>
       <button data-mn="rep">📜 Turn report</button><button data-mn="help">📖 Help & glossary</button>
-      <button data-mn="snd">${Sfx.on ? '🔇 Sound off' : '🔊 Sound on'}</button><button data-mn="fit">🗺 Zoom to fit</button>${G.food ? '<button data-mn="build">🔨 Build (road, mine, farm)</button>' : ''}${$('bFs').style.display === 'none' ? '' : `<button data-mn="fs">${fsOn() ? '🗗 Exit full screen' : '⛶ Full screen'}</button>`}
+      <button data-mn="snd">${Sfx.on ? '🔇 Sound off' : '🔊 Sound on'}</button><button data-mn="fit">🗺 Zoom to fit</button>${G.build ? '<button data-mn="build">🔨 Build (road, mine, tunnel)</button>' : ''}${$('bFs').style.display === 'none' ? '' : `<button data-mn="fs">${fsOn() ? '🗗 Exit full screen' : '⛶ Full screen'}</button>`}
       </div><div class="mb"><button data-mn="exit" id="mnExit">🚪 Main menu</button><button class="primary" id="mnClose">Resume</button></div>`);
     $('mnClose').onclick = closeModal;
     $('mbox').querySelectorAll('[data-mn]').forEach(b => b.onclick = () => {
@@ -3431,5 +3433,5 @@
   if (!/[?&]demo/.test(location.search) && Settings.resume && localStorage.getItem(SAVE)) Assets.ready.then(() => { if (!G && load()) $('title').classList.add('hide'); });
   if (/[?&]demo/.test(location.search)) Assets.ready.then(() => setTimeout(() => { try { newGame('castle', 'Orrin', 'normal', { size: 'medium', seed: 'demo', wrap: true, food: /[?&]food/.test(location.search) }); $('title').classList.add('hide'); demo(); } catch (e) { console.error('demo failed', e); } }, 400));
   window.__G = () => G;
-  window.__dbg = { borderBlock, canCross, terrOwner, openDiplomacy, aiDiplomacy, declareWar, atWar, realmPower, demo, openBuildMenu, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
+  window.__dbg = { endTurn, borderBlock, canCross, terrOwner, openDiplomacy, aiDiplomacy, declareWar, atWar, realmPower, demo, openBuildMenu, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
 })();

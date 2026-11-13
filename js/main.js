@@ -2963,6 +2963,7 @@
   $('mGear').onclick = () => G && !busy && openEquip(G.hero);
   $('mLand').onclick = () => sheetOpen('🗺️ Territory', [$('minipanel'), $('terr')]);
   $('mMenu').onclick = () => openMenu();
+  $('mDip').onclick = $('bDip').onclick = () => G && !busy && (G.dip ? openDiplomacy() : toast('Diplomacy is off in this game (old rules: everyone is an enemy).'));
 
   // custom art from art/ finished loading: rebuild every cached picture, set the title artwork
   document.addEventListener('assets-ready', () => {

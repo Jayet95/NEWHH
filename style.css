@@ -1594,3 +1594,8 @@ body.skin #mbox .gacts button, #mbox .gacts button { flex: 1 1 0; min-width: 0; 
   .tpbody .wcard .bpic.wpic { height: 72px; width: 72px; }
 }
 @media (max-width: 760px) { .tui:has(.tpanel) .tarrow { display: none; } }   /* the town arrows would sit on top of the open panel */
+/* town Warriors: the recruit / − / + / Max buttons were a muddy brown with dark text; brighter gold, crisper label */
+body.skin .tpbody .wcard .bacts button, .tpbody .wcard .bacts button { background: linear-gradient(#ffe08a, #e0a82e 55%, #b9801a) !important; color: #1a0c01 !important; font-weight: 800; text-shadow: 0 1px 0 rgba(255, 240, 190, .6); border: 1px solid #5a3a08 !important; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 0 1px 3px rgba(0, 0, 0, .6) !important; }
+.tpbody .wcard .bacts button:disabled { background: linear-gradient(#8a7a55, #5e5236) !important; color: #2a2113 !important; opacity: .75; }
+.tpbody .wcard .bacts input { background: #120b05 !important; color: #fff3cf !important; border: 1px solid #c9a24a !important; font-weight: bold; }
+.tpbody .wcard.lockedrow { opacity: .8; filter: saturate(.6); }   /* locked creatures stay readable */

@@ -298,7 +298,9 @@
       if (G.met[a.id] || !a.alive) continue;
       // contact is mutual: you see them, or they see you (their heroes see 6 tiles, towns 9, forts 6)
       const seesMe = () => { const mine = [...G.heroes, ...G.objs.filter(o => o.owner === 0)]; return a.heroes.some(h => mine.some(m => hexDist(h, m) <= 6)) || G.objs.some(o => o.owner === a.id && mine.some(m => hexDist(o, m) <= (o.t === 'town' ? 9 : o.t === 'fort' ? 6 : 4))); };
-      if (!fogOn() || (vis && (G.objs.some(o => o.owner === a.id && isVis(o.x, o.y)) || a.heroes.some(h => isVis(h.x, h.y)))) || seesMe()) { G.met[a.id] = true; if (fogOn()) toast(`🕊 You have met the ${FACTIONS[a.fac].name} realm — diplomacy with them is open.`); }
+      // a border counts too: if any tile of their land is in view (or a tile of yours is in theirs), you have met
+      const TGm = terrGrid(), seeBorder = () => { if (!vis) return false; for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) if (TGm[y * G.W + x] === a.id + 1 && isVis(x, y)) return true; return false; };
+      if (!fogOn() || seeBorder() || (vis && (G.objs.some(o => o.owner === a.id && isVis(o.x, o.y)) || a.heroes.some(h => isVis(h.x, h.y)))) || seesMe()) { G.met[a.id] = true; if (fogOn()) toast(`🕊 You have met the ${FACTIONS[a.fac].name} realm — diplomacy with them is open.`); }
     }
   }
   function recomputeVision() {

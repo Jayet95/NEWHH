@@ -745,8 +745,15 @@
   new MutationObserver(() => { if (G) renderResOnly(); syncMres(); }).observe($('modal'), { attributes: true, attributeFilter: ['class'] });
   new MutationObserver(syncMres).observe($('title'), { attributes: true, attributeFilter: ['class'] });
   function renderResOnly() { $('mres').innerHTML = $('res').innerHTML; }
+  // quiet autosave a moment after anything changes (never during a battle or on the title screen), so a refresh loses almost nothing
+  let qsT = 0;
+  function quietSave() {
+    clearTimeout(qsT);
+    qsT = setTimeout(() => { if (G && !G.over && !busy && $('title').classList.contains('hide') && !document.body.classList.contains('inbattle') && !/[?&]demo/.test(location.search)) saveTo(SAVE); }, 1500);
+  }
   function renderAll() {
     if (!G) return;
+    quietSave();
     recomputeVision();
     const gn = computeGain();
     const resHtml = RES.map(k => `<span class="chip" title="${k[0].toUpperCase() + k.slice(1)}: ${G.res[k]}${gn[k] ? ` (+${gn[k]}/day)` : ''}">${RES_ICON[k]} <b>${fmtN(G.res[k])}</b>${gn[k] ? `<small class="inc">+${fmtN(gn[k])}</small>` : ''}</span>`).join('');
@@ -2904,7 +2911,7 @@
   $('tHelp').onclick = () => openHelp();
   async function exitToMenu() {
     if (!G || busy) return;
-    const i = await showModal('<h2>Return to the main menu?</h2><p class="small">The game also autosaves at the start of every day.</p>', ['💾 Save & exit', 'Exit without saving', 'Cancel']);
+    const i = await showModal('<h2>Return to the main menu?</h2><p class="small">The game autosaves as you play, so refreshing the page brings you back here.</p>', ['💾 Save & exit', 'Exit', 'Cancel']);
     if (i === 2) return;
     if (i === 0) save();
     $('title').classList.remove('hide'); refreshTitle();
@@ -3212,6 +3219,8 @@
     });
     [home, ...towns].forEach(t => markView(t.x, t.y, 9, false)); G.res.gold += 20000; renderAll();
   }
+  // refreshing the page picks the game up where it was
+  if (!/[?&]demo/.test(location.search) && localStorage.getItem(SAVE)) Assets.ready.then(() => { if (!G && load()) $('title').classList.add('hide'); });
   if (/[?&]demo/.test(location.search)) Assets.ready.then(() => setTimeout(() => { try { newGame('castle', 'Orrin', 'normal', { size: 'medium', seed: 'demo', wrap: true }); $('title').classList.add('hide'); demo(); } catch (e) { console.error('demo failed', e); } }, 400));
   window.__G = () => G;
   window.__dbg = { borderBlock, canCross, terrOwner, openDiplomacy, aiDiplomacy, declareWar, atWar, realmPower, demo, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };

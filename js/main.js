@@ -1904,8 +1904,9 @@
       const pc = (b) => `left:${(b[0] * 100).toFixed(2)}%;top:${(b[1] * 100).toFixed(2)}%;width:${(b[2] * 100).toFixed(2)}%;height:${(b[3] * 100).toFixed(2)}%`;
       return `<div class="gpanel" style="aspect-ratio:${g.aspect};background-image:url(${src})">${g.slots.map((b, i) => { const a = arr[i]; return `<button class="slot gs${a ? '' : ' empty'}${gSel(rk, i)}" data-gr="${rk}" data-gi="${i}" style="${pc(b)}" title="${a ? C[a.t].n + ' — ' + a.n : 'Empty slot'}">${a ? `${Art.pic(a.t, 60)}<small>${a.n}</small>` : ''}</button>`; }).join('')}${kind === 'with' && g.hero && hero ? `<div class="gshero" style="${pc(g.hero)}">${Art.heroPic(hero.icon, ownCol(0), 64, hero.pid)}</div>` : ''}</div>`;
     };
-    const gTop = `<div class="glabel">🛡️ ${t.name} garrison</div>` + (garPanel('without', t.garrison, 'g') || `<div class="armyrow garrow">${t.garrison.map((a, i) => garSlot(a, 'g', i)).join('')}</div>`);
-    const gHero = th ? `<div class="glabel">⚔️ ${th.name} — hero army</div>` + (garPanel('with', th.army, 'h', th) || `<div class="armyrow garrow">${th.army.map((a, i) => garSlot(a, 'h', i)).join('')}</div>`) + `<div class="gacts"><button data-gmove="toHero">⬆ All to hero</button><button data-gmove="toGarr">⬇ To garrison</button><button data-garr="1">Split…</button></div>`
+    const gCol = !!Settings.mem('gcol');   // the troop panels can be folded away to see more of the town
+    const gTop = `<button class="gcol" id="gColB" title="${gCol ? 'Show' : 'Hide'} the garrison and hero army">${gCol ? '▸ 🛡️ Garrison & army' : '▾ Hide troops'}</button>` + (gCol ? '' : `<div class="glabel">🛡️ ${t.name} garrison</div>` + (garPanel('without', t.garrison, 'g') || `<div class="armyrow garrow">${t.garrison.map((a, i) => garSlot(a, 'g', i)).join('')}</div>`));
+    const gHero = gCol ? '' : th ? `<div class="glabel">⚔️ ${th.name} — hero army</div>` + (garPanel('with', th.army, 'h', th) || `<div class="armyrow garrow">${th.army.map((a, i) => garSlot(a, 'h', i)).join('')}</div>`) + `<div class="gacts"><button data-gmove="toHero">⬆ All to hero</button><button data-gmove="toGarr">⬇ To garrison</button><button data-garr="1">Split…</button></div>`
       : `<div class="small gnohero">No hero in this town — recruits join the garrison. Bring a hero to move troops.</div>`;
     const bsrc = (k) => (Assets.has('ui/town_btn_' + t.fac + '_' + k) && Assets.src('ui/town_btn_' + t.fac + '_' + k)) || null;
     const tabBtn = (k, label, ico) => { const u = bsrc(k === 'war' ? 'war' : 'bld'); return `<button class="ttab${townTab === k ? ' on' : ''}${u ? ' tbtn' : ''}" data-ttab="${k}" title="${label}">${u ? `<img src="${u}" alt="${label}" draggable="false">` : ico + ' ' + label}</button>`; };
@@ -1922,6 +1923,7 @@
       cv.onclick = (e) => { if (pd && pd.moved) return; const i = at(e); if (i >= 0) townSlotClick(t, i); }; }
     if (!townLoop) { townLoop = true; requestAnimationFrame(drawTown); }
     $('tClose').onclick = () => { townTab = null; townPan = null; $('modal').classList.add('hide'); renderAll(); };
+    if ($('gColB')) $('gColB').onclick = () => { Settings.mem('gcol', Settings.mem('gcol') ? 0 : 1); openTown(t); };
     if ($('tpClose')) $('tpClose').onclick = () => { townTab = null; openTown(t); };
     const again = () => { openTown(t); renderAll(); };
     const q = (sel, fn) => $('mbox').querySelectorAll(sel).forEach(fn);
@@ -3164,6 +3166,7 @@
       ${row('Warn before deadly fights', seg('confirmDanger', [[true, 'On'], [false, 'Off']]), 'Asks before attacking something far stronger than you')}
       ${row('Confirm before ending a turn', seg('confirmEnd', [[true, 'On'], [false, 'Off']]), 'Warns about idle heroes and unspent recruits')}
       ${row('Resume on refresh', seg('resume', [[true, 'On'], [false, 'Off']]), 'Refreshing the page jumps straight back into your game (otherwise you land on the title screen; Continue always works)')}
+      ${row('Building names in town', seg('townNames', [[true, 'Always'], [false, 'On hover']]), 'Off keeps the town picture clear; a name shows when you point at a building')}
       ${row('Hints', seg('hints', [[true, 'On'], [false, 'Off']]), '<a href="#" id="stReset">Show all hints again</a>')}
       <div class="mb"><button class="primary" id="stClose">Done</button></div>`);
     $('stClose').onclick = () => { if (G && $('title').classList.contains('hide')) openMenu(); else $('modal').classList.add('hide'); };

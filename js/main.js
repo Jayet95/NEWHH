@@ -946,7 +946,7 @@
       case 'seer': return `<b>Seer's Hut</b><br>Wants ${o.amt} ${o.need} for an artifact.`;
       case 'spring': return `<b>${SPRING[o.kind].n}</b><br>${SPRING[o.kind].d}<br><span class="small">Once per week per hero.</span>`;
       case 'wreck': return `<b>Shipwreck</b><br>Salvage: ${RES_ICON.gold}${o.gold} + ${RES_ICON[o.res]}${g}`;
-      case 'farm': return `<b>Farm</b> (${o.owner === 0 ? 'yours' : 'unclaimed'}) +${o.built ? FOOD.field : FOOD.mapFarm} 🌾/day${o.built ? '' : '<br>Pays only if you hold its zone'}`;
+      case 'farm': return `<b>Farm</b> (${o.owner === 0 ? 'yours' : o.owner ? 'held by a rival' : 'unclaimed'}) +${o.built ? FOOD.field : FOOD.mapFarm} 🌾/day${o.built ? '' : '<br>Pays only if you hold its zone'}`;
       case 'deposit': return `<b>${o.kind[0].toUpperCase() + o.kind.slice(1)} deposit</b><br>Step here to build a mine.`;
       case 'site': return `<b>Under construction</b><br>${SITE_NAME[o.build]} — ${o.left} day(s) left`;
       case 'mine': {
@@ -2139,6 +2139,8 @@
       if (o.t === 'town') g += 500 + (o.b && o.b.hall ? HALL_LEVELS[o.b.hall].inc : 0);
       else if (o.t === 'fort') g += FORT_INCOME;
       else if (o.t === 'mine' && zoneOwner(G, G.zone[o.y][o.x]) === ai.id) g += MINE_YIELD[o.kind] * RES_VALUE[o.kind];
+      else if (G.food && o.t === 'farm') g += 0.6 * RES_VALUE.food * (o.built ? FOOD.field : (zoneOwner(G, G.zone[o.y][o.x]) === ai.id ? FOOD.mapFarm : 0));
+      if (G.food && o.t === 'town') g += 0.6 * RES_VALUE.food * (FOOD.town[o.farm || 0].inc || 0);
     }
     return Math.round(g * DF().aiInc);
   }
@@ -2160,7 +2162,7 @@
     for (let tier = 7; tier >= 1; tier--) {
       if (!t.b[tier]) continue;
       const type = tierType(t, tier), price = goldEq(C[type].cost);
-      const n = Math.min(t.avail[tier] || 0, Math.floor(ai.gold * 0.5 / price));
+      const n = Math.min(t.avail[tier] || 0, Math.floor(ai.gold * (ai.saving ? 0.2 : 0.5) / price));
       if (n > 0 && addToArmy({ army }, type, n)) { ai.gold -= n * price; t.avail[tier] -= n; }
     }
   }
@@ -2171,7 +2173,7 @@
     if (ai.spawnWait > 0) ai.spawnWait--;
     // a rival without any hero hires one first (cheaply), before spending on buildings and troops
     if (!ai.heroes.length && ai.spawnWait <= 0 && ai.gold >= HIRE_COST * 0.5) { ai.gold -= HIRE_COST * 0.5; spawnAiHero(ai, towns[0]); }
-    for (const t of towns) { let k = 0; while (k < 2 && aiBuild(ai, t)) k++; aiRecruit(ai, t); }
+    for (const t of towns) { let k = 0; while (k < 2 && aiBuild(ai, t)) k++; aiRecruit(ai, t); if (G.food) aiFarm(ai, t); }
     // a held Dragon Lair: buy the strongest dragons the treasury allows and send them to the home castle
     for (const lr of G.objs) if (lr.t === 'lair' && lr.owner === ai.id) {
       const t = towns[0], hero = ai.heroes.find(h => h.x === t.x && h.y === t.y), army = hero ? hero.army : t.garrison;
@@ -2197,11 +2199,35 @@
         case 'lair': { const gp = armyPower(o.guard || []); if (power >= gp * 2.2 + 1) sc = 3000 / (d + 8); break; }
         case 'fort': { const dp = defPower(o); if (power >= dp * 2 + 1) sc = 1600 / (d + 8); break; }
         case 'town': { const dp = defPower(o); if (power >= dp * 2.2 + 1) sc = 4000 / (d + 10); break; }
+        case 'farm': { const gp = armyPower(o.guard || []); if (power >= gp * 2) sc = (o.owner === 0 ? 2000 : 1500) / (d + 6); break; }
+        case 'deposit': if (ai.gold >= aiCost(mineCost(o.kind)) * 1.2) sc = 700 / (d + 6); break;
       }
       if (sc > 0) list.push({ x: o.x, y: o.y, score: sc });
     }
     if (!isAlly(ai.id, 0)) for (const ph of G.heroes) { const d = dist(ph, h); if (d > R) continue; if (power >= armyPower(ph.army) * 1.25) list.push({ x: ph.x, y: ph.y, score: 2400 / (d + 6) }); }
     return list.sort((a, b) => b.score - a.score);
+  }
+  // food mode: rivals grow their town farms and put up building sites like a player's hero does
+  const aiCost = (c) => Math.round(c.gold * 1.3);   // what a rival pays for building work (its wood and ore are not tracked)
+  function aiSite(ai, build, x, y, kind) { G.objs.push({ t: 'site', build, kind, left: BUILD_DAYS[build], owner: ai.id, x, y }); reindex(G); }
+  function aiFarm(ai, t) {
+    const lv = t.farm || 0;
+    if (t.farmBuild || lv >= 3 || G.day < 6 * (lv + 1)) return;
+    const nx = FOOD.town[lv + 1]; if (aiCost(nx.cost) > ai.gold * 0.6) return;
+    ai.gold -= aiCost(nx.cost); t.farmBuild = { left: 3 };
+  }
+  // an idle rival hero raises a farm on open ground inside its own lands
+  function aiHeroBuild(ai, h) {
+    if (!G.food || G.day < 8) return;
+    const mine = G.objs.filter(f => (f.t === 'farm' && f.owner === ai.id) || (f.t === 'site' && f.owner === ai.id && f.build === 'farm')).length;
+    ai.saving = mine < 4 && G.day < 45;   // keep some gold back for the next farm instead of spending it all on troops
+    if (mine >= 4 || aiCost(FOOD.fieldCost) > ai.gold * 0.9) return;
+    const home = G.objs.some(t => t.t === 'town' && t.owner === ai.id && dist(t, h) <= 9);
+    if (!(home || zoneOwner(G, G.zone[h.y][h.x]) === ai.id)) return;
+    const free = (p) => p[0] >= 0 && p[1] >= 0 && p[0] < G.W && p[1] < G.H && G.tiles[p[1]][p[0]] === T.GRASS && !objAt(G, p[0], p[1]) && !heroesAt(p[0], p[1]).length;
+    const spot = free([h.x, h.y]) ? [h.x, h.y] : hexNb(h.x, h.y).find(free);   // the hero's own tile, or one beside it (heroes often wait inside a town)
+    if (!spot) return;
+    ai.gold -= aiCost(FOOD.fieldCost); ai.saving = false; aiSite(ai, 'farm', spot[0], spot[1]);
   }
   function aiKill(ai, h) { ai.heroes = ai.heroes.filter(x => x !== h); ai.spawnWait = 3; }
   async function aiHeroTurn(ai, h) {
@@ -2211,12 +2237,13 @@
     const here = towns.find(t => t.x === h.x && t.y === h.y);
     if (here) { here.garrison.forEach((s, i) => { if (s && addToArmy(h, s.t, s.n)) here.garrison[i] = null; }); mergeArmy(h); }
     if (G.day < D.ehDay + (ai.id - 1) * 2) return;
+    aiHeroBuild(ai, h);
     const power = armyPower(h.army), nearest = () => towns.slice().sort((a, b) => dist(a, h) - dist(b, h))[0];
     if (here) h.peak = power; else h.peak = Math.max(h.peak || 0, power);
     // a worn-down army goes home to recruit instead of marching on (fights cost a lot, so it only attacks with clear odds)
     if ((power < 1200 || power < 0.45 * h.peak) && towns.length) { if (!here) await aiWalk(ai, h, nearest()); return; }
     for (const tg of aiTargets(ai, h, power).slice(0, 5)) { if (await aiWalk(ai, h, tg)) return; }
-    if (towns.length && !here) await aiWalk(ai, h, nearest());
+    if (towns.length && !here) { await aiWalk(ai, h, nearest()); aiHeroBuild(ai, h); }
   }
   // walk toward a target tile; returns false if there is no path
   async function aiWalk(ai, h, tg) {
@@ -2247,6 +2274,7 @@
   async function aiInteract(ai, h, o, last) {
     if (o.t === 'pile') { ai.gold += o.kind === 'gold' ? o.amt : o.amt * RES_VALUE[o.kind]; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return false; }
     if (o.t === 'chest') { ai.gold += o.gold; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return false; }
+    if (o.t === 'deposit' && last) { const c = mineCost(o.kind); if (ai.gold >= aiCost(c) * 1.2) { ai.gold -= aiCost(c); aiSite(ai, 'mine', o.x, o.y, o.kind); } return true; }
     if (!last || o.owner === ai.id || isAlly(ai.id, o.owner)) return false;
     if (o.owner === 0 && o.t !== 'town' && o.t !== 'fort') { centerOn(o.x, o.y); renderAll(); toast(`${h.name} of the ${FACTIONS[ai.fac].name} attacks your ${o.t === 'mine' ? o.kind + ' mine' : o.t}!`); await sleep(700); }
     const win = (def, bonus = 1) => { const d = def.map(a => a && ({ ...a })); return quickBattle(h.army, d, bonus); };
@@ -2255,6 +2283,7 @@
       case 'monster': if (!win(o.guard)) return lose(); G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return true;
       case 'art': if (o.guard && o.guard.length && !win(o.guard)) return lose(); giveArt(h, o.art); G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return true;
       case 'mine': if (o.guard && o.guard.length && !win(o.guard)) return lose(); { const was = o.owner === 0; o.guard = []; o.owner = ai.id; note(`⛏ ${ai.name} took ${was ? 'YOUR ' : 'a '}${o.kind} mine`, o.x, o.y); } return true;
+      case 'farm': if (o.guard && o.guard.length && !win(o.guard)) return lose(); { const was = o.owner === 0; o.guard = []; o.owner = ai.id; note(`🌾 ${ai.name} took ${was ? 'YOUR ' : 'a '}farm`, o.x, o.y); } return true;
       case 'lair': if (o.guard && o.guard.length && !win(o.guard)) return lose(); o.guard = []; o.owner = ai.id; toast(`The ${FACTIONS[ai.fac].name} rivals seize the Dragon Lair!`); note(`🐲 ${ai.name} seized the Dragon Lair`, o.x, o.y); return true;
       case 'fort': case 'town': {
         if (o.owner === 0) { await defendStructure(o, h); return true; }
@@ -2299,14 +2328,17 @@
   }
   function completeSite(o) {
     G.objs.splice(G.objs.indexOf(o), 1); let tilesChanged = false, msg = '';
-    if (o.build === 'farm') { G.objs.push({ t: 'farm', owner: 0, built: true, x: o.x, y: o.y, guard: [] }); msg = `The farm is finished: +${FOOD.field} 🌾/day.`; }
-    else if (o.build === 'mine') { G.objs.push({ t: 'mine', kind: o.kind, owner: 0, built: true, x: o.x, y: o.y, guard: [] }); msg = `The ${o.kind} mine is open.`; }
+    const ow = o.owner || 0;
+    if (o.build === 'farm') { G.objs.push({ t: 'farm', owner: ow, built: true, x: o.x, y: o.y, guard: [] }); msg = `The farm is finished: +${FOOD.field} 🌾/day.`; }
+    else if (o.build === 'mine') { G.objs.push({ t: 'mine', kind: o.kind, owner: ow, built: true, x: o.x, y: o.y, guard: [] }); msg = `The ${o.kind} mine is open.`; }
     else if (o.build === 'road') { if (G.tiles[o.y][o.x] === T.GRASS || G.tiles[o.y][o.x] === T.SAND) { G.tiles[o.y][o.x] = T.ROAD; tilesChanged = true; } msg = 'The road is finished.'; }
     else if (o.build === 'tunnel') { G.tiles[o.y][o.x] = T.ROAD; (G.tunnels = G.tunnels || []).push({ x: o.x, y: o.y }); tilesChanged = true; msg = 'The tunnel is dug through the mountain!'; }
-    reindex(G); if (tilesChanged) buildTerrain(); renderAll(); toast('🔨 ' + msg); note('🔨 ' + msg, o.x, o.y);
+    reindex(G); if (tilesChanged) buildTerrain(); renderAll();
+    if (ow === 0) { toast('🔨 ' + msg); note('🔨 ' + msg, o.x, o.y); }
   }
   function advanceBuilds() {
     for (const o of G.objs.filter(x => x.t === 'site')) { o.left--; if (o.left <= 0) completeSite(o); }
+    for (const t of G.objs) if (t.t === 'town' && t.owner > 0 && t.farmBuild && --t.farmBuild.left <= 0) { t.farm = (t.farm || 0) + 1; t.farmBuild = null; }
     for (const t of myTowns()) if (t.farmBuild && --t.farmBuild.left <= 0) { t.farm = (t.farm || 0) + 1; t.farmBuild = null; toast(`🌾 ${t.name}: ${FOOD.town[t.farm].n} is ready.`); }
   }
   // the hero's Build menu: what can be built on this tile (or into the mountain next to it)
@@ -2952,5 +2984,5 @@
   }
   if (/[?&]demo/.test(location.search)) Assets.ready.then(() => setTimeout(() => { try { newGame('castle', 'Orrin', 'normal', { size: 'medium', seed: 'demo', wrap: true, food: /[?&]food/.test(location.search) }); $('title').classList.add('hide'); demo(); } catch (e) { console.error('demo failed', e); } }, 400));
   window.__G = () => G;
-  window.__dbg = { demo, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
+  window.__dbg = { endTurn, demo, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
 })();

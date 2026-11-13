@@ -254,10 +254,10 @@ const TownArt = (() => {
       if (!s.built && !(an && an.kind === 'build')) hammerBadge(g, x + ws * 0.3, base - hs * 0.3, !!(s.locked || s.na), 0.5 + 0.5 * Math.sin(now / 420 + i));
       if (s.built && s.av > 0) { const bx = x - ws * 0.36, by = base - hs * 0.86; g.beginPath(); g.arc(bx, by, 10, 0, 7); g.fillStyle = '#d9a52a'; g.fill(); g.lineWidth = 1.6; g.strokeStyle = '#140a04'; g.stroke(); g.fillStyle = '#1c1204'; g.font = 'bold 11px Cinzel, Georgia, serif'; g.fillText(s.av > 99 ? '99+' : s.av, bx, by + 1); }
       // name plate and level stars
-      const nm = s.name || '', pw = Math.max(62, nm.length * 6.6 + 16), py = base + (layout ? 4 : sceneImg ? 24 : 8);
-      g.font = 'bold 11px Cinzel, Georgia, serif'; roundRect(g, x - pw / 2, py, pw, 17, 5); g.fillStyle = hov ? 'rgba(48,32,10,.95)' : 'rgba(14,9,5,.84)'; g.fill(); g.lineWidth = 1.2; g.strokeStyle = s.built ? (hov ? '#ffd766' : '#c9a24a') : 'rgba(255,255,255,.28)'; g.stroke();
-      g.fillStyle = s.built ? '#f6ebc8' : '#aaa59a'; g.fillText(nm, x, py + 9);
-      if (s.max > 1 && s.built && s.lv > 0) { g.font = 'bold 11px sans-serif'; g.lineWidth = 3; g.strokeStyle = '#000'; g.fillStyle = '#ffd24a'; const st = '★'.repeat(Math.max(0, Math.min(s.lv, s.max))); g.strokeText(st, x, py + 25); g.fillText(st, x, py + 25); }
+      const nm = (Settings.townNames || hov) ? (s.name || '') : '', pw = Math.max(62, nm.length * 6.6 + 16), py = base + (layout ? 4 : sceneImg ? 24 : 8);
+      g.font = 'bold 11px Cinzel, Georgia, serif'; if (nm) roundRect(g, x - pw / 2, py, pw, 17, 5); if (nm) { g.fillStyle = hov ? 'rgba(48,32,10,.95)' : 'rgba(14,9,5,.84)'; g.fill(); g.lineWidth = 1.2; g.strokeStyle = s.built ? (hov ? '#ffd766' : '#c9a24a') : 'rgba(255,255,255,.28)'; g.stroke();
+        g.fillStyle = s.built ? '#f6ebc8' : '#aaa59a'; g.fillText(nm, x, py + 9); }
+      if (s.max > 1 && s.built && s.lv > 0) { g.font = 'bold 11px sans-serif'; g.lineWidth = 3; g.strokeStyle = '#000'; g.fillStyle = '#ffd24a'; const st = '★'.repeat(Math.max(0, Math.min(s.lv, s.max))); const sy = nm ? py + 25 : py + 8; g.strokeText(st, x, sy); g.fillText(st, x, sy); }
     }
     // soft vignette so the panorama sits in its frame
     if (!sceneImg) { const vg = g.createRadialGradient(W / 2, H / 2, H * 0.55, W / 2, H / 2, W * 0.62); vg.addColorStop(0, 'rgba(8,4,0,0)'); vg.addColorStop(1, 'rgba(8,4,0,.38)'); g.fillStyle = vg; g.fillRect(0, 0, W, H); }

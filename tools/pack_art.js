@@ -4,7 +4,7 @@
 // packs/index.json: { packs: [{ f, n, core }], files: { "<stem>": [pack, offset, length, "webp|png|..."] } }
 // The game falls back to the single files when the packs are not there (for example the python dev server).
 const fs = require('fs'), path = require('path');
-const LATER = /^(poses|mounted|anim|buildings)\/|^ui\/(castle_select|hero_select|adventure|town_)/;
+const LATER = /^(poses|mounted|anim|buildings|heroes)\/|^ui\/(castle_select|hero_select|adventure|town_)/;
 function pack(root, outDir) {
   const art = path.join(root, 'art'), list = JSON.parse(fs.readFileSync(path.join(art, 'manifest.json'), 'utf8')).files;
   outDir = outDir || path.join(art, 'packs'); fs.rmSync(outDir, { recursive: true, force: true }); fs.mkdirSync(outDir, { recursive: true });
@@ -19,6 +19,7 @@ function pack(root, outDir) {
   const facs = [...new Set(list.map(townFac).filter(Boolean))].sort();
   facs.forEach(fc => add('town_' + fc, false, list.filter(f => townFac(f) === fc)));
   add('ui', false, list.filter(f => /^ui\/(castle_select|hero_select|adventure|town_)/.test(stem(f)) && !townFac(f)));
+  add('heroes', false, list.filter(f => /^heroes\//.test(f)));   // 144 hero busts: only the hero screens and the heroes in play need them
   add('poses', false, list.filter(f => /^(poses|mounted)\//.test(f) && !idleSet.has(f)));
   // animation frames: whole creature folders together, about 10 MB per pack
   const anim = list.filter(f => /^anim\//.test(f) && !idleSet.has(f)), byDir = {}; anim.forEach(f => { (byDir[f.split('/')[1]] = byDir[f.split('/')[1]] || []).push(f); });
@@ -29,8 +30,9 @@ function pack(root, outDir) {
   groups.forEach((g, gi) => {
     const bufs = []; let off = 0;
     g.files.forEach(f => { const b = fs.readFileSync(path.join(art, f)); index.files[stem(f)] = [gi, off, b.length, path.extname(f).slice(1).toLowerCase()]; bufs.push(b); off += b.length; });
-    fs.writeFileSync(path.join(outDir, g.name + '.bin'), Buffer.concat(bufs));
-    index.packs.push({ f: g.name + '.bin', n: off, core: g.core });
+    const all = Buffer.concat(bufs), fn = g.name + '.' + require('crypto').createHash('md5').update(all).digest('hex').slice(0, 8) + '.bin';   // the name changes whenever the content does, so a cached copy can never be stale
+    fs.writeFileSync(path.join(outDir, fn), all);
+    index.packs.push({ f: fn, n: off, core: g.core });
   });
   fs.writeFileSync(path.join(outDir, 'index.json'), JSON.stringify(index));
   return index.packs;

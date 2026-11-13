@@ -18,7 +18,8 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
   if (req.headers.has('range')) return;                       // media range requests go straight to the network
-  const heavy = HEAVY.test(req.url), store = (res) => { if (res && res.status === 200) { const copy = res.clone(); caches.open(heavy ? ART : CACHE).then((c) => c.put(req, copy)); } return res; };
+  // the two art lists must always be fresh; the packs they name are content-hashed, so a cached pack is never stale
+  const heavy = HEAVY.test(req.url) && !/\/art\/(manifest\.json|packs\/index\.json)$/.test(new URL(req.url).pathname),  store = (res) => { if (res && res.status === 200) { const copy = res.clone(); caches.open(heavy ? ART : CACHE).then((c) => c.put(req, copy)); } return res; };
   if (heavy) {
     e.respondWith(caches.open(ART).then((c) => c.match(req, { ignoreSearch: true })).then((hit) => {
       // a cached file is served at once; it is checked again (a tiny 304 answer) only when the copy is over a day old, so a visit does not fire thousands of background requests

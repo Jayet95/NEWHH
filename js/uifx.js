@@ -128,6 +128,7 @@
 (() => {
   const $ = (id) => document.getElementById(id), box = $('mbox'); if (!box || typeof MutationObserver === 'undefined') return;
   const small = () => matchMedia('(max-width: 760px), (orientation: landscape) and (max-height: 540px)').matches;
+  const PAGING = false;
   let busy = false, pages = [], cur = 0, bar = null, hideable = new Set();
   const isFixed = (k) => k.tagName === 'H2' || k.classList.contains('mb') || k.classList.contains('townwide') || k.tagName === 'SPAN' && !k.offsetHeight;
   const show = () => {
@@ -160,6 +161,7 @@
     if (busy) return; busy = true;
     try {
       clear();
+      if (!PAGING) return;   // phone windows scroll instead (one page, footer stays put); flip PAGING on to split them into ‹ 1/2 › pages again
       if (!small() || box.querySelector('.ttabs') || box.querySelector('#tcv') || $('modal').classList.contains('hide')) return;
       if (box.scrollHeight <= box.clientHeight + 24) return;   // a sliver of overflow is not worth a second page
       let root = box; const top = [...box.children].filter(k => !isFixed(k) && k.offsetHeight > 0);
@@ -183,9 +185,9 @@
     } finally { setTimeout(() => { busy = false; }, 0); }
   };
   let t = 0; const later = () => { clearTimeout(t); t = setTimeout(() => { cur = 0; build(); }, 80); };
-  new MutationObserver((m) => { if (busy || m.every(x => [...x.addedNodes, ...x.removedNodes].every(n => n.classList && n.classList.contains('pgbar')))) return; later(); }).observe(box, { childList: true, subtree: true });
+  new MutationObserver((m) => { if (busy || m.every(x => (x.target.closest && x.target.closest('.pgbar')) || [...x.addedNodes, ...x.removedNodes].every(n => n.classList && n.classList.contains('pgbar')))) return; later(); }).observe(box, { childList: true, subtree: true });
   new MutationObserver(later).observe($('modal'), { attributes: true, attributeFilter: ['class'] });
-  window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => { cur = 0; build(); }, 200); });
+  window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => { build(); }, 200); });   // keep the page you are on (a phone's address bar fires resize while you tap)
   let sx = 0; box.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; }, { passive: true });
   box.addEventListener('touchend', (e) => { if (!pages.length) return; const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 70) { if (dx < 0 && cur < pages.length - 1) cur++; else if (dx > 0 && cur > 0) cur--; show(); } }, { passive: true });
 })();

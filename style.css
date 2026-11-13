@@ -123,7 +123,7 @@ input, select { background: #120d08; color: var(--txt); border: 1px solid var(--
 
 /* title screen */
 #title { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 30%, #4a3418 0%, #1a1008 55%, #070402 100%); overflow: hidden; }
-#title::before { content: ""; position: absolute; inset: -50%; background: conic-gradient(from 0deg at 50% 50%, transparent 0 20%, rgba(230, 191, 85, .07) 25%, transparent 30% 70%, rgba(230, 191, 85, .07) 75%, transparent 80%); animation: spin 40s linear infinite; }
+#title::before { content: ""; position: fixed; inset: -50%; background: conic-gradient(from 0deg at 50% 50%, transparent 0 20%, rgba(230, 191, 85, .07) 25%, transparent 30% 70%, rgba(230, 191, 85, .07) 75%, transparent 80%); animation: spin 40s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .titlebox { position: relative; text-align: center; padding: 34px 56px; border: 3px solid var(--gold); border-radius: 14px; background: rgba(20, 14, 8, .82); box-shadow: 0 0 40px rgba(163, 122, 28, .45), inset 0 0 30px rgba(0, 0, 0, .6); animation: popIn .5s ease-out; }
 .titlebox h1 { margin: 0; font-size: 42px; color: var(--gold); text-shadow: 0 0 16px #a37a1c, 0 3px 0 #000; letter-spacing: 1px; }
@@ -411,6 +411,7 @@ body #emblem { height: 78px; display: flex; align-items: center; justify-content
 /* ---------- menu, settings, slots ---------- */
 .menugrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .menugrid button { padding: 13px 8px; font-size: 15px; }
+@media (max-width: 760px) { .menugrid { gap: 6px; } .menugrid button { padding: 8px 6px; font-size: 14px; } }
 .setrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #44331c; flex-wrap: wrap; }
 .setrow > div:first-child { flex: 1 1 150px; }
 .setrow a { color: var(--gold); }
@@ -1411,6 +1412,21 @@ body.skin #mbox .gacts button, #mbox .gacts button { flex: 1 1 0; min-width: 0; 
 .gpanel .gshero { position: absolute; display: grid; place-items: center; overflow: hidden; border-radius: 40% 40% 4px 4px / 22% 22% 4px 4px; pointer-events: none; }
 .gpanel .gshero .pic { width: 100% !important; height: 100% !important; object-fit: cover; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
 .tui .gstack { background: transparent !important; border: 0 !important; padding: 0 6px; }
+.tvarm { display: inline-flex; align-items: center; gap: 2px; margin: 2px 8px 0 0; } .tvarm small { font-weight: bold; color: #f3e7c6; }
+.bigcr { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, .78); display: grid; place-items: center; padding: 12px; }
+.bigcr .bcbox { max-width: 420px; width: 100%; max-height: 96vh; overflow-y: auto; text-align: center; background: linear-gradient(#2a1d10, #140d07); border: 3px solid var(--gold); border-radius: 12px; padding: 12px 14px; }
+.bigcr .bcpic { display: grid; place-items: center; } .bigcr .bcpic img { width: min(80vw, 340px) !important; height: auto !important; aspect-ratio: 1; object-fit: contain; }
+.bigcr h3 { margin: 4px 0 2px; color: var(--gold); } .bigcr .wstats.big { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 8px 0; } .bigcr .wstats.big span { font-size: 15px; padding: 3px 9px; background: rgba(0, 0, 0, .45); border: 1px solid var(--edge); border-radius: 12px; }
+.bigcr button { margin-top: 8px; min-width: 140px; }
+.mklbl { margin: 10px 0 4px; font-weight: bold; color: var(--gold); font-size: 14px; }
+.mkchips { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; } .mkchip { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 2px; border-radius: 8px; background: #17100a; border: 2px solid #4a381c; color: #f3e7c6; font-size: 20px; line-height: 1.1; }
+.mkchip small { font-size: 11px; color: #cdbb8a; } .mkchip.on { border-color: #ffd766; background: linear-gradient(#4a3512, #2a1d0a); box-shadow: 0 0 8px rgba(255, 215, 102, .5); }
+.mkqty { display: grid; grid-template-columns: 44px 1fr 44px 52px 56px; gap: 5px; } .mkqty input { text-align: center; font-size: 18px; min-width: 0; } .mkqty button { padding: 8px 0; }
+.mkcost { margin: 12px 0 4px; font-size: 16px; padding: 8px 10px; background: rgba(0, 0, 0, .35); border-radius: 8px; border: 1px solid var(--edge); }
+.mkart { display: grid; gap: 5px; margin-top: 6px; } .mkart .arow { text-align: left; padding: 8px 10px !important; border: 2px solid #4a381c !important; border-image: none !important; background: #17100a !important; color: #f3e7c6 !important; border-radius: 8px; min-width: 0 !important; }
+.mkart .arow.on { border-color: #ffd766 !important; background: linear-gradient(#4a3512, #2a1d0a) !important; }
+.mkdur { display: grid; grid-template-columns: 1fr 1.6fr; gap: 6px; } body.skin .mkdur button, .mkdur button { border-image: none !important; border: 2px solid #4a381c !important; background: #17100a !important; color: #f3e7c6 !important; padding: 8px 4px !important; min-width: 0 !important; } body.skin .mkdur button.on, .mkdur button.on { border-color: #ffd766 !important; background: linear-gradient(#4a3512, #2a1d0a) !important; }
+.gcol { display: block; margin: 2px auto; padding: 3px 12px; font-size: 12px; border-radius: 12px; background: rgba(12, 8, 4, .7); color: #f3e7c6; border: 1px solid var(--edge); }
 .tui .gstack .glabel { text-shadow: 0 1px 3px #000, 0 0 6px #000; color: #f3e7c6; margin: 2px 4px 0; }
 .tbar .ttab.tbtn { padding: 0 !important; border: 0 !important; border-image: none !important; background: transparent !important; box-shadow: none !important; min-height: 0 !important; height: auto; }
 .tbar .ttab.tbtn img { display: block; width: 100%; height: auto; max-height: 64px; object-fit: contain; filter: drop-shadow(0 2px 4px #000); }
@@ -1584,3 +1600,26 @@ body.skin #mbox .gacts button, #mbox .gacts button { flex: 1 1 0; min-width: 0; 
 .townpick .tcard:hover { border-color: var(--gold); }
 .townpick .tcn { position: absolute; left: 0; right: 0; bottom: 0; padding: 22px 10px 18px; font-weight: bold; font-size: 15px; color: #fff3cf; text-shadow: 0 1px 2px #000; background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, .82)); }
 .townpick .tci { position: absolute; left: 10px; right: 10px; bottom: 4px; font-size: 11px; color: #e8d9ac; text-shadow: 0 1px 2px #000; }
+/* phones: the creature rows keep the height their content needs (they used to be squeezed into equal slices and overlapped); the panel scrolls instead */
+@media (max-width: 760px) {
+  #mbox .tpbody .bgrid.wgrid { grid-auto-rows: auto; flex: 0 0 auto; align-content: start; min-height: 0; }
+  .tpbody .wcard { min-height: min-content; overflow: hidden; }
+  .tpbody .wcard .bpic.wpic { height: 72px; width: 72px; }
+}
+@media (max-width: 760px) { .tui:has(.tpanel) .tarrow { display: none; } }   /* the town arrows would sit on top of the open panel */
+/* town Warriors: the recruit / − / + / Max buttons were a muddy brown with dark text; brighter gold, crisper label */
+body.skin .tpbody .wcard .bacts button, .tpbody .wcard .bacts button { background: linear-gradient(#ffe08a, #e0a82e 55%, #b9801a) !important; color: #1a0c01 !important; font-weight: 800; text-shadow: 0 1px 0 rgba(255, 240, 190, .6); border: 1px solid #5a3a08 !important; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 0 1px 3px rgba(0, 0, 0, .6) !important; }
+.tpbody .wcard .bacts button:disabled { background: linear-gradient(#8a7a55, #5e5236) !important; color: #2a2113 !important; opacity: .75; }
+.tpbody .wcard .bacts input { background: #120b05 !important; color: #fff3cf !important; border: 1px solid #c9a24a !important; font-weight: bold; }
+.tpbody .wcard.lockedrow { opacity: .8; filter: saturate(.6); }   /* locked creatures stay readable */
+/* trade screen on phones: the painted button frames are too fat for seven resource chips in a row */
+body.skin .mkchip, .mkchip { border: 2px solid #4a381c !important; border-image: none !important; background: #17100a !important; padding: 5px 0 !important; min-width: 0 !important; min-height: 0 !important; width: 100%; box-sizing: border-box; box-shadow: none; }
+body.skin .mkchip.on, .mkchip.on { border-color: #ffd766 !important; background: linear-gradient(#4a3512, #2a1d0a) !important; box-shadow: 0 0 8px rgba(255, 215, 102, .5); }
+.mkchip img { width: 26px; height: 26px; }
+.mkchips { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+body.skin .mkqty button { border-image: none !important; border: 2px solid #8c6a33 !important; background: linear-gradient(#5a4020, #34240f) !important; color: #f3e7c6 !important; padding: 8px 0 !important; min-width: 0 !important; min-height: 0 !important; font-weight: bold; }
+.mkqty { grid-template-columns: 40px minmax(0, 1fr) 40px 48px 52px; }
+/* diplomacy trade on phones: selects and amounts must stay inside the window */
+#mbox .trow select, #mbox .trow input[type=number], #tgD { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+#mbox .trow[style*="90px"] { grid-template-columns: minmax(0, 1fr) 90px !important; }
+#tgD { display: block; margin-top: 4px; text-overflow: ellipsis; }

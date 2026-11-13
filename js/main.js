@@ -2599,12 +2599,15 @@
     const gets = [...RES.map(k => ({ k: 'r:' + k, res: k, label: `${RES_ICON[k]} ${k}` })),
       ...ai.heroes.flatMap((h, hi) => heroArts(h).map(a => ({ k: `a:${hi}:${a.where}:${a.ref}`, art: a, hero: h, label: `${ART[a.id].i} ${ART[a.id].n} (${h.name})` })))];
     const st = openTrade.st = openTrade.st || { g: 0, q: 100, t: 0, r: 1 };
-    const sel = (list, cur, idn) => `<select id="${idn}">${list.map((x, i) => `<option value="${i}"${i === cur ? ' selected' : ''}>${x.label}</option>`).join('')}</select>`;
+    // phone-friendly pickers: resource chips and artifact rows instead of drop-down lists (the chosen index lives in a hidden field)
+    const sel = (list, cur, idn, own) => `<input type="hidden" id="${idn}" value="${cur}"><div class="mkchips" data-for="${idn}">${list.map((x, i) => x.res ? `<button type="button" class="mkchip${i === cur ? ' on' : ''}" data-i="${i}" title="${x.res}">${RES_ICON[x.res]}<small>${own ? G.res[x.res] : (x.res === 'gold' ? ai.gold : x.res === 'food' ? (ai.food || 0) : '')}</small></button>` : '').join('')}</div>
+      ${list.some(x => x.art) ? `<div class="mkart" data-for="${idn}">${list.map((x, i) => x.art ? `<button type="button" class="arow${i === cur ? ' on' : ''}" data-i="${i}">${ART[x.art.id].i} <b>${ART[x.art.id].n}</b> <span class="small">${x.hero.name}</span></button>` : '').join('')}</div>` : ''}`;
+    const stepper = (idn, val) => `<div class="mkqty"><button type="button" data-q="${idn}:-1">−</button><input type="number" id="${idn}" min="1" inputmode="numeric" value="${val}"><button type="button" data-q="${idn}:1">+</button><button type="button" data-q="${idn}:10">+10</button><button type="button" data-q="${idn}:max">Max</button></div>`;
     modalOpen(`<h2>⚖ Trade with the ${FN(id)} realm</h2><p class="small">${war ? 'They will not trade with an enemy.' : ally ? 'Allies trade at fair value.' : `They buy at a discount and sell at a premium (your rank ${dipRank()} narrows the gap). Artifacts are worth more to them than the market says.`}</p>
-      <div class="trow" style="grid-template-columns:1fr 90px"><div>You give<br>${sel(gives, Math.min(st.g, gives.length - 1), 'tgG')}</div><div>Amount<br><input type="number" id="tgQ" min="1" value="${st.q}"></div></div>
-      <div class="trow" style="grid-template-columns:1fr 90px"><div>You get<br>${sel(gets, Math.min(st.t, gets.length - 1), 'tgT')}</div><div>Amount<br><input type="number" id="tgR" min="1" value="${st.r}"></div></div>
-      <div class="small" style="margin-top:6px">Duration: <select id="tgD"><option value="1">once</option><option value="10">every day for 10 days (resources only)</option></select></div>
-      <div id="tgV" style="margin:10px 0"></div><div class="mb"><button class="primary" id="tgGo">Offer</button><button id="tgBack">Back</button></div>`);
+      <div class="mklbl">You give</div>${sel(gives, Math.min(st.g, gives.length - 1), 'tgG', true)}${stepper('tgQ', st.q)}
+      <div class="mklbl">You get</div>${sel(gets, Math.min(st.t, gets.length - 1), 'tgT', false)}${stepper('tgR', st.r)}
+      <div class="mklbl">How often</div><input type="hidden" id="tgD" value="1"><div class="mkdur"><button type="button" class="on" data-dur="1">Once</button><button type="button" data-dur="10" title="Resources only">Every day, 10 days</button></div>
+      <div id="tgV" class="mkcost"></div><div class="mb"><button class="primary" id="tgGo">Offer</button><button id="tgBack">Back</button></div>`);
     const eval1 = () => {
       st.g = +$('tgG').value; st.t = +$('tgT').value; st.q = Math.max(1, parseInt($('tgQ').value) || 1); st.r = Math.max(1, parseInt($('tgR').value) || 1);
       const g = gives[st.g], t = gets[st.t]; if (!g || !t) return { ok: false, why: 'Choose what to trade.' };
@@ -2620,7 +2623,16 @@
       return vg >= vt ? { ok: true, why: `✔ They accept (${Math.round(vg)} offered for ${Math.round(vt)}).`, g, t, qg, qt } : { ok: false, why: `✘ Not enough: they value your offer at ${Math.round(vg)}, the price is ${Math.round(vt)}.` };
     };
     const upd = () => { const e = eval1(); $('tgV').innerHTML = `<span style="color:${e.ok ? '#9be59b' : '#f0a090'}">${e.why}</span>`; $('tgGo').disabled = !e.ok; return e; };
-    ['tgG', 'tgT', 'tgQ', 'tgR'].forEach(x => { $(x).oninput = upd; $(x).onchange = upd; });
+    ['tgQ', 'tgR'].forEach(x => { $(x).oninput = upd; $(x).onchange = upd; });
+    $('mbox').querySelectorAll('.mkchips[data-for], .mkart[data-for]').forEach(g => g.querySelectorAll('[data-i]').forEach(b => b.onclick = () => {
+      $(g.dataset.for).value = b.dataset.i; $('mbox').querySelectorAll('[data-for="' + g.dataset.for + '"] [data-i]').forEach(x => x.classList.toggle('on', x === b)); upd();
+    }));
+    $('mbox').querySelectorAll('[data-q]').forEach(b => b.onclick = () => {
+      const [idn, d] = b.dataset.q.split(':'), inp = $(idn), cur = Math.max(1, parseInt(inp.value) || 1);
+      const lim = idn === 'tgQ' ? (gives[+$('tgG').value] && gives[+$('tgG').value].res ? G.res[gives[+$('tgG').value].res] : 1) : 99999;
+      inp.value = d === 'max' ? Math.max(1, lim) : Math.max(1, cur + +d); upd();
+    });
+    $('mbox').querySelectorAll('[data-dur]').forEach(b => b.onclick = () => { $('tgD').value = b.dataset.dur; $('mbox').querySelectorAll('[data-dur]').forEach(x => x.classList.toggle('on', x === b)); });
     $('tgBack').onclick = openDiplomacy;
     $('tgGo').onclick = () => {
       const e = upd(); if (!e.ok) return; const { g, t, qg, qt } = e;

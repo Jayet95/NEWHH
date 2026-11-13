@@ -1745,22 +1745,26 @@
 
   function openMarket(rate, title, back) {
     const st = openMarket.st || (openMarket.st = { get: 'wood', give: 'gold', qty: 1 });
-    const opts = (sel) => RES.map(k => `<option value="${k}"${k === sel ? ' selected' : ''}>${Art.RES_EMOJI[k]} ${k}</option>`).join('');
+    const chips = (grp, sel) => `<div class="mkchips" data-grp="${grp}">${RES.map(k => `<button type="button" class="mkchip${k === sel ? ' on' : ''}" data-k="${k}" title="${k}">${RES_ICON[k]}<small>${G.res[k]}</small></button>`).join('')}</div>`;
     $('mbox').innerHTML = `<h2>⚖️ ${title}</h2>
       <p class="small">Rate: ${Math.round(rate * 100)}% of market value. Pay with any resource to buy the ones you are missing.</p>
-      <div class="trow" style="grid-template-columns:1fr 1fr 100px"><div>Buy<br><select id="mGet">${opts(st.get)}</select></div>
-      <div>Pay with<br><select id="mGive">${opts(st.give)}</select></div><div>Quantity<br><input type="number" id="mQty" min="1" value="${st.qty}"></div></div>
-      <div id="mCost" style="margin:10px 0"></div>
-      <div class="small">${RES.map(k => RES_ICON[k] + ' ' + G.res[k]).join('  ')}</div>
+      <div class="mklbl">You get</div>${chips('get', st.get)}
+      <div class="mklbl">You pay with</div>${chips('give', st.give)}
+      <div class="mklbl">Quantity</div><div class="mkqty"><button type="button" id="mQm">−</button><input type="number" id="mQty" min="1" inputmode="numeric" value="${st.qty}"><button type="button" id="mQp">+</button><button type="button" id="mQ10">+10</button><button type="button" id="mQmax">Max</button></div>
+      <div id="mCost" class="mkcost"></div>
       <div class="mb"><button id="mBuy" class="primary">Trade</button><button id="mClose">${back ? 'Back to town' : 'Close'}</button></div>`;
     const cost = () => Math.ceil(st.qty * RES_VALUE[st.get] / (RES_VALUE[st.give] * rate));
+    const maxQty = () => Math.max(1, Math.floor(G.res[st.give] * RES_VALUE[st.give] * rate / RES_VALUE[st.get]));
     const upd = () => {
-      st.get = $('mGet').value; st.give = $('mGive').value; st.qty = Math.max(1, parseInt($('mQty').value) || 1);
+      st.qty = Math.max(1, parseInt($('mQty').value) || 1);
       const same = st.get === st.give, c = cost();
       $('mCost').innerHTML = same ? 'Choose two different resources.' : `Cost: <b>${RES_ICON[st.give]} ${c}</b> for ${RES_ICON[st.get]} ${st.qty}` + (G.res[st.give] < c ? ' <span style="color:#f88">(not enough)</span>' : '');
       $('mBuy').disabled = same || G.res[st.give] < c;
     };
-    ['mGet', 'mGive', 'mQty'].forEach(id => { $(id).oninput = upd; $(id).onchange = upd; });
+    $('mQty').oninput = upd; $('mQty').onchange = upd;
+    const setQ = (v) => { $('mQty').value = Math.max(1, v); upd(); };
+    $('mQm').onclick = () => setQ(st.qty - 1); $('mQp').onclick = () => setQ(st.qty + 1); $('mQ10').onclick = () => setQ(st.qty + 10); $('mQmax').onclick = () => setQ(maxQty());
+    $('mbox').querySelectorAll('.mkchips').forEach(g => g.querySelectorAll('.mkchip').forEach(b => b.onclick = () => { st[g.dataset.grp] = b.dataset.k; g.querySelectorAll('.mkchip').forEach(x => x.classList.toggle('on', x === b)); upd(); }));
     $('mBuy').onclick = () => { upd(); const c = cost(); if (st.get === st.give || G.res[st.give] < c) return; G.res[st.give] -= c; G.res[st.get] += st.qty; toast(`Bought ${st.qty} ${RES_ICON[st.get]} for ${c} ${RES_ICON[st.give]}.`); renderAll(); openMarket(rate, title, back); };
     $('mClose').onclick = () => { if (back) openTown(curTown); else { $('modal').classList.add('hide'); renderAll(); } };
     upd(); $('modal').classList.remove('hide');

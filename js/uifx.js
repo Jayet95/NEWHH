@@ -128,6 +128,7 @@
 (() => {
   const $ = (id) => document.getElementById(id), box = $('mbox'); if (!box || typeof MutationObserver === 'undefined') return;
   const small = () => matchMedia('(max-width: 760px), (orientation: landscape) and (max-height: 540px)').matches;
+  const PAGING = false;
   let busy = false, pages = [], cur = 0, bar = null, hideable = new Set();
   const isFixed = (k) => k.tagName === 'H2' || k.classList.contains('mb') || k.classList.contains('townwide') || k.tagName === 'SPAN' && !k.offsetHeight;
   const show = () => {
@@ -160,6 +161,7 @@
     if (busy) return; busy = true;
     try {
       clear();
+      if (!PAGING) return;   // phone windows scroll instead (one page, footer stays put); flip PAGING on to split them into ‹ 1/2 › pages again
       if (!small() || box.querySelector('.ttabs') || box.querySelector('#tcv') || $('modal').classList.contains('hide')) return;
       if (box.scrollHeight <= box.clientHeight + 24) return;   // a sliver of overflow is not worth a second page
       let root = box; const top = [...box.children].filter(k => !isFixed(k) && k.offsetHeight > 0);

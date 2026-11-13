@@ -698,7 +698,9 @@
       const c = miniCache.getContext('2d'); c.drawImage(miniTerr, 0, 0);
       for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) {
         const ow = TG[y * G.W + x] - 1;
-        if (ow >= 0) { c.fillStyle = ownFill(ow, 0.4); c.fillRect(mxp(x, y, k), y * MV, k + 0.7, MV + 0.7); }
+        if (ow >= 0) {
+          let edge = false; for (const [nx, ny] of hexNb(x, y)) if (nx >= 0 && ny >= 0 && nx < G.W && ny < G.H && TG[ny * G.W + nx] !== ow + 1 && G.tiles[ny][nx] !== T.WATER) { edge = true; break; }
+          c.fillStyle = edge ? ownFill(ow, 0.95) : ownFill(ow, 0.4); c.fillRect(mxp(x, y, k), y * MV, k + 0.7, MV + 0.7); }
       }
     }
     mx.drawImage(miniCache, 0, 0);
@@ -794,12 +796,14 @@
       }).join('');
       tp.querySelectorAll('[data-tc]').forEach(b => b.onclick = () => { if (busy) return; const t = mt[+b.dataset.tc]; centerOn(t.x, t.y); openTown(t); });
     } }
-    $('terr').innerHTML = `<h3>🗺 Territory — ${mine.length}/${zs.length} zones</h3>` +
+    const TS = terrStats();
+    $('terr').innerHTML = `<h3>🗺 Territory — ${mine.length}/${zs.length} zones · ${TS.count[0] || 0} tiles</h3>` +
       mine.map(z => { const gn = z.garrison ? z.garrison.reduce((s, a) => s + (a ? a.n : 0), 0) : 0;
         return `<div class="zrow"><span class="zdot" style="background:${ownCol(0)};color:${ownCol(0)}"></span>${z.t === 'town' ? '🏰' : '🏯'} ${z.name} <span class="small">garrison ${gn}</span></div>`; }).join('') +
       `<div class="small">Paying mines: ${mineIncome} · other zones: ${rest}</div>` +
-      G.ais.map(ai => { const tw = G.objs.filter(o => o.t === 'town' && o.owner === ai.id).length, fr = G.objs.filter(o => o.t === 'fort' && o.owner === ai.id).length;
-        return `<div class="zrow" title="Rival: ${FACTIONS[ai.fac].name}"><span class="zdot" style="background:${ownCol(ai.id)};color:${ownCol(ai.id)}"></span>${allyOfPlayer(ai.id) ? '🤝 ' : G.dip ? (atWar(0, ai.id) ? '⚔ ' : '🕊 ') : ''}${FACTIONS[ai.fac].icon} ${ai.alive ? `${tw} towns, ${fr} forts, ${ai.heroes.length} heroes` : '<s>eliminated</s>'}</div>`; }).join('');
+      G.ais.map(ai => { const tw = G.objs.filter(o => o.t === 'town' && o.owner === ai.id).length, fr = G.objs.filter(o => o.t === 'fort' && o.owner === ai.id).length, ed = TS.edges[ai.id] || 0;
+        const bs = ed ? (allyOfPlayer(ai.id) ? 'allied — open' : atWar(0, ai.id) ? 'at war — open to invasion' : pairOb(0, ai.id) ? 'open borders' : 'closed') : '';
+        return `<div class="zrow" title="Rival: ${FACTIONS[ai.fac].name}"><span class="zdot" style="background:${ownCol(ai.id)};color:${ownCol(ai.id)}"></span>${allyOfPlayer(ai.id) ? '🤝 ' : G.dip ? (atWar(0, ai.id) ? '⚔ ' : '🕊 ') : ''}${FACTIONS[ai.fac].icon} ${ai.alive ? `${tw} towns, ${fr} forts, ${ai.heroes.length} heroes · ${TS.count[ai.id] || 0} tiles` : '<s>eliminated</s>'}${ai.alive && ed ? `<br><span class="small">🚧 border with you: ${ed} edges — ${bs}</span>` : ''}</div>`; }).join('');
     const el = $('army'); el.innerHTML = ''; el.title = 'Drag a stack onto another slot (or tap two slots) to move, merge or swap.';
     h.army.forEach((a, i) => {
       const b = document.createElement('button');
@@ -2295,6 +2299,17 @@
       }
     }
     terrA = a; terrSig = h; terrG = G; return a;
+  }
+  // land held per realm and how long each realm's border runs against yours (cached until the borders change)
+  let tstat = null, tstatSig = -1, tstatG = null;
+  function terrStats() {
+    const a = terrGrid(); if (tstat && tstatSig === terrSig && tstatG === G) return tstat;
+    const W = G.W, H = G.H, count = {}, edges = {};
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const v = a[y * W + x]; if (!v) continue; count[v - 1] = (count[v - 1] || 0) + 1;
+      if (v === 1) for (const [nx, ny] of hexNb(x, y)) { if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue; const u = a[ny * W + nx]; if (u > 1) edges[u - 1] = (edges[u - 1] || 0) + 1; }
+    }
+    tstatSig = terrSig; tstatG = G; return (tstat = { count, edges });
   }
   const terrOwner = (x, y) => { const v = terrGrid()[y * G.W + x]; return v ? v - 1 : null; };
   // crossing borders: you may not enter another realm's land unless you are allied, at war with them, or they gave you open borders (a hero already standing inside may move about and leave)

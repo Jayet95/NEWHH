@@ -123,7 +123,7 @@ input, select { background: #120d08; color: var(--txt); border: 1px solid var(--
 
 /* title screen */
 #title { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 30%, #4a3418 0%, #1a1008 55%, #070402 100%); overflow: hidden; }
-#title::before { content: ""; position: absolute; inset: -50%; background: conic-gradient(from 0deg at 50% 50%, transparent 0 20%, rgba(230, 191, 85, .07) 25%, transparent 30% 70%, rgba(230, 191, 85, .07) 75%, transparent 80%); animation: spin 40s linear infinite; }
+#title::before { content: ""; position: fixed; inset: -50%; background: conic-gradient(from 0deg at 50% 50%, transparent 0 20%, rgba(230, 191, 85, .07) 25%, transparent 30% 70%, rgba(230, 191, 85, .07) 75%, transparent 80%); animation: spin 40s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .titlebox { position: relative; text-align: center; padding: 34px 56px; border: 3px solid var(--gold); border-radius: 14px; background: rgba(20, 14, 8, .82); box-shadow: 0 0 40px rgba(163, 122, 28, .45), inset 0 0 30px rgba(0, 0, 0, .6); animation: popIn .5s ease-out; }
 .titlebox h1 { margin: 0; font-size: 42px; color: var(--gold); text-shadow: 0 0 16px #a37a1c, 0 3px 0 #000; letter-spacing: 1px; }
@@ -411,6 +411,7 @@ body #emblem { height: 78px; display: flex; align-items: center; justify-content
 /* ---------- menu, settings, slots ---------- */
 .menugrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .menugrid button { padding: 13px 8px; font-size: 15px; }
+@media (max-width: 760px) { .menugrid { gap: 6px; } .menugrid button { padding: 8px 6px; font-size: 14px; } }
 .setrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #44331c; flex-wrap: wrap; }
 .setrow > div:first-child { flex: 1 1 150px; }
 .setrow a { color: var(--gold); }

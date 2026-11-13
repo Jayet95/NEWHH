@@ -66,6 +66,10 @@
   const teamOf = (o) => o === 0 ? 1 : ((G.ais.find(a => a.id === o) || {}).team || (10 + o));
   const isAlly = (a, b) => a !== null && a !== undefined && b !== null && b !== undefined && a !== b && teamOf(a) === teamOf(b);
   const allyOfPlayer = (o) => o !== null && o !== undefined && o !== 0 && teamOf(o) === 1;
+  // war and peace: with diplomacy on, rivals are at peace until somebody declares war (G.rel); without it everyone not allied is an enemy
+  const relKey = (a, b) => (a < b ? a + '_' + b : b + '_' + a);
+  const atWar = (a, b) => { if (a === null || a === undefined || b === null || b === undefined) return true; if (a === b || isAlly(a, b)) return false; if (!G.dip) return true; const r = (G.rel || {})[relKey(a, b)]; return !!r && r.s === 'war'; };
+  const peaceWithPlayer = (o) => o === 0 || (o !== null && o !== undefined && !atWar(0, o));
   const ownFill = (o, a) => { const c = ownCol(o); return `rgba(${parseInt(c.slice(1, 3), 16)},${parseInt(c.slice(3, 5), 16)},${parseInt(c.slice(5, 7), 16)},${a})`; };
   const armyCount = (h) => h.army.reduce((s, a) => s + (a ? a.n : 0), 0);
   const maxMana = (h) => eff(h, 'kn') * 10 + 15 * perk(h, 'wisdom') + (h.arts ? artBonus(h).mana : 0);
@@ -225,6 +229,7 @@
       ais: aiFacs.map((f, i) => ({ id: i + 1, fac: f, name: FACTIONS[f].name, gold: Math.round(3000 * D.aiInc), heroes: [], alive: true, spawnWait: 0, team: ({ ally: 1, bloc: 2 }[(map.teams || [])[i]] || 3 + i) })) };
     if (G.ais.every(a => a.team === 1)) G.ais[0].team = 3;
     G.wrap = wrap; WRAP_W = wrap ? G.W : 0;
+    G.dip = !map.scn && map.dip !== false; G.rel = {};   // diplomacy: everyone at peace until war is declared (scenarios keep the old rules)
     for (const o of G.objs) if (o.t === 'town') {
       if (o.owner === 0) { o.fac = faction; o.name = FACTIONS[faction].town; initTown(o, 0); }
       else initTown(o, o.owner ? 1 : 0);
@@ -345,13 +350,13 @@
   }
   function defenderOf(o) {
     if (!o) return null;
-    if (o.t === 'town' || o.t === 'fort') { if (o.owner === 0 || allyOfPlayer(o.owner)) return null; return o.owner === null ? (o.guard || []) : (o.garrison || []); }
-    if (o.owner === 0 || allyOfPlayer(o.owner)) return null;
+    if (o.t === 'town' || o.t === 'fort') { if (peaceWithPlayer(o.owner)) return null; return o.owner === null ? (o.guard || []) : (o.garrison || []); }
+    if (peaceWithPlayer(o.owner)) return null;
     return o.guard && o.guard.length ? o.guard : null;
   }
   function threatAt(x, y) {
     if (!isExpl(x, y)) return null;
-    const ah = isVis(x, y) ? aiHeroAt(x, y) : null; if (ah) return allyOfPlayer(ah.ai) ? null : threatOfDef(ah.army);
+    const ah = isVis(x, y) ? aiHeroAt(x, y) : null; if (ah) return peaceWithPlayer(ah.ai) ? null : threatOfDef(ah.army);
     const o = objAt(G, x, y); if (!o || (o.t === 'monster' && !isVis(x, y))) return null;
     return threatOfDef(defenderOf(o));
   }
@@ -586,7 +591,7 @@
         cx.setLineDash([]); prev = s;
       });
       { const e = G.path[G.path.length - 1], ex = pux - cam.x, ey = hcy(e.y) - cam.y, r = 9;
-        const eo = objAt(G, e.x, e.y), ahh = aiHeroAt(e.x, e.y), hostile = (ahh && !allyOfPlayer(ahh.ai)) || (eo && eo.owner !== 0 && !allyOfPlayer(eo.owner) && (eo.t === 'monster' || defenderOf(eo))), boat = G.boats.some(b => b.x === e.x && b.y === e.y);
+        const eo = objAt(G, e.x, e.y), ahh = aiHeroAt(e.x, e.y), hostile = (ahh && !peaceWithPlayer(ahh.ai)) || (eo && !peaceWithPlayer(eo.owner) && (eo.t === 'monster' || defenderOf(eo))), boat = G.boats.some(b => b.x === e.x && b.y === e.y);
         const mk = hostile ? Assets.get('markers/attack') : boat ? Assets.get('markers/anchor') : null;
         if (mk) { const mw = 30, mh = mk.height * mw / mk.width; cx.drawImage(mk, ex - mw / 2, ey - mh / 2, mw, mh); }
         else for (const [w, col] of [[8.5, 'rgba(25,12,0,.9)'], [5, '#e0281c']]) { cx.lineWidth = w; cx.strokeStyle = col; cx.beginPath(); cx.moveTo(ex - r, ey - r); cx.lineTo(ex + r, ey + r); cx.moveTo(ex + r, ey - r); cx.lineTo(ex - r, ey + r); cx.stroke(); }
@@ -775,7 +780,7 @@
         return `<div class="zrow"><span class="zdot" style="background:${ownCol(0)};color:${ownCol(0)}"></span>${z.t === 'town' ? '🏰' : '🏯'} ${z.name} <span class="small">garrison ${gn}</span></div>`; }).join('') +
       `<div class="small">Paying mines: ${mineIncome} · other zones: ${rest}</div>` +
       G.ais.map(ai => { const tw = G.objs.filter(o => o.t === 'town' && o.owner === ai.id).length, fr = G.objs.filter(o => o.t === 'fort' && o.owner === ai.id).length;
-        return `<div class="zrow" title="Rival: ${FACTIONS[ai.fac].name}"><span class="zdot" style="background:${ownCol(ai.id)};color:${ownCol(ai.id)}"></span>${allyOfPlayer(ai.id) ? '🤝 ' : ''}${FACTIONS[ai.fac].icon} ${ai.alive ? `${tw} towns, ${fr} forts, ${ai.heroes.length} heroes` : '<s>eliminated</s>'}</div>`; }).join('');
+        return `<div class="zrow" title="Rival: ${FACTIONS[ai.fac].name}"><span class="zdot" style="background:${ownCol(ai.id)};color:${ownCol(ai.id)}"></span>${allyOfPlayer(ai.id) ? '🤝 ' : G.dip ? (atWar(0, ai.id) ? '⚔ ' : '🕊 ') : ''}${FACTIONS[ai.fac].icon} ${ai.alive ? `${tw} towns, ${fr} forts, ${ai.heroes.length} heroes` : '<s>eliminated</s>'}</div>`; }).join('');
     const el = $('army'); el.innerHTML = ''; el.title = 'Drag a stack onto another slot (or tap two slots) to move, merge or swap.';
     h.army.forEach((a, i) => {
       const b = document.createElement('button');
@@ -904,7 +909,7 @@
   function describe(x, y) {
     if (!isExpl(x, y)) return 'Unexplored territory';
     const seen = isVis(x, y);
-    const ah = seen ? aiHeroAt(x, y) : null; if (ah) return `<b>${ah.name}</b> (${allyOfPlayer(ah.ai) ? 'allied' : 'rival'} ${FACTIONS[aiById(ah.ai).fac].name} hero, L${ah.lvl})<br>${armyList(ah.army, true)}`;
+    const ah = seen ? aiHeroAt(x, y) : null; if (ah) return `<b>${ah.name}</b> (${relWord(ah.ai)} ${FACTIONS[aiById(ah.ai).fac].name} hero, L${ah.lvl})<br>${armyList(ah.army, true)}`;
     const hs = heroesAt(x, y); if (hs.length) return hs.map(h => `<b>${h.name}</b> (${clsLabel(h.cls)} L${h.lvl})${h.boat != null ? ' ⛵ sailing' : ''}<br>⚔ ${h.att} 🛡 ${h.def} ✨ ${h.sp} 📚 ${h.kn} · 👢 ${h.move}/${maxMove(h)} · 🔷 ${h.mana}/${maxMana(h)}<br>${h.army.filter(Boolean).map(x => `${x.n} ${C[x.t].n}`).join('<br>') || 'No troops'}`).join('<hr style="border:0;border-top:1px solid #6b4f18;margin:4px 0">');
     if (G.boats.some(b => b.x === x && b.y === y)) return '<b>⛵ Your boat</b><br>Walk onto it from the shore to set sail.';
     let o = objAt(G, x, y);
@@ -916,6 +921,7 @@
         const fn = FACTIONS[o.fac || G.faction].name, gn = (o.garrison || []).reduce((s, a) => s + (a ? a.n : 0), 0);
         return o.owner === 0 ? `<b>${o.name}</b> — your ${fn} town (garrison ${gn})`
           : allyOfPlayer(o.owner) ? `<b>${o.name}</b> — allied ${fn} town (it will never attack you)`
+          : o.owner && !atWar(0, o.owner) ? `<b>${o.name}</b> — ${fn} town of a realm you are at peace with<br>Declare war to attack it.`
           : o.owner ? `<b>${o.name}</b> — rival ${fn} town${gn ? ' — garrison: ' + armyList(o.garrison, true) : ''}<br>Assaulting it is a siege battle.`
             : `<b>${o.name}</b> — neutral ${fn} town${g}<br>Capture it for a new castle (siege battle).`;
       }
@@ -960,7 +966,7 @@
       const cp = capsOf(G.hero);
       const blocked = (tt === T.FOREST && !cp.forest) || (tt === T.MOUNT && !cp.mount) || (tt === T.WATER && !cp.water && !lakeAt(G, hover.x, hover.y) && G.hero.boat == null && !G.boats.some(b => b.x === hover.x && b.y === hover.y));
       const ah = isVis(hover.x, hover.y) ? aiHeroAt(hover.x, hover.y) : null, mine = heroesAt(hover.x, hover.y).length > 0;
-      const hostile = (ah && !allyOfPlayer(ah.ai)) || (o && isExpl(hover.x, hover.y) && ((o.t === 'monster' && isVis(hover.x, hover.y)) || (o.guard && o.guard.some(Boolean) && o.owner !== 0 && !allyOfPlayer(o.owner)) || ((o.t === 'town' || o.t === 'fort') && o.owner !== 0 && !allyOfPlayer(o.owner))));
+      const hostile = (ah && !peaceWithPlayer(ah.ai)) || (o && isExpl(hover.x, hover.y) && ((o.t === 'monster' && isVis(hover.x, hover.y)) || (o.guard && o.guard.some(Boolean) && !peaceWithPlayer(o.owner)) || ((o.t === 'town' || o.t === 'fort') && !peaceWithPlayer(o.owner))));
       const sailing = G.hero.boat != null || (tt === T.WATER && !blocked && !lakeAt(G, hover.x, hover.y));
       cmap.style.cursor = !isExpl(hover.x, hover.y) ? Art.cursor('pointer') : mine ? Art.cursor('pointer') : hostile ? Art.cursor('sword') : blocked ? Art.cursor('no') : sailing ? Art.cursor('boat') : Art.cursor('horse');
     }
@@ -1082,6 +1088,8 @@
       const last = i === path.length - 1, o = objAt(G, s.x, s.y);
       const eh = aiHeroAt(s.x, s.y);
       if (eh && allyOfPlayer(eh.ai)) { openExchange(`🤝 ${eh.name}`, `Allied hero of the ${FACTIONS[aiById(eh.ai).fac].name} realm — swap troops freely.`, h.army, h.name, eh.army, eh.name, null); break; }
+      if (eh && !atWar(0, eh.ai) && !last) continue;
+      if (eh && !(await confirmWar(eh.ai))) break;
       if (eh) {
         if (o && (o.t === 'town' || o.t === 'fort') && o.owner === eh.ai) await interact(o, h, eh);
         else await fightAiHero(h, eh, true);
@@ -1270,6 +1278,7 @@
   }
   async function interact(o, h, eh) {
     if (o.owner !== null && o.owner !== undefined && o.owner !== 0 && allyOfPlayer(o.owner)) return toast(`${o.name || 'This place'} belongs to your ally — you are welcome to pass, but it is not yours to take.`);
+    if (o.owner !== null && o.owner !== undefined && o.owner !== 0 && !atWar(0, o.owner) && !(await confirmWar(o.owner))) return;
     if (o.t === 'wreck') {
       if (o.guard && o.guard.length) { if (!(await fight(h, o.guard, { att: 0, def: 0 }, 'Shipwreck guardians'))) return; o.guard = []; }
       const n = 3 + Math.floor(Math.random() * 4);
@@ -2160,7 +2169,7 @@
   function aiTargets(ai, h, power) {
     const R = 22 * sizeMv(), list = [];
     for (const o of G.objs) {
-      if (o.owner === ai.id || isAlly(ai.id, o.owner)) continue;
+      if (o.owner === ai.id || !atWar(ai.id, o.owner)) continue;
       const d = dist(o, h); if (d > R) continue;
       let sc = 0;
       switch (o.t) {
@@ -2174,7 +2183,7 @@
       }
       if (sc > 0) list.push({ x: o.x, y: o.y, score: sc });
     }
-    if (!isAlly(ai.id, 0)) for (const ph of G.heroes) { const d = dist(ph, h); if (d > R) continue; if (power >= armyPower(ph.army) * 1.25) list.push({ x: ph.x, y: ph.y, score: 2400 / (d + 6) }); }
+    if (atWar(ai.id, 0)) for (const ph of G.heroes) { const d = dist(ph, h); if (d > R) continue; if (power >= armyPower(ph.army) * 1.25) list.push({ x: ph.x, y: ph.y, score: 2400 / (d + 6) }); }
     return list.sort((a, b) => b.score - a.score);
   }
   function aiKill(ai, h) { ai.heroes = ai.heroes.filter(x => x !== h); ai.spawnWait = 3; }
@@ -2200,7 +2209,7 @@
       const s = path[i];
       if (s.cost > h.move) return true;
       h.move -= s.cost; h.dir = dirOf(h.x, h.y, s.x, s.y); h.x = s.x; h.y = s.y;
-      const ph = isAlly(ai.id, 0) ? [] : heroesAt(s.x, s.y);
+      const ph = !atWar(ai.id, 0) ? [] : heroesAt(s.x, s.y);
       if (ph.length) {
         const d = ph.reduce((a, b) => armyCount(a) >= armyCount(b) ? a : b);
         centerOn(s.x, s.y); renderAll(); toast(`${h.name} of the ${FACTIONS[ai.fac].name} attacks ${d.name}!`); note(`⚔ ${h.name} of the ${FACTIONS[ai.fac].name} attacked ${d.name}`, s.x, s.y); await sleep(350);
@@ -2210,7 +2219,7 @@
         if (so && so.owner === 0 && (so.t === 'fort' || so.t === 'town')) await defendStructure(so, h);
         return true;
       }
-      const other = G.ais.flatMap(a => a.heroes).find(x => x !== h && x.x === s.x && x.y === s.y && !isAlly(ai.id, x.ai));
+      const other = G.ais.flatMap(a => a.heroes).find(x => x !== h && x.x === s.x && x.y === s.y && atWar(ai.id, x.ai));
       if (other) { if (quickBattle(h.army, other.army, 1)) aiKill(aiById(other.ai), other); else { aiKill(ai, h); return true; } }
       const o = objAt(G, s.x, s.y);
       if (o && await aiInteract(ai, h, o, i === path.length - 1)) return true;
@@ -2221,7 +2230,7 @@
   async function aiInteract(ai, h, o, last) {
     if (o.t === 'pile') { ai.gold += o.kind === 'gold' ? o.amt : o.amt * RES_VALUE[o.kind]; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return false; }
     if (o.t === 'chest') { ai.gold += o.gold; G.objs.splice(G.objs.indexOf(o), 1); reindex(G); return false; }
-    if (!last || o.owner === ai.id || isAlly(ai.id, o.owner)) return false;
+    if (!last || o.owner === ai.id || !atWar(ai.id, o.owner)) return false;
     if (o.owner === 0 && o.t !== 'town' && o.t !== 'fort') { centerOn(o.x, o.y); renderAll(); toast(`${h.name} of the ${FACTIONS[ai.fac].name} attacks your ${o.t === 'mine' ? o.kind + ' mine' : o.t}!`); await sleep(700); }
     const win = (def, bonus = 1) => { const d = def.map(a => a && ({ ...a })); return quickBattle(h.army, d, bonus); };
     const lose = () => { aiKill(ai, h); return true; };
@@ -2241,7 +2250,169 @@
     }
     return false;
   }
+
+  // ---------- Diplomacy: everyone starts at peace; war has to be declared; trade, demands, alliances ----------
+  const FN = (id) => FACTIONS[aiById(id).fac].name;
+  const nm = (id) => id === 0 ? 'you' : `the ${FN(id)} realm`;
+  const relWord = (id) => allyOfPlayer(id) ? 'allied' : atWar(0, id) ? 'enemy' : 'neutral';
+  function realmPower(id) {
+    let p = 1;
+    const hs = id === 0 ? G.heroes : aiById(id).heroes;
+    for (const h of hs) p += armyPower(h.army);
+    for (const t of G.objs) if (t.t === 'town' && t.owner === id) p += armyPower(t.garrison || []);
+    return p;
+  }
+  function setRel(a, b, s) { (G.rel = G.rel || {})[relKey(a, b)] = { s, since: G.day }; }
+  const relLen = (a, b) => { const r = (G.rel || {})[relKey(a, b)]; return r ? G.day - r.since : 99; };
+  function declareWar(a, b) {
+    if (a === 0 || b === 0) { const o = aiById(a === 0 ? b : a); if (o.team === 1) o.team = 10 + o.id; }
+    setRel(a, b, 'war'); note(`⚔ War: ${nm(a)} against ${nm(b)}`);
+  }
+  // attacking someone you are at peace with means declaring war first
+  async function confirmWar(owner) {
+    if (atWar(0, owner)) return true;
+    const i = await showModal(`<h2>🕊 At peace with the ${FN(owner)} realm</h2><p>You have no quarrel with them yet. Attacking means <b>declaring war</b> — they will fight back with everything they have.</p>`, ['Cancel', '⚔ Declare war']);
+    if (i !== 1) return false;
+    declareWar(0, owner); renderAll(); return true;
+  }
+  async function aiDiplomacy() {
+    if (!G.dip) return;
+    const live = G.ais.filter(a => a.alive), ids = [0, ...live.map(a => a.id)];
+    const aggr = ({ easy: 0.03, normal: 0.06, hard: 0.1, expert: 0.14 }[G.diff] || 0.06);
+    G.dipLog = G.dipLog || {};
+    // wars wear out: a losing side asks for peace (you are asked, rivals just agree)
+    for (const ai of live) for (const o of ids) {
+      if (o === ai.id || (o !== 0 && o < ai.id) || !atWar(ai.id, o)) continue;
+      const len = relLen(ai.id, o); if (len < 6) continue;
+      const weaker = realmPower(ai.id) < realmPower(o) * 0.8;
+      if (!(weaker ? Math.random() < 0.3 : len > 14 && Math.random() < 0.1)) continue;
+      if (o === 0) {
+        const i = await showModal(`<h2>🕊 The ${FN(ai.id)} realm proposes peace</h2><p>The war has gone on for ${len} days. They offer to lay down their arms.</p>`, ['Keep fighting', '🕊 Accept peace']);
+        if (i === 1) { setRel(ai.id, 0, 'peace'); note(`🕊 Peace with the ${FN(ai.id)} realm`); }
+      } else { setRel(ai.id, o, 'peace'); toast(`🕊 The ${FN(ai.id)} and ${FN(o)} realms make peace.`); }
+    }
+    // a realm that is at peace with everyone may pick a neighbour that looks weak
+    for (const ai of live) {
+      if (G.day < 10 + ai.id * 2 || ids.some(o => o !== ai.id && atWar(ai.id, o)) || Math.random() > aggr) continue;
+      const mine = realmPower(ai.id), homes = G.objs.filter(t => t.t === 'town' && t.owner === ai.id); if (!homes.length) continue;
+      let best = null;
+      for (const o of ids) {
+        if (o === ai.id || isAlly(ai.id, o)) continue;
+        const ot = G.objs.filter(t => t.t === 'town' && t.owner === o); if (!ot.length) continue;
+        const them = realmPower(o); if (mine < them * 0.7) continue;
+        const d = Math.min(...ot.flatMap(t => homes.map(h => hexDist(t, h)))), sc = (mine / them) * (o === 0 ? 1.15 : 1) / (1 + d / 40);
+        if (!best || sc > best.sc) best = { o, sc };
+      }
+      if (!best) continue;
+      declareWar(ai.id, best.o);
+      if (best.o === 0) await showModal(`<h2>⚔ The ${FN(ai.id)} realm declares war!</h2><p>Their heroes will march on your lands. You can still seek peace in the <b>Diplomacy</b> screen (Menu).</p>`, ['To arms!']);
+      else toast(`⚔ The ${FN(ai.id)} realm declares war on the ${FN(best.o)} realm.`);
+    }
+    // a much stronger neighbour at peace with you may demand tribute
+    for (const ai of live) {
+      if (G.day < 15 || !ai.alive || atWar(ai.id, 0) || isAlly(ai.id, 0) || Math.random() > 0.05 || (G.dipLog['t' + ai.id] || -99) > G.day - 12) continue;
+      if (realmPower(ai.id) < realmPower(0) * 2.2) continue;
+      const gold = Math.round(Math.min(G.res.gold * 0.35, 800 + G.day * 60) / 50) * 50; if (gold < 300) continue;
+      G.dipLog['t' + ai.id] = G.day;
+      const i = await showModal(`<h2>💰 The ${FN(ai.id)} realm demands tribute</h2><p>Their armies dwarf yours. They want <b>${RES_ICON.gold}${gold}</b> gold. Refuse, and it means war.</p>`, ['⚔ Refuse (war)', `💰 Pay ${gold}`]);
+      if (i === 1) { G.res.gold -= gold; ai.gold += gold; renderAll(); } else declareWar(ai.id, 0);
+    }
+  }
+  const ART_VAL = { 1: 1500, 2: 3500, 3: 7000, 4: 12000, 5: 20000 }, artVal = (id) => ART_VAL[ART[id].tier] || 3000;
+  const heroArts = (h) => [...Object.entries(h.arts || {}).filter(([, v]) => v).map(([s, id]) => ({ id, where: 'slot', ref: s })), ...(h.pack || []).map((id, i) => ({ id, where: 'pack', ref: i }))];
+  function openDiplomacy() {
+    if (!G.dip) return toast('Diplomacy is off in this game: every rival is your enemy.');
+    const word = (p) => p < 0.6 ? 'weaker than you' : p < 1.4 ? 'about your strength' : p < 2.5 ? 'stronger than you' : 'far stronger';
+    const rows = G.ais.map(ai => {
+      const id = ai.id, tw = G.objs.filter(o => o.t === 'town' && o.owner === id).length;
+      const ally = isAlly(0, id), war = atWar(0, id);
+      const st = !ai.alive ? 'eliminated' : ally ? '🤝 allied' : war ? '⚔ at war' : '🕊 at peace';
+      const btns = !ai.alive ? '' : ally ? `<button data-d="trade:${id}">⚖ Trade</button><button data-d="break:${id}">Break alliance</button>`
+        : war ? `<button data-d="peace:${id}">🕊 Propose peace</button><button data-d="demand:${id}">📜 Demand</button>`
+          : `<button data-d="trade:${id}">⚖ Trade</button><button data-d="demand:${id}">📜 Demand</button><button data-d="ally:${id}">🤝 Alliance</button><button data-d="war:${id}">⚔ Declare war</button>`;
+      return `<div class="trow" style="display:block"><div><span class="zdot" style="background:${ownCol(id)};color:${ownCol(id)}"></span> <b>${FACTIONS[ai.fac].icon} ${FACTIONS[ai.fac].name} realm</b> — ${st}${ai.alive ? `<br><span class="small">${tw} town${tw === 1 ? '' : 's'}, ${ai.heroes.length} hero${ai.heroes.length === 1 ? '' : 'es'} — ${word(realmPower(id) / realmPower(0))}</span>` : ''}</div><div class="acts" style="margin-top:6px">${btns}</div></div>`;
+    }).join('');
+    modalOpen(`<h2>🕊 Diplomacy</h2><p class="small">Everyone starts at peace: nobody may attack until war is declared. Trade resources and artifacts, demand towns from the weak, seek an alliance — or break the peace yourself.</p>${rows}<div class="mb"><button class="primary" id="dpClose">Close</button></div>`);
+    $('dpClose').onclick = closeModal;
+    $('mbox').querySelectorAll('[data-d]').forEach(b => b.onclick = async () => {
+      const [k, s] = b.dataset.d.split(':'), id = +s, ai = aiById(id), mine = realmPower(0), theirs = realmPower(id);
+      if (k === 'war') { const i = await showModal(`<h2>⚔ Declare war on the ${FN(id)} realm?</h2><p>Their heroes and armies will come for you.</p>`, ['Cancel', '⚔ Declare war']); if (i === 1) declareWar(0, id); }
+      else if (k === 'peace') {
+        if (relLen(0, id) >= 2 && theirs < mine * 1.6) { setRel(0, id, 'peace'); await showModal(`<h2>🕊 Peace</h2><p>The ${FN(id)} realm accepts. The war is over.</p>`); }
+        else await showModal(`<h2>✋ Refused</h2><p>"${relLen(0, id) < 2 ? 'The war has hardly begun.' : 'We are winning. There will be no peace.'}"</p>`);
+      } else if (k === 'break') { ai.team = 10 + id; setRel(0, id, 'peace'); toast('The alliance is over — you are at peace.'); }
+      else if (k === 'ally') {
+        const common = G.ais.some(o => o.alive && o.id !== id && (atWar(id, o.id) || atWar(0, o.id)));
+        if (relLen(0, id) >= 5 && (common || theirs < mine * 0.8)) { ai.team = 1; await showModal(`<h2>🤝 Alliance</h2><p>The ${FN(id)} realm joins you. They will never attack you, and you share what you see.</p>`); }
+        else await showModal(`<h2>✋ Refused</h2><p>"${relLen(0, id) < 5 ? 'We hardly know you.' : 'We have no common cause.'}"</p>`);
+      } else if (k === 'trade') return openTrade(id);
+      else if (k === 'demand') return openDemand(id);
+      openDiplomacy(); renderAll();
+    });
+  }
+  function openDemand(id) {
+    const ai = aiById(id), fear = realmPower(0) / realmPower(id), mine = G.objs.filter(o => o.t === 'town' && o.owner === id);
+    const tribute = Math.floor(ai.gold * 0.4 / 50) * 50;
+    const rows = mine.filter(t => mine.length > 1 && !ai.heroes.some(h => h.x === t.x && h.y === t.y)).map(t => `<div class="trow" style="display:flex;justify-content:space-between;align-items:center"><span><b>${t.name}</b></span><button data-dm="town:${G.objs.indexOf(t)}">Demand this town</button></div>`).join('');
+    modalOpen(`<h2>📜 Demands on the ${FN(id)} realm</h2><p class="small">They give in only to fear: your armies must be clearly stronger than theirs (now <b>${fear.toFixed(1)}×</b>; about 1.6× is enough for tribute, 2.5× for a town). Refusing at peace can end in war.</p>
+      <div class="trow" style="display:flex;justify-content:space-between;align-items:center"><span><b>Tribute</b> — ${RES_ICON.gold}${tribute}</span><button data-dm="gold:0"${tribute < 100 ? ' disabled' : ''}>Demand gold</button></div>${rows || '<p class="small">They have no town to spare.</p>'}
+      <div class="mb"><button id="dmBack">Back</button></div>`);
+    $('dmBack').onclick = openDiplomacy;
+    $('mbox').querySelectorAll('[data-dm]').forEach(b => b.onclick = async () => {
+      const [k, s] = b.dataset.dm.split(':'), need = k === 'town' ? 2.5 : 1.6;
+      if (fear >= need) {
+        if (k === 'gold') { ai.gold -= tribute; G.res.gold += tribute; sfx('coin'); await showModal(`<h2>💰 Tribute paid</h2><p>The ${FN(id)} realm hands over ${RES_ICON.gold}${tribute}.</p>`); }
+        else { const t = G.objs[+s]; takeTown(t, 0); await showModal(`<h2>🏰 ${t.name} surrendered</h2><p>The ${FN(id)} realm cedes the town to you rather than face your armies.</p>`); }
+      } else {
+        const war = !atWar(0, id) && fear < 1.1 && Math.random() < 0.5;
+        if (war) declareWar(id, 0);
+        await showModal(`<h2>😠 Refused</h2><p>"You do not frighten us."${war ? ' <b>They declare war!</b>' : ''}</p>`);
+      }
+      openDiplomacy(); renderAll();
+    });
+  }
+  function openTrade(id) {
+    const ai = aiById(id), ally = isAlly(0, id), war = atWar(0, id);
+    const gives = [...RES.filter(k => G.res[k] > 0).map(k => ({ k: 'r:' + k, res: k, label: `${RES_ICON[k]} ${k} (${G.res[k]})` })),
+      ...G.heroes.flatMap((h, hi) => heroArts(h).map(a => ({ k: `a:${hi}:${a.where}:${a.ref}`, art: a, hero: h, label: `${ART[a.id].i} ${ART[a.id].n} (${h.name})` })))];
+    const gets = [...RES.map(k => ({ k: 'r:' + k, res: k, label: `${RES_ICON[k]} ${k}` })),
+      ...ai.heroes.flatMap((h, hi) => heroArts(h).map(a => ({ k: `a:${hi}:${a.where}:${a.ref}`, art: a, hero: h, label: `${ART[a.id].i} ${ART[a.id].n} (${h.name})` })))];
+    const st = openTrade.st = openTrade.st || { g: 0, q: 100, t: 0, r: 1 };
+    const sel = (list, cur, idn) => `<select id="${idn}">${list.map((x, i) => `<option value="${i}"${i === cur ? ' selected' : ''}>${x.label}</option>`).join('')}</select>`;
+    modalOpen(`<h2>⚖ Trade with the ${FN(id)} realm</h2><p class="small">${war ? 'They will not trade with an enemy.' : ally ? 'Allies trade at fair value.' : 'They buy at a discount and sell at a premium. Artifacts are worth more to them than the market says.'}</p>
+      <div class="trow" style="grid-template-columns:1fr 90px"><div>You give<br>${sel(gives, Math.min(st.g, gives.length - 1), 'tgG')}</div><div>Amount<br><input type="number" id="tgQ" min="1" value="${st.q}"></div></div>
+      <div class="trow" style="grid-template-columns:1fr 90px"><div>You get<br>${sel(gets, Math.min(st.t, gets.length - 1), 'tgT')}</div><div>Amount<br><input type="number" id="tgR" min="1" value="${st.r}"></div></div>
+      <div id="tgV" style="margin:10px 0"></div><div class="mb"><button class="primary" id="tgGo">Offer</button><button id="tgBack">Back</button></div>`);
+    const eval1 = () => {
+      st.g = +$('tgG').value; st.t = +$('tgT').value; st.q = Math.max(1, parseInt($('tgQ').value) || 1); st.r = Math.max(1, parseInt($('tgR').value) || 1);
+      const g = gives[st.g], t = gets[st.t]; if (!g || !t) return { ok: false, why: 'Choose what to trade.' };
+      if (war) return { ok: false, why: 'They refuse: you are at war.' };
+      if (g.res && g.res === t.res) return { ok: false, why: 'Choose two different things.' };
+      const qg = g.art ? 1 : st.q, qt = t.art ? 1 : st.r;
+      if (g.res && G.res[g.res] < qg) return { ok: false, why: 'You do not have that much.' };
+      const buy = ally ? 1 : 0.85, sell = ally ? 1 : 1.15;
+      const vg = g.art ? artVal(g.art.id) * (ally ? 1 : 0.8) : qg * RES_VALUE[g.res] * buy, vt = t.art ? artVal(t.art.id) * (ally ? 1 : 1.3) : qt * RES_VALUE[t.res] * sell;
+      if (t.res) { const have = t.res === 'gold' ? ai.gold : t.res === 'food' ? (ai.food || 0) : ai.gold / RES_VALUE[t.res]; if (have < qt) return { ok: false, why: 'They do not have that much to spare.' }; }
+      if (t.art && !G.heroes.some(h => h.pack.length < MAX_PACK || slotFor(h, ART[t.art.id]))) return { ok: false, why: 'No hero of yours can carry another artifact.' };
+      return vg >= vt ? { ok: true, why: `✔ They accept (${Math.round(vg)} offered for ${Math.round(vt)}).`, g, t, qg, qt } : { ok: false, why: `✘ Not enough: they value your offer at ${Math.round(vg)}, the price is ${Math.round(vt)}.` };
+    };
+    const upd = () => { const e = eval1(); $('tgV').innerHTML = `<span style="color:${e.ok ? '#9be59b' : '#f0a090'}">${e.why}</span>`; $('tgGo').disabled = !e.ok; return e; };
+    ['tgG', 'tgT', 'tgQ', 'tgR'].forEach(x => { $(x).oninput = upd; $(x).onchange = upd; });
+    $('tgBack').onclick = openDiplomacy;
+    $('tgGo').onclick = () => {
+      const e = upd(); if (!e.ok) return; const { g, t, qg, qt } = e;
+      // what the rival receives
+      if (g.res) { if (g.res === 'food') ai.food = (ai.food || 0) + qg; else ai.gold += g.res === 'gold' ? qg : Math.round(qg * RES_VALUE[g.res] * 0.9); G.res[g.res] -= qg; }
+      else { const a = g.art; if (a.where === 'slot') g.hero.arts[a.ref] = null; else g.hero.pack.splice(a.ref, 1); g.hero.av++; if (ai.heroes[0]) giveArt(ai.heroes[0], a.id); }
+      // what you receive
+      if (t.res) { if (t.res === 'food') ai.food = (ai.food || 0) - qt; else ai.gold -= t.res === 'gold' ? qt : Math.round(qt * RES_VALUE[t.res]); G.res[t.res] += qt; }
+      else { const a = t.art; if (a.where === 'slot') t.hero.arts[a.ref] = null; else t.hero.pack.splice(a.ref, 1); t.hero.av++; [G.hero, ...G.heroes].filter(Boolean).find(h => giveArt(h, a.id) !== 'full'); }
+      sfx('coin'); toast('Deal done.'); openDiplomacy(); renderAll();
+    };
+    upd();
+  }
   async function aiPhase() {
+    await aiDiplomacy();
     for (const ai of G.ais) {
       if (!ai.alive) continue;
       aiEconomy(ai);
@@ -2438,7 +2609,7 @@
     $('modal').classList.remove('hide');
   }
   function showMapSelect(diff, st = Object.assign({ preset: 'plains', size: 'medium', seed: '', wrap: true }, Settings.mem('lastMap') || {})) {
-    Settings.mem('lastMap', { preset: st.preset, size: st.size, fog: st.fog, ais: st.ais, color: st.color, wrap: st.wrap });     // the next game starts with the same options
+    Settings.mem('lastMap', { preset: st.preset, size: st.size, fog: st.fog, ais: st.ais, color: st.color, wrap: st.wrap, dip: st.dip });     // the next game starts with the same options
     const cards = Object.entries(MAPS).map(([k, m]) => `<div class="card${st.preset === k ? ' on' : ''}" data-m="${k}"><img class="mprev" src="${mapPreview(k, undefined, k)}" alt="" draggable="false"><b>${m.name}</b><div class="small">${m.desc}</div></div>`).join('');
     const sizes = Object.entries(SIZES).map(([k, s]) => `<button class="${st.size === k ? 'primary' : ''}" data-s="${k}">${s.name} (${s.w}×${s.h})</button>`).join(' ');
     $('mbox').innerHTML = `<div class="setup"><span data-bg="map_select"></span><h2>Choose your map<span class="small">${DIFFICULTY[diff].icon} ${DIFFICULTY[diff].name}</span></h2><div class="grid two">${cards}</div>
@@ -2446,6 +2617,7 @@
         <div class="opt"><label>Map size</label><div class="optc"><div class="opts">${Object.entries(SIZES).map(([k, s]) => `<button class="${st.size === k ? 'primary' : ''}" data-s="${k}"><b>${s.name}</b><small>${s.w}×${s.h}</small></button>`).join('')}</div></div></div>
         <div class="opt"><label>Fog of war</label><div class="optc"><div class="opts">${[[true, 'On'], [false, 'Off']].map(([v, n]) => `<button class="${(st.fog !== false) === v ? 'primary' : ''}" data-fog="${v}"><b>${n}</b></button>`).join('')}</div><small>Unexplored land is hidden; scouts, towers and your heroes reveal it.</small></div></div>
         <div class="opt"><label>Map edges</label><div class="optc"><div class="opts">${[[true, 'Globe'], [false, 'Walled']].map(([v, n]) => `<button class="${(st.wrap !== false) === v ? 'primary' : ''}" data-wrap="${v}"><b>${n}</b></button>`).join('')}</div><small>Globe: the world has no edge, walk east to come out in the west. Walled: the edges cannot be crossed.</small></div></div>
+        <div class="opt"><label>Diplomacy</label><div class="optc"><div class="opts">${[[true, 'On'], [false, 'Old rules']].map(([v, n]) => `<button class="${(st.dip !== false) === v ? 'primary' : ''}" data-dip="${v}"><b>${n}</b></button>`).join('')}</div><small>On: everyone starts at peace — war must be declared, and you can trade, make demands and ally. Old rules: every rival is your enemy from the start, no diplomacy.</small></div></div>
         <div class="opt"><label>Rivals</label><div class="optc"><div class="opts">${[0, 1, 2, 3, 4].map(n => `<button class="${(st.ais || 0) === n ? 'primary' : ''}" data-a="${n}"><b>${n ? n : 'Auto'}</b></button>`).join('')}</div><small>AI players that expand and fight you.</small></div></div>
         <div class="opt"><label>Seed</label><div class="optc"><div class="seedrow"><input id="mSeed" placeholder="empty = random map" value="${st.seed}"><button id="mDice" title="Pick a random seed">🎲 Random</button></div><small>Share a seed to replay the same map.</small></div></div>
         <div class="opt"><label>Your flag</label><div class="optc"><div class="flags">${PALETTE.map((p, i) => `<button class="swatch flagbtn${(st.color || 0) === i ? ' on' : ''}" data-col="${i}" title="${p[0]}">${flagImg(i, 34)}</button>`).join('')}</div></div></div>
@@ -2459,6 +2631,7 @@
     $('mbox').querySelectorAll('[data-tm]').forEach(b => b.onclick = () => { keep(); const [i, v] = b.dataset.tm.split(':'); (st.teams = st.teams || [])[+i] = v; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-m]').forEach(c => c.onclick = () => { keep(); st.preset = c.dataset.m; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-s]').forEach(b => b.onclick = () => { keep(); st.size = b.dataset.s; showMapSelect(diff, st); });
+    $('mbox').querySelectorAll('[data-dip]').forEach(b => b.onclick = () => { keep(); st.dip = b.dataset.dip === 'true'; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-wrap]').forEach(b => b.onclick = () => { keep(); st.wrap = b.dataset.wrap === 'true'; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-fog]').forEach(b => b.onclick = () => { keep(); st.fog = b.dataset.fog === 'true'; showMapSelect(diff, st); });
     $('mbox').querySelectorAll('[data-a]').forEach(b => b.onclick = () => { keep(); st.ais = +b.dataset.a; showMapSelect(diff, st); });
@@ -2631,7 +2804,7 @@
     if (!G) return;
     modalOpen(`<h2>☰ Menu</h2><div class="menugrid">
       <button data-mn="save">💾 Save / Load</button><button data-mn="set">⚙ Settings</button>
-      <button data-mn="kd">📋 Kingdom</button><button data-mn="ach">🏆 Achievements</button>
+      <button data-mn="dip">🕊 Diplomacy</button><button data-mn="kd">📋 Kingdom</button><button data-mn="ach">🏆 Achievements</button>
       <button data-mn="lb">📊 Leaderboard</button><button data-mn="hint">💡 Hints on/off</button>
       <button data-mn="rep">📜 Turn report</button><button data-mn="help">📖 Help & glossary</button>
       <button data-mn="snd">${Sfx.on ? '🔇 Sound off' : '🔊 Sound on'}</button><button data-mn="fit">🗺 Zoom to fit</button>
@@ -2639,7 +2812,7 @@
     $('mnClose').onclick = closeModal;
     $('mbox').querySelectorAll('[data-mn]').forEach(b => b.onclick = () => {
       const k = b.dataset.mn;
-      if (k === 'save') openSlots(); else if (k === 'set') openSettings(); else if (k === 'kd') openKingdom(); else if (k === 'ach') openAchievements(); else if (k === 'lb') openLeaderboard(); else if (k === 'hint') { Settings.set('hints', !Settings.hints); if (Settings.hints) Settings.resetHints(); toast(Settings.hints ? 'Hints on.' : 'Hints off.'); }
+      if (k === 'dip') openDiplomacy(); else if (k === 'save') openSlots(); else if (k === 'set') openSettings(); else if (k === 'kd') openKingdom(); else if (k === 'ach') openAchievements(); else if (k === 'lb') openLeaderboard(); else if (k === 'hint') { Settings.set('hints', !Settings.hints); if (Settings.hints) Settings.resetHints(); toast(Settings.hints ? 'Hints on.' : 'Hints off.'); }
       else if (k === 'rep') openReport(); else if (k === 'help') openHelp();
       else if (k === 'snd') { Sfx.toggle(); $('bSnd').textContent = Sfx.on ? '🔊' : '🔇'; openMenu(); }
       else if (k === 'fit') { closeModal(); fitZoom(); } else if (k === 'exit') { $('modal').classList.add('hide'); exitToMenu(); }
@@ -2865,5 +3038,5 @@
   }
   if (/[?&]demo/.test(location.search)) Assets.ready.then(() => setTimeout(() => { try { newGame('castle', 'Orrin', 'normal', { size: 'medium', seed: 'demo', wrap: true }); $('title').classList.add('hide'); demo(); } catch (e) { console.error('demo failed', e); } }, 400));
   window.__G = () => G;
-  window.__dbg = { demo, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
+  window.__dbg = { openDiplomacy, aiDiplomacy, declareWar, atWar, realmPower, demo, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
 })();

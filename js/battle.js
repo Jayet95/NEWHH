@@ -28,6 +28,28 @@ const Battle = (() => {
   }
 
   const alive = (side) => B.stacks.filter(s => !s.dead && (side === undefined || s.side === side));
+  // phone landscape: "crop to action" - zoom so every living stack is in view (never below the full-field fit, never huge) and centre on them
+  function frameAction(cur, smooth) {
+    try {
+      const st = document.getElementById('stage'), c = document.getElementById('bat');
+      if (!st || !c || document.body.classList.contains('bzfit') || !matchMedia('(orientation: landscape) and (max-height: 540px)').matches) return false;
+      const us = alive(); if (cur && !us.includes(cur)) us.push(cur);
+      if (!us.length) return false;
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+      for (const u of us) { x0 = Math.min(x0, u.px); x1 = Math.max(x1, u.px); y0 = Math.min(y0, u.py); y1 = Math.max(y1, u.py); }
+      x0 -= 80; x1 += 80; y0 = 0; y1 = Math.min(640, y1 + 70);   // a hex around the outermost stacks; the turn-order strip on top always stays in view
+      const bw = Math.max(240, x1 - x0), bh = Math.max(200, y1 - y0);
+      const Hs = st.clientHeight, Ws = st.clientWidth;
+      const H = Math.min(Ws * 640 / bw, Hs * 640 / bh);
+      const k = Math.max(1, Math.min(1.9, H / Hs));
+      st.style.setProperty('--bk', k.toFixed(3));
+      const cw = c.clientWidth, ch = c.clientHeight;   // forces layout with the new zoom
+      let top = Math.max(0, ((y0 + y1) / 2 / 640) * ch - Hs / 2); const maxTop = Math.max(0, ch - Hs);
+      top = Math.min(top, maxTop);
+      st.scrollTo({ left: Math.max(0, ((x0 + x1) / 2 / 960) * cw - Ws / 2), top, behavior: smooth ? 'smooth' : 'auto' });
+      return true;
+    } catch (e) { return false; }
+  }
   // double-width creatures: head hex (c, r) plus a tail hex one column behind (to the left for your side, to the right for the enemy)
   const isWide = (s) => !!(C[s.t].wide && B && !B.siege);
   const tailAt = (s, c = s.c, r = s.r) => { if (!isWide(s)) return null; const tc = c + (s.side === 0 ? -1 : 1); return inB(tc, r) ? [tc, r] : null; };
@@ -710,7 +732,7 @@ const Battle = (() => {
     B.cur = s; s.defb = false; B.spell = null;
     if (s.side === 1 || B.auto) push(s.px, s.py, 0.016, 700); // a soft look toward the enemy's acting stack (never on your own turn, so aiming stays exact)
     // narrow screens scroll the board sideways: keep the acting stack in view
-    try { const st = document.getElementById('stage'), c = document.getElementById('bat'); if (st && c && (st.scrollWidth > st.clientWidth + 4 || st.scrollHeight > st.clientHeight + 4)) st.scrollTo({ left: Math.max(0, (s.px / 960) * c.clientWidth - st.clientWidth / 2), top: Math.max(0, (s.py / 640) * c.clientHeight - st.clientHeight / 2), behavior: 'smooth' }); } catch (e) { /* ignore */ }
+    if (!frameAction(s, true)) try { const st = document.getElementById('stage'), c = document.getElementById('bat'); if (st && c && (st.scrollWidth > st.clientWidth + 4 || st.scrollHeight > st.clientHeight + 4)) st.scrollTo({ left: Math.max(0, (s.px / 960) * c.clientWidth - st.clientWidth / 2), top: Math.max(0, (s.py / 640) * c.clientHeight - st.clientHeight / 2), behavior: 'smooth' }); } catch (e) { /* ignore */ }
     B.reach = computeReach(s);
     const ai = s.side === 1 || B.auto;
     B.input = !ai;
@@ -990,7 +1012,7 @@ const Battle = (() => {
     $('bWait').onclick = () => B && B.cur && !B.cur.waited && playerAct(async () => { B.cur.waited = true; B.waitQ.push(B.cur); log(`${C[B.cur.t].n} waits.`); });
     $('bDef').onclick = () => B && playerAct(async () => { B.cur.defb = true; log(`${C[B.cur.t].n} defends.`); });
     $('bSpell').onclick = () => B && B.input && openSpells();
-    if ($('bZoom')) $('bZoom').onclick = () => { document.body.classList.toggle('bzfit'); try { localStorage.setItem('h3-bzoom', document.body.classList.contains('bzfit') ? '0' : '1'); } catch (e) { /* ignore */ } const st = $('stage'), c = $('bat'); if (B && B.cur && st && c) setTimeout(() => st.scrollTo({ left: Math.max(0, (B.cur.px / 960) * c.clientWidth - st.clientWidth / 2), top: Math.max(0, (B.cur.py / 640) * c.clientHeight - st.clientHeight / 2) }), 60); };
+    if ($('bZoom')) $('bZoom').onclick = () => { document.body.classList.toggle('bzfit'); try { localStorage.setItem('h3-bzoom', document.body.classList.contains('bzfit') ? '0' : '1'); } catch (e) { /* ignore */ } const st = $('stage'), c = $('bat'); if (B && B.cur && st && c && !document.body.classList.contains('bzfit') && frameAction(B.cur, false)) return; if (B && B.cur && st && c) setTimeout(() => st.scrollTo({ left: Math.max(0, (B.cur.px / 960) * c.clientWidth - st.clientWidth / 2), top: Math.max(0, (B.cur.py / 640) * c.clientHeight - st.clientHeight / 2) }), 60); };
     $('bBal').onclick = () => { if (B && B.input && !B.balUsed) { B.spell = '__ballista'; toast('Ballista: pick an enemy stack'); } };
     $('bTent').onclick = () => { if (B && B.input && !B.tentUsed) { B.spell = '__tent'; toast('First aid: pick one of your stacks'); } };
     $('bHero').onclick = () => { if (B && B.input && !B.strikeUsed) { B.spell = '__strike'; toast('Hero Strike: pick an enemy stack'); } };
@@ -1676,7 +1698,7 @@ const Battle = (() => {
       placeMines();
       $('blog').innerHTML = ''; $('btitle').textContent = opts.title || 'Battle';
       document.body.classList.add('inbattle'); rotateHint(true);
-      try { if (matchMedia('(orientation: landscape) and (max-height: 540px)').matches) document.body.classList.toggle('bzfit', localStorage.getItem('h3-bzoom') !== '1'); } catch (e) { /* ignore */ }   // phones in landscape: the whole field fits at once; the zoom button still follows the active unit
+      try { if (matchMedia('(orientation: landscape) and (max-height: 540px)').matches) document.body.classList.toggle('bzfit', localStorage.getItem('h3-bzoom') === '0'); } catch (e) { /* ignore */ }   // phones in landscape: the whole field fits at once; the zoom button still follows the active unit
       log(opts.siege ? (opts.siege.dside === 1 ? '🏰 Siege! Break the gate, cross the drawbridge, beware the towers.' : '🏰 The castle is under siege — hold the walls!') : 'Battle begins!');
       refreshButtons();
       requestAnimationFrame(draw);

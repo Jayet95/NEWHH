@@ -778,7 +778,7 @@ body.th-inferno, body.th-necropolis, body.th-dungeon, body.th-fortress { --fibre
   body.inbattle #top, body.inbattle #mbar { display: none !important; }
   body.inbattle #game { display: block !important; height: 100%; }
   body.inbattle #stage { position: fixed !important; left: 0; top: 0; bottom: 40px; right: 0; width: auto !important; height: auto !important; min-height: 0 !important; overflow: auto !important; display: block !important; border: 0 !important; border-radius: 0 !important; z-index: 5; -webkit-overflow-scrolling: touch; box-shadow: none !important; }
-  body.inbattle #stage canvas#bat { display: block !important; height: calc(100% * 1.5) !important; width: auto !important; max-width: none !important; max-height: none !important; aspect-ratio: 3 / 2; margin: 0 auto; }
+  body.inbattle #stage canvas#bat { display: block !important; height: calc(100% * var(--bk, 1.5)) !important; width: auto !important; max-width: none !important; max-height: none !important; aspect-ratio: 3 / 2; margin: 0 auto; }
   body.inbattle.bzfit #stage canvas#bat { height: 100% !important; }
   /* controls live in a slim bar along the bottom so the battlefield gets the full width */
   body.inbattle #side { position: fixed !important; left: 0; right: 0; bottom: 0; top: auto; width: auto !important; height: calc(40px + var(--sab)); box-sizing: border-box; z-index: 40; display: flex !important; flex-direction: row; padding: 2px calc(4px + var(--sar)) calc(2px + var(--sab)) calc(4px + var(--sal)); }

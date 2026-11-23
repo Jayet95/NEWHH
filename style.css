@@ -1704,3 +1704,29 @@ body.skin .mkqty button { border-image: none !important; border: 2px solid #8c6a
 @media (orientation: landscape) and (max-height: 540px) {
   body.inbattle #stage { background: linear-gradient(90deg, #2c4a1a, #3d5f26 50%, #2c4a1a) !important; }
 }
+
+/* ---------- phone landscape: Warriors rows keep their content height (no overlap), compact, panel scrolls ---------- */
+@media (orientation: landscape) and (max-height: 540px) {
+  #mbox .tpbody .bgrid.wgrid { grid-auto-rows: auto !important; flex: 0 0 auto !important; align-content: start; min-height: 0 !important; gap: 4px; }
+  .tpbody .wcard { min-height: min-content; overflow: hidden; grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px 8px; padding: 2px 6px !important; }
+  .tpbody .wcard .bpic.wpic { height: 46px; width: 46px; }
+  .tpbody .wcard .wstats, .tpbody .wcard .small { display: flex; font-size: 10px; }
+  .tpbody .wcard .wstats > span { font-size: 9px; padding: 0 3px; }
+  .tpbody .wcard b { font-size: 13px; }
+  .tpbody .wcard .wpic .bcr { width: 18px; height: 18px; }
+  .tpbody .wcard .bacts { flex-direction: row; flex-wrap: nowrap; align-items: center; max-width: 230px; gap: 4px; }
+  .tpbody .wcard .bacts .qty { width: auto; }
+  .tpbody .wcard .bacts button { width: auto; min-width: 60px; height: 26px; min-height: 26px !important; font-size: 11px !important; }
+  .tpbody .wcard .bacts .qty input { width: 40px !important; height: 24px !important; }
+  .tpbody .wcard .qty .qb { min-width: 0 !important; padding: 0 !important; height: 24px; min-height: 24px !important; font-size: 13px !important; flex: 0 0 24px !important; }
+  .tpbody .wcard .qty .qmax { flex: 0 0 32px !important; font-size: 10px !important; }
+  .tphead { padding: 3px 10px; }
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  .tpbody .bgrid:not(.wgrid) { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 6px; }
+  .tpbody .bgrid:not(.wgrid) > .bcard { padding: 4px !important; }
+  .tpbody .bgrid:not(.wgrid) > .bcard .bpic { height: 52px !important; }
+  .tpbody .bgrid:not(.wgrid) > .bcard .bpic img { max-height: 50px; width: auto; object-fit: contain; }
+  .tpbody .bgrid:not(.wgrid) > .bcard { font-size: 11px; }
+  .tpbody .bgrid:not(.wgrid) > .bcard b { font-size: 12px; }
+}

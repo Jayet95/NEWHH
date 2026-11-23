@@ -1794,3 +1794,30 @@ body.skin .mkqty button { border-image: none !important; border: 2px solid #8c6a
   #mbox .hspan .hsspells { gap: 3px; margin-top: 2px; } #mbox .hspan .hsspells > span { font-size: 9.5px; padding: 0 5px; }
   #mbox .hspan .hsarmy { margin-top: 2px; gap: 4px; } #mbox .hspan .hsarmy .pic { width: 30px !important; height: 30px !important; } #mbox .hspan .hsarmy div { font-size: 8.5px; width: 62px; }
 }
+
+/* ---------- phone landscape: Merchant / market screen is compact ---------- */
+@media (orientation: landscape) and (max-height: 540px) {
+  .mklbl { margin: 4px 0 2px; font-size: 12px; }
+  .mkchips { gap: 4px; } .mkchip { padding: 2px 2px; font-size: 15px; flex-direction: row; justify-content: center; gap: 4px; } .mkchip small { font-size: 10px; }
+  .mkqty { grid-template-columns: 38px 1fr 38px 44px 48px; gap: 4px; } .mkqty input { font-size: 15px; padding: 2px; } .mkqty button { padding: 3px 0; }
+  .mkcost { margin: 5px 0 2px; font-size: 13px; padding: 3px 8px; }
+}
+
+/* ---------- phone landscape: Victory / Defeat result is two columns (banner + hero | stats + army) ---------- */
+@media (orientation: landscape) and (max-height: 540px) {
+  #mbox:has(> .vic) { display: grid !important; grid-template-columns: 1fr 1.1fr; column-gap: 12px; align-content: start; }
+  #mbox > .vic { grid-column: 1; grid-row: 1; margin: 0 !important; padding: 8px 4px 2px !important; }
+  #mbox > .vic-hero { grid-column: 1; grid-row: 2; margin: 4px 0 !important; }
+  #mbox > .vic-stats { grid-column: 2; grid-row: 1; margin: 6px 0 4px !important; }
+  #mbox > h4 { grid-column: 2; grid-row: 2; margin: 2px 0 !important; text-align: center; font-size: 11px; }
+  #mbox > .vic-army { grid-column: 2; grid-row: 2 / 4; margin: 20px 0 0 !important; align-self: start; gap: 5px; }
+  #mbox > .mb { grid-column: 1 / -1; grid-row: 4; }
+  #mbox > .vic .vic-crest { width: 50px; height: 50px; font-size: 26px; } #mbox > .vic .vic-crest .gi { width: 28px; height: 28px; }
+  #mbox > .vic .vic-rays { top: 34px; width: 340px; height: 340px; margin: -170px 0 0 -170px; }
+  #mbox > .vic .vic-ribbon { font-size: 20px; letter-spacing: 4px; padding: 3px 28px 5px; margin-top: -6px; }
+  #mbox > .vic .vic-sub { margin: 4px 0 0; font-size: 12px; }
+  #mbox > .vic-stats > div { padding: 3px 2px; } #mbox > .vic-stats b { font-size: 18px; } #mbox > .vic-stats span { font-size: 9px; }
+  #mbox > .vic-hero b { font-size: 14px; } #mbox > .vic-hero .pic { width: 40px !important; height: 40px !important; }
+  #mbox > .vic-army .vic-unit { width: 58px; padding: 3px 2px; } #mbox > .vic-army .vic-unit .pic { width: 36px !important; height: 36px !important; } #mbox > .vic-army .vic-unit b { font-size: 12px; }
+}
+@media (orientation: landscape) and (max-height: 540px) { #mbox > .vic-stats { align-self: start; } #mbox > .vic-stats > div { height: auto; } }

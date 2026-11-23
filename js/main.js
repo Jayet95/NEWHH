@@ -277,6 +277,7 @@
     terrain = document.createElement('canvas'); terrain.width = Math.ceil(w1 * tsc); terrain.height = Math.ceil(h1 * tsc);
     const c = terrain.getContext('2d'); c.scale(tsc, tsc);
     for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) Art.tile(c, G.tiles[y][x], x, y, G);
+    Art.drawRivers(c, G);
     for (let y = 0; y < G.H; y++) for (let x = 0; x < G.W; x++) Art.tileOverlay(c, G.tiles[y][x], x, y, G);
     for (const tn of (G.tunnels || [])) {   // a dug tunnel: a dark arch in the rock
       const cxp = (tn.x + .5 + (tn.y & 1) * .5) * TS, cyp = tn.y * RH + HR; c.save(); c.fillStyle = '#0c0804'; c.beginPath(); c.moveTo(cxp - 10, cyp + 10); c.lineTo(cxp - 10, cyp - 2); c.quadraticCurveTo(cxp, cyp - 16, cxp + 10, cyp - 2); c.lineTo(cxp + 10, cyp + 10); c.closePath(); c.fill(); c.strokeStyle = '#9a8a68'; c.lineWidth = 2.4; c.stroke(); c.restore();
@@ -3067,6 +3068,7 @@
       const PW = (mp.W + 0.5) * 32, PH = mp.H * RH + HR * 0.5, big = document.createElement('canvas'); big.width = Math.ceil(PW); big.height = Math.ceil(PH);
       const bc = big.getContext('2d'), GF = { W: mp.W, H: mp.H, tiles: mp.tiles, biome: mp.biome, river: mp.river, zone: mp.zone, objs: mp.objs };
       for (let y = 0; y < mp.H; y++) for (let x = 0; x < mp.W; x++) Art.tile(bc, mp.tiles[y][x], x, y, GF);
+      Art.drawRivers(bc, GF);
       for (let y = 0; y < mp.H; y++) for (let x = 0; x < mp.W; x++) Art.tileOverlay(bc, mp.tiles[y][x], x, y, GF);
       for (const o of mp.objs.slice().sort((p, q) => p.y - q.y)) {
         if (!['town', 'mine', 'fort', 'lair', 'tower', 'shrine', 'chest'].includes(o.t)) continue;

@@ -489,25 +489,82 @@ const Art = (() => {
     return curCache[name] = 'url(' + c.toDataURL() + ') ' + hot + ', ' + (name === 'no' ? 'not-allowed' : name === 'sword' ? 'crosshair' : 'pointer');
   }
 
+  // rivers: every stream is traced into a chain of tiles (source in the hills, mouth in the sea), bent into one smooth meandering curve and painted as a single
+  // ribbon that widens downstream, with muddy banks and a faint glint. Painted after the ground and before the trees and mountains.
+  function drawRivers(c, G) {
+    if (!G || !G.river) return;
+    const W = G.W, H = G.H, N = W * H, adj = new Map(), TS2 = 32;
+    const id = (x, y) => y * W + x, xy = (i) => [i % W, (i / W) | 0];
+    const add = (a, b) => { if (a === b) return; if (!adj.has(a)) adj.set(a, new Set()); if (!adj.has(b)) adj.set(b, new Set()); adj.get(a).add(b); adj.get(b).add(a); };
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const rv = G.river[y][x], t = G.tiles[y][x]; if (!rv || t === T.WATER || t === T.MOUNT) continue;
+      const nb = hexNb(x, y);
+      for (let i = 0; i < 6; i++) {
+        const p = nb[i]; if (p[0] < 0 || p[1] < 0 || p[0] >= W || p[1] >= H) continue;
+        const isR = rv > 1 ? (rv & (1 << i)) : ((G.river[p[1]] && G.river[p[1]][p[0]]) || G.tiles[p[1]][p[0]] === T.WATER);      // new maps link only the real stream; old saves keep the old links
+        if (isR) add(id(x, y), id(p[0], p[1]));
+      }
+    }
+    if (!adj.size) return;
+    const term = (i) => { const [x, y] = xy(i), t = G.tiles[y][x]; return t === T.WATER || t === T.MOUNT; };
+    const ek = (a, b) => (a < b ? a * N + b : b * N + a), used = new Set(), chains = [];
+    const walk = (a, b) => {
+      const path = [a, b]; used.add(ek(a, b)); let prev = a, cur = b;
+      while (!term(cur) && adj.get(cur).size === 2) { let n2 = -1; for (const q of adj.get(cur)) if (q !== prev) n2 = q; if (n2 < 0 || used.has(ek(cur, n2))) break; used.add(ek(cur, n2)); prev = cur; cur = n2; path.push(cur); }
+      return path;
+    };
+    for (const [a, nb] of adj) { if (!term(a) && nb.size === 2) continue; for (const b of nb) if (!used.has(ek(a, b))) chains.push(walk(a, b)); }
+    for (const [a, nb] of adj) for (const b of nb) if (!used.has(ek(a, b))) chains.push(walk(a, b));      // closed loops
+    const jit = (px, py) => { const h = Math.sin(px * 127.1 + py * 311.7) * 43758.5453, h2b = Math.sin(px * 269.5 + py * 183.3) * 24634.6345; return [((h - Math.floor(h)) - .5) * 12, ((h2b - Math.floor(h2b)) - .5) * 10]; };
+    const ctr = (i) => { const [x, y] = xy(i), cx = (x + .5 + (y & 1) * .5) * TS2, cy = y * HR * 1.5 + HR; if (term(i)) return [cx, cy]; const j = jit(x, y); return [cx + j[0], cy + j[1]]; };
+    const water = groundPat(c, 'water') || '#2f6f9c';
+    const strokes = [];
+    for (let path of chains) {
+      const isWater = (i) => { const [x, y] = xy(i); return G.tiles[y][x] === T.WATER; };
+      if (isWater(path[0]) && !isWater(path[path.length - 1])) path = path.slice().reverse();      // the mouth is the last point
+      else if (!isWater(path[path.length - 1]) && term(path[path.length - 1]) && !term(path[0])) path = path.slice().reverse();
+      // waypoints: every tile centre plus a sideways wobble between neighbours, so even a straight run bends a little
+      let pts = [];
+      for (let k = 0; k < path.length; k++) {
+        const p = ctr(path[k]); pts.push(p);
+        if (k < path.length - 1) { const q = ctr(path[k + 1]), mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2, dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy) || 1, hh = h2(path[k] * 7 + 1, path[k + 1] * 13 + 5) - .5, amp = Math.min(6, L * .22) * hh * 2; pts.push([mx - dy / L * amp, my + dx / L * amp]); }
+      }
+      for (let it = 0; it < 3; it++) { const q = pts.map(p => p.slice()); for (let i = 1; i < pts.length - 1; i++) { q[i][0] = pts[i][0] * .5 + (pts[i - 1][0] + pts[i + 1][0]) * .25; q[i][1] = pts[i][1] * .5 + (pts[i - 1][1] + pts[i + 1][1]) * .25; } pts = q; }      // relax the route: zigzags become gentle bends
+      // Catmull-Rom through the waypoints
+      const n = pts.length, P = (i) => pts[Math.max(0, Math.min(n - 1, i))], samples = [];
+      for (let i = 0; i < n - 1; i++) {
+        const p0 = P(i - 1), p1 = P(i), p2 = P(i + 1), p3 = P(i + 2);
+        for (let s = 0; s < 6; s++) {
+          const t = s / 6, t2 = t * t, t3 = t2 * t;
+          samples.push([.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3), .5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3)]);
+        }
+      }
+      samples.push(pts[n - 1]);
+      const m = samples.length, seed0 = path[0] * 31 + path.length;
+      samples.forEach((s, i) => { const f = i / Math.max(1, m - 1); s[2] = Math.max(2.4, 2.8 + 4.4 * Math.pow(f, .85) + (h2(seed0 + (i >> 2), 9) - .5) * 1.1); });      // thin at the source, wider towards the sea
+      strokes.push(samples);
+    }
+    c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
+    const GROUP = 4;
+    const run = (style, extra, alpha) => {
+      c.strokeStyle = style; c.globalAlpha = alpha;
+      for (const samples of strokes) for (let g = 0; g < samples.length - 1; g += GROUP) {
+        const end = Math.min(samples.length - 1, g + GROUP); let w = 0; for (let i = g; i <= end; i++) w += samples[i][2]; w = w / (end - g + 1) + extra;
+        c.lineWidth = w; c.beginPath(); c.moveTo(samples[g][0], samples[g][1]); for (let i = g + 1; i <= end; i++) c.lineTo(samples[i][0], samples[i][1]); c.stroke();
+      }
+    };
+    run('#5b4a2c', 3.2, 1);          // muddy bank
+    run('#7d6a42', 1.6, 1);          // lighter shore
+    run(water, 0, 1);                // the water itself
+    c.globalAlpha = 1; c.lineWidth = 1.1; c.strokeStyle = 'rgba(205,234,248,.3)';       // faint glint down the middle
+    for (const samples of strokes) { c.beginPath(); samples.forEach((s, i) => { if (i) c.lineTo(s[0], s[1] - .4); else c.moveTo(s[0], s[1] - .4); }); c.stroke(); }
+    c.restore();
+  }
+
   // trees / mountains from the art pack are drawn on top of the base tiles (second pass, so they overlap the row above)
   function tileOverlay(c, t, x, y, G) {
     if (typeof Assets === 'undefined') return;
     const cxp = (x + .5 + (y & 1) * .5) * 32, cyp = y * HR * 1.5 + HR;
-    if (G && G.river && G.river[y] && G.river[y][x] && t !== T.WATER && t !== T.MOUNT) {      // a stream: water-coloured strokes to every neighbour that is also river or sea
-      const nb = hexNb(x, y); let any = false;
-      // every river tile's centre is nudged by a fixed pseudo-random offset and the banks vary in width, so the stream meanders and is never a regular zigzag;
-      // neighbours share the same offsets, so the pieces still meet exactly
-      const jit = (px, py) => { const h = Math.sin(px * 127.1 + py * 311.7) * 43758.5453, h2 = Math.sin(px * 269.5 + py * 183.3) * 24634.6345; return [((h - Math.floor(h)) - .5) * 14, ((h2 - Math.floor(h2)) - .5) * 12]; };
-      const jw = (px, py) => 0.82 + 0.4 * (Math.abs(Math.sin(px * 12.9 + py * 78.2) * 43758.5453) % 1);
-      const j0 = jit(x, y), wv = jw(x, y); const cxj = cxp + j0[0], cyj = cyp + j0[1];
-      c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
-      for (let i = 0; i < 6; i++) { const p = nb[i]; if (p[0] < 0 || p[1] < 0 || p[0] >= G.W || p[1] >= G.H) continue; const rv = G.river[y][x], isR = rv > 1 ? (rv & (1 << i)) : ((G.river[p[1]] && G.river[p[1]][p[0]]) || G.tiles[p[1]][p[0]] === T.WATER); if (!isR) continue; any = true;      // new maps link only the real stream; old saves (value 1) keep the old look
-        const ux = x + [1, y & 1, (y & 1) - 1, -1, (y & 1) - 1, y & 1][i], nx = (ux + .5 + (p[1] & 1) * .5) * 32, ny = p[1] * HR * 1.5 + HR, jn = G.tiles[p[1]][p[0]] === T.WATER ? [0, 0] : jit(p[0], p[1]), mx = (cxj + nx + jn[0]) / 2, my = (cyj + ny + jn[1]) / 2;
-        c.beginPath(); c.moveTo(cxj, cyj); c.quadraticCurveTo((cxj + mx) / 2 + (j0[1] * .35), (cyj + my) / 2 - (j0[0] * .35), mx, my); c.lineWidth = 8 * wv; c.strokeStyle = 'rgba(60,48,28,.3)'; c.stroke();                    // muddy bank
-        c.lineWidth = 5.8 * wv; c.strokeStyle = groundPat(c, 'water') || '#2f6f9c'; c.stroke(); c.lineWidth = 1.6; c.strokeStyle = 'rgba(190,226,246,.28)'; c.stroke(); }   // water, with a faint glint
-      c.beginPath(); c.arc(cxj, cyj, (any ? 3.8 : 4.8) * wv, 0, 7); c.fillStyle = groundPat(c, 'water') || '#2f6f9c'; c.fill(); c.lineWidth = 1.2; c.strokeStyle = 'rgba(60,48,28,.4)'; c.stroke();
-      c.restore();
-    }
     if (t === T.ROAD) {                                   // road pieces: a half-road from the centre to every connected neighbour plus a hub
       const st = Assets.get('roads/dirt_straight'); if (!st || !G) return;
       const nb = hexNb(x, y), rw = 15, L = 19, ih = st.height, iw = st.width;
@@ -529,5 +586,5 @@ const Art = (() => {
   }
   // after custom art finishes loading: forget everything painted so far and rebuild the icon strings
   function reload() { for (const o of [resCache, resUrl, spriteCache, portCache, heroCache, urlCache, patCache]) for (const k in o) delete o[k]; for (const k of Object.keys(RES_ICON)) RES_ICON[k] = resImg(k); }
-  return { reload, tile, tileOverlay, hexPath, hexPt, HR, cursor, rarity, portraitCanvas, heroCanvas, pic, heroPic, obj, boat: boatC, resImg, resCanvas, RES_EMOJI, fmtCostTxt, facHue };
+  return { reload, tile, tileOverlay, drawRivers, hexPath, hexPt, HR, cursor, rarity, portraitCanvas, heroCanvas, pic, heroPic, obj, boat: boatC, resImg, resCanvas, RES_EMOJI, fmtCostTxt, facHue };
 })();

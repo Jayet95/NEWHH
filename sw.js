@@ -3,7 +3,7 @@
 const VERSION = '__VERSION__';
 const CACHE = 'hexkingdoms-js-' + VERSION;
 const ART = 'hexkingdoms-art';          // art/audio keep their own cache across deploys (refreshed in the background), so an update never re-downloads them all
-const ASSETS = ['./', './index.html', './style.css', './manifest.webmanifest', './js/settings.js', './js/assets.js', './js/sfx.js', './js/fx.js', './js/data.js', './js/names.js', './js/art.js', './js/figures.js', './js/townart.js', './js/icons.js', './js/gi.js', './js/ach.js', './js/missions.js', './js/board.js', './js/map.js', './js/battle.js', './js/main.js', './js/uifx.js', './icons/icon-192.png', './icons/icon-512.png'];
+const ASSETS = ['./', './index.html', './style.css', './manifest.webmanifest', './js/settings.js', './js/assets.js', './js/sfx.js', './js/fx.js', './js/data.js', './js/names.js', './js/art.js', './js/figures.js', './js/townart.js', './js/icons.js', './js/gi.js', './js/ach.js', './js/moods.js', './js/missions.js', './js/board.js', './js/map.js', './js/battle.js', './js/main.js', './js/uifx.js', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));

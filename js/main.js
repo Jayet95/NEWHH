@@ -796,7 +796,7 @@
         </div>
       </div>
       <div class="hbar xp" title="Experience: ${h.xp} of ${need(h.lvl)} to the next level"><i style="width:${Math.min(100, h.xp / need(h.lvl) * 100)}%"></i><span>XP ${h.xp}/${need(h.lvl)}</span></div>
-      <div class="hmood small" title="Morale: each point = 4% chance of an extra turn (negative: of skipping a turn). Mixing creatures from different castles lowers it; undead and golems are immune. Luck: each point = 4% chance of double damage.">😀 Morale ${sgn(heroMorale(h))} · 🍀 Luck ${sgn(heroLuck(h))}</div>
+      <div class="hmood small">${Moods.html('morale', heroMorale(h), { label: true })} ${Moods.html('luck', heroLuck(h), { label: true })}</div>
       ${h.boat != null ? '<div class="small">⛵ Sailing — walk onto a shore tile to disembark</div>' : ''}
       ${perkTxt ? `<div class="small hperks">${perkTxt}</div>` : ''}
       <div class="small hspells" title="${G.spells.map(k => SPELLS[k].n).join(', ')}">Spells: ${G.spells.map(k => SPELLS[k].i).join(' ')}</div>
@@ -845,9 +845,9 @@
     });
     // the army is a tidy 4x2 grid: the spare eighth cell holds a heraldic plate
     if (h.army.length % 4) {   // the spare eighth cell shows the hero's morale and luck
-      const mo = Math.max(-3, Math.min(3, Math.round(heroMorale(h)) || 0)), lu = Math.max(-3, Math.min(3, Math.round(heroLuck(h)) || 0)), cl = (v) => v > 0 ? 'pos' : v < 0 ? 'neg' : '', dc = document.createElement('div');
-      dc.className = 'sdeco ml'; dc.title = `Morale ${sgn(mo)} (extra turns for your creatures) · Luck ${sgn(lu)} (lucky strikes)`;
-      dc.innerHTML = `<span class="mlr ${cl(mo)}"><i class="mle">😀</i><b>${sgn(mo)}</b><u class="mlbar"><s style="${mo >= 0 ? 'left:50%' : 'right:50%'};width:${Math.abs(mo) / 3 * 50}%"></s></u></span><span class="mlr ${cl(lu)}"><i class="mle">🍀</i><b>${sgn(lu)}</b><u class="mlbar"><s style="${lu >= 0 ? 'left:50%' : 'right:50%'};width:${Math.abs(lu) / 3 * 50}%"></s></u></span>`; el.appendChild(dc); }
+      const mo = Moods.clamp(heroMorale(h)), lu = Moods.clamp(heroLuck(h)), dc = document.createElement('div');
+      dc.className = 'sdeco ml'; dc.title = Moods.tip('morale', mo) + '\n' + Moods.tip('luck', lu);
+      dc.innerHTML = Moods.html('morale', mo) + Moods.html('luck', lu); el.appendChild(dc); }
     const sw = document.createElement('div'); sw.className = 'small'; sw.style.gridColumn = '1/-1'; sw.textContent = 'Drag a stack onto another slot — or tap two slots — to move, merge or swap.'; el.appendChild(sw);
     if (selSlot >= 0 && h.army[selSlot] && h.army[selSlot].n > 1 && h.army.some(x => !x)) { const a = h.army[selSlot], sp = document.createElement('button'); sp.style.gridColumn = '1/-1'; sp.className = 'splitb'; sp.textContent = `✂ Split ${Math.floor(a.n / 2)} into a new stack`; sp.onclick = () => { const e = h.army.findIndex(x => !x), k = Math.floor(a.n / 2); h.army[e] = { t: a.t, n: k }; a.n -= k; selSlot = -1; sfx('click'); renderAll(); }; el.appendChild(sp); }
     if (selSlot >= 0 && h.army[selSlot]) { const a = h.army[selSlot], db = document.createElement('button'); db.className = 'danger disb'; db.style.gridColumn = '1/-1'; db.textContent = `🗑 Disband ${a.n} ${C[a.t].n}`; db.onclick = () => disbandSlot(h.army, selSlot, a.n, db); el.appendChild(db); }
@@ -904,7 +904,7 @@
     const perkTxt = Object.keys(PERKS).filter(k => perk(h, k) > 0).map(k => `<span title="${PERKS[k].d}">${PERKS[k].i}${PERKS[k].n} ${RANK_NAMES[perk(h, k)]}</span>`).join(' · ') || 'No skills yet';
     const army = h.army.map((a, i) => a ? `<div class="chip" title="${C[a.t].n}">${C[a.t].i || ''} <b>${a.n}</b> ${C[a.t].n}</div>` : '').join('') || '<div class="small">No troops</div>';
     const i = await showModal(`<h2>${h.name}</h2><div class="small">${clsLabel(h.cls)} · Level ${h.lvl} · XP ${h.xp}/${need(h.lvl)}</div>
-      <div style="display:flex;gap:12px;align-items:center;margin:8px 0">${Art.heroPic(h.icon, ownCol(0), 84, h.pid)}<div class="small" style="line-height:1.7">⚔️ Attack ${h.att}${plus(ab.att)} · 🛡 Defense ${h.def}${plus(ab.def)}<br>✨ Spell power ${h.sp}${plus(ab.sp)} · 📚 Knowledge ${h.kn}${plus(ab.kn)}<br>👢 Movement ${h.move}/${maxMove(h)} · 🔷 Mana ${h.mana}/${maxMana(h)}<br>😀 Morale ${sgn(heroMorale(h))} · 🍀 Luck ${sgn(heroLuck(h))}</div></div>
+      <div style="display:flex;gap:12px;align-items:center;margin:8px 0">${Art.heroPic(h.icon, ownCol(0), 84, h.pid)}<div class="small" style="line-height:1.7">⚔️ Attack ${h.att}${plus(ab.att)} · 🛡 Defense ${h.def}${plus(ab.def)}<br>✨ Spell power ${h.sp}${plus(ab.sp)} · 📚 Knowledge ${h.kn}${plus(ab.kn)}<br>👢 Movement ${h.move}/${maxMove(h)} · 🔷 Mana ${h.mana}/${maxMana(h)}<br>${Moods.html('morale', heroMorale(h), { label: true })} &nbsp; ${Moods.html('luck', heroLuck(h), { label: true })}</div></div>
       <h4>Troops</h4><div style="display:flex;flex-wrap:wrap;gap:6px">${army}</div><h4>Skills</h4><div class="small">${perkTxt}</div>`, ['Close', '🎒 Equipment']);
     if (i === 1) openEquip(h);
   }
@@ -3198,6 +3198,7 @@
       if (typeof G !== 'undefined' && G) renderQuick();
     };
     place(); [mqP, mqD].forEach((m) => { if (m.addEventListener) m.addEventListener('change', place); else if (m.addListener) m.addListener(place); }); }
+  document.addEventListener('click', (e) => { const m = e.target.closest && e.target.closest('.mood'); if (m && m.dataset.tip && G) toast(m.dataset.tip); });   // tap a morale / luck icon: what it means
   // minimap on the map (phone landscape): a small button minimises it to an icon and brings it back
   { const mp = $('minipanel'); if (mp && !$('miniTog')) { const b = document.createElement('button'); b.id = 'miniTog'; b.type = 'button'; b.title = 'Minimise or show the minimap'; mp.appendChild(b);
       const apply = (v) => { document.body.classList.toggle('minihid', v); b.textContent = v ? '🗺' : '–'; try { Settings.mem('minihid', v ? 1 : 0); } catch (e) { /* ignore */ } };

@@ -2324,3 +2324,29 @@ html body:not(.inbattle) #side > #army .sdeco.ml { background: linear-gradient(#
 }
 /* the map HUD already fits the screen height, so the "Interface size" zoom must not stack on top of it (it made the column taller than its space) */
 @media (orientation: landscape) and (max-height: 540px) { html body:not(.inbattle) #top, html body:not(.inbattle) #side, html body:not(.inbattle) #mbar { zoom: 1 !important; } }
+
+/* morale and luck as icons (js/moods.js): 1-3 icons for how strong, tint and shape for good / bad */
+.mood { display: inline-flex; align-items: center; gap: 2px; vertical-align: middle; line-height: 1; cursor: help; }
+.mood i { display: inline-flex; width: 1.2em; height: 1.2em; font-style: normal; transition: transform .25s, filter .25s; }
+.mood i .gi { width: 100%; height: 100%; }
+.mood em { margin-left: 4px; font-style: normal; font-size: .9em; letter-spacing: .3px; color: #e9dcb4; }
+.mood.lv-n0 i { filter: grayscale(1) brightness(.95); opacity: .6; }
+.mood.lv-g1 i { filter: saturate(1.15) drop-shadow(0 0 2px rgba(130, 230, 140, .65)); }
+.mood.lv-g2 i { filter: saturate(1.35) drop-shadow(0 0 3px rgba(110, 235, 130, .9)); }
+.mood.lv-g3 i { filter: saturate(1.6) brightness(1.12) drop-shadow(0 0 4px rgba(255, 214, 90, 1)); animation: moodGlow 2.6s ease-in-out infinite alternate; }
+.mood.lv-b1 i, .mood.lv-b2 i, .mood.lv-b3 i { filter: sepia(1) hue-rotate(-48deg) saturate(3) brightness(.82) drop-shadow(0 0 2px rgba(255, 90, 70, .6)); }
+.mood.lv-b3 i { filter: sepia(1) hue-rotate(-55deg) saturate(3.4) brightness(.62) drop-shadow(0 0 4px rgba(255, 70, 50, .9)); }
+.mood.k-morale[class*="lv-b"] i { transform: rotate(180deg); }                       /* a frown */
+.mood.k-luck[class*="lv-b"] i { transform: rotate(180deg) scaleX(-1); }              /* a wilted, upside-down clover */
+.mood.lv-g1 em { color: #a6ecaa; } .mood.lv-g2 em { color: #8fe08f; } .mood.lv-g3 em { color: #ffd86a; }
+.mood.lv-b1 em, .mood.lv-b2 em { color: #ffb3a8; } .mood.lv-b3 em { color: #ff8a78; } .mood.lv-n0 em { color: #b8a67a; }
+@keyframes moodGlow { from { filter: saturate(1.5) brightness(1.05) drop-shadow(0 0 3px rgba(255, 214, 90, .8)); } to { filter: saturate(1.7) brightness(1.2) drop-shadow(0 0 6px rgba(255, 224, 120, 1)); } }
+@media (prefers-reduced-motion: reduce) { .mood.lv-g3 i { animation: none; } }
+/* the spare army cell: two rows, one for morale and one for luck */
+html body:not(.inbattle) #side > #army .sdeco.ml { display: flex !important; flex-direction: column; align-items: center; justify-content: space-evenly; padding: 2px 3px; }
+html body:not(.inbattle) #side > #army .sdeco.ml .mood { font-size: 12px; }
+@media (min-width: 761px) and (min-height: 541px) { html body:not(.inbattle) #side > #army .sdeco.ml .mood { font-size: 18px; gap: 3px; } }
+.hmood .mood { margin-right: 6px; }
+/* the morale / luck cell everywhere (army sheet on phones, town, ...): a dark plate instead of the old shield */
+.sdeco.ml { display: flex; flex-direction: column; align-items: center; justify-content: space-evenly; gap: 2px; padding: 4px; border-radius: 9px; background: radial-gradient(ellipse at 50% 0, rgba(255, 224, 150, .16), transparent 70%), linear-gradient(#2e2114, #130c06) !important; border: 1px solid #8c6a22; box-shadow: inset 0 0 0 1px #0d0803, inset 0 1px 0 2px rgba(255, 225, 160, .12); }
+.sdeco.ml .mood { font-size: 18px; gap: 3px; }

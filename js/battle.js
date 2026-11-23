@@ -1324,7 +1324,7 @@ const Battle = (() => {
       ctx.fillText(hh.name, hp.x, plateY + 9);
       if (isPlayer) {
         ctx.font = '10px sans-serif'; ctx.fillText(`⚔${hh.att} 🛡${hh.def} 🔷${hh.mana}`, hp.x, plateY + 22);
-        ctx.fillStyle = hh.morale < 0 || hh.luck < 0 ? '#ffb3a8' : '#bfe3a8'; ctx.fillText(`😀${hh.morale >= 0 ? '+' : ''}${hh.morale} 🍀${hh.luck >= 0 ? '+' : ''}${hh.luck}`, hp.x, plateY + 34);
+        ctx.fillStyle = hh.morale < 0 || hh.luck < 0 ? '#ffb3a8' : '#bfe3a8'; ctx.fillText(Moods.glyphs('morale', hh.morale) + ' ' + Moods.glyphs('luck', hh.luck), hp.x, plateY + 34);
       }
     });
     // a fallen stack slumps, shrinks and fades (a stack killed by a delayed spell stays whole until the effect lands)

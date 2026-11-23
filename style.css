@@ -1756,3 +1756,4 @@ body.skin .mkqty button { border-image: none !important; border: 2px solid #8c6a
   body.skin #mbox button .gi, body.skin #mbox button img.ico { width: 14px !important; height: 14px !important; }
 }
 #mbar button span { letter-spacing: 0 !important; white-space: nowrap; font-size: 9.5px; }
+@media (max-width: 420px) { #mbar button { padding-left: 1px !important; padding-right: 1px !important; min-width: 0; } #mbar button span { font-size: 9px; } }

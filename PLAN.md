@@ -1,4 +1,4 @@
-# Heroes-3 style game (JS) — design plan
+# Hex strategy game (JS) — design plan
 
 Stack: plain HTML + Canvas + vanilla JS, no build step. Run: `python -m http.server` then open index.html.
 

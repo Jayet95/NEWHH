@@ -1,7 +1,7 @@
 {
   "name": "Day & Night — Hex Kingdoms",
   "short_name": "Day & Night",
-  "description": "A Heroes-3 style turn-based strategy game: explore, build, recruit and conquer.",
+  "description": "A turn-based hex strategy game: explore, build, recruit and conquer.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "fullscreen",

@@ -3100,8 +3100,8 @@
     const army = startArmy(cur, f).filter(Boolean).map(a => [a.t, a.n]);
     const panel = `<div class="hspan"><div class="hsbig">${heroArt(cur.i, 150, cur.id)}</div><h3>${cur.name}</h3><div class="hscls">${clsLabel(cur.cls)}${cur.sk ? ` · ${PERKS[cur.sk].i} ${PERKS[cur.sk].n}` : ''}</div>
       <div class="hsstats"><div><b>${cur.att}</b><span>Attack</span></div><div><b>${cur.def}</b><span>Defence</span></div><div><b>${cur.sp}</b><span>Spell power</span></div><div><b>${cur.kn}</b><span>Knowledge</span></div></div>
-      <h4>Spells</h4><div class="hsspells">${[...START_SPELLS, ...cur.spells].map(k => `<span>${SPELLS[k].i} ${SPELLS[k].n}</span>`).join('')}</div>
       <h4>Starting army</h4><div class="hsarmy">${army.map(([id, n]) => `<div>${Art.pic(id, 60)}<small>${n} ${C[id].n}</small></div>`).join('')}</div>
+      <h4>Spells</h4><div class="hsspells">${[...START_SPELLS, ...cur.spells].map(k => `<span>${SPELLS[k].i} ${SPELLS[k].n}</span>`).join('')}</div>
       <button class="primary hsgo" id="hsGo">Play as ${cur.name}</button></div>`;
     $('mbox').innerHTML = `<div class="setup"><span data-bg="${heroBg(f)}"></span><h2>${FACTIONS[f].icon} ${FACTIONS[f].name} — choose your hero</h2><div class="hsbody"><div class="hsgrid">${tiles}</div>${panel}</div>
       <div class="small">Your rival will command a different castle. Fight them across zones, forts and sieges.</div><div class="mb"><button id="sBack">Back</button><button class="primary hsgo2" id="hsGo2">Play as ${cur.name}</button></div></div>`;

@@ -2066,3 +2066,94 @@ body.skin .mkqty button { border-image: none !important; border: 2px solid #8c6a
 }
 @media (orientation: landscape) and (max-height: 540px) { html body:not(.inbattle) #side > #army .slot { height: 27px !important; } html body:not(.inbattle) #side > #army .slot .pic { width: 22px !important; height: 22px !important; } }
 @media (orientation: landscape) and (max-height: 540px) { html body:not(.inbattle) #side > #army .slot { height: 26px !important; } }
+
+/* =====================================================================
+   PC / tablet adventure map - the same Heroes-3 layout, larger:
+   map on the left; right column with minimap, castle + hero selector, hero card, army slots and the
+   action buttons; one thin strip along the bottom with resources and the date.
+   ===================================================================== */
+@media (min-width: 761px) and (min-height: 541px) {
+  html body:not(.inbattle) { --rail: clamp(290px, 24vw, 350px); --strip: 34px; --mbarh: 146px; }
+  html body:not(.inbattle) #top, html body:not(.inbattle) #side, html body:not(.inbattle) #mbar { zoom: 1 !important; }
+  html body:not(.inbattle) #game { position: fixed !important; left: 0 !important; top: 0 !important; right: var(--rail) !important; bottom: var(--strip) !important; display: block !important; width: auto !important; height: auto !important; margin: 0 !important; padding: 0 !important; }
+  html body:not(.inbattle) #stage { position: absolute !important; inset: 8px 0 8px 8px !important; width: auto !important; height: auto !important; max-width: none !important; }
+  /* thin bottom strip: resources + date */
+  html body:not(.inbattle) #top { position: fixed !important; left: 0 !important; right: 0 !important; top: auto !important; bottom: 0 !important; height: var(--strip) !important; min-height: 0 !important; padding: 0 14px !important; display: flex !important; align-items: center !important; gap: 14px !important; z-index: 20; border-radius: 0 !important; flex-wrap: nowrap !important; }
+  html body:not(.inbattle) #top .btns, html body:not(.inbattle) #top #income, html body:not(.inbattle) #top .sky { display: none !important; }
+  html body:not(.inbattle) #top #res { flex: 1 1 auto !important; flex-wrap: nowrap !important; overflow: visible !important; height: 26px !important; gap: 8px !important; justify-content: flex-start !important; }
+  html body:not(.inbattle) #top #res .chip { height: 26px; min-height: 0 !important; font-size: 14px !important; padding: 0 10px !important; flex: 0 1 auto !important; }
+  html body:not(.inbattle) #top #res .chip .gi { width: 18px !important; height: 18px !important; font-size: 16px !important; }
+  html body:not(.inbattle) #top #res .chip b { font-size: 14px !important; }
+  html body:not(.inbattle) #top #date { flex: none; font-size: 13px !important; line-height: 1; padding: 0 !important; min-height: 0 !important; }
+  html body:not(.inbattle) #top #orb { flex: none; }
+  /* right column */
+  html body:not(.inbattle) #side { display: flex !important; flex-direction: column; gap: 6px; position: fixed !important; top: 0 !important; right: 0 !important; bottom: calc(var(--strip) + var(--mbarh)) !important; left: auto !important; width: var(--rail) !important; max-width: none !important; max-height: none !important; padding: 8px 10px 4px 8px !important; box-sizing: border-box; overflow-x: hidden !important; overflow-y: auto !important; scrollbar-width: thin; z-index: 15; background: var(--grain), linear-gradient(#241a10, #120c06) !important; border-left: 2px solid #5a4222 !important; }
+  html body:not(.inbattle) #side > #townsPanel, html body:not(.inbattle) #side > #terr, html body:not(.inbattle) #side > #emblem, html body:not(.inbattle) #side > #batui { display: none !important; }
+  html body:not(.inbattle) #side > #minipanel { order: 0; flex: 1 1 130px; min-height: 90px; max-height: 270px; max-width: none !important; width: auto !important; display: flex !important; justify-content: center; align-items: center; position: relative; grid-column: auto; }
+  html body:not(.inbattle) #side > #minipanel #mini { height: 100% !important; width: auto !important; max-width: 100%; }
+  /* castle + hero selector */
+  html body:not(.inbattle) #side > #quick { order: 1; position: static !important; flex: none; display: flex !important; flex-direction: column; gap: 6px; width: 100%; max-height: none !important; overflow: visible !important; }
+  html body:not(.inbattle) #side > #quick .qrow { display: flex; gap: 6px; height: 40px; align-items: stretch; }
+  html body:not(.inbattle) #side > #quick .qa { width: 28px !important; height: 40px !important; font-size: 22px !important; border-radius: 8px !important; }
+  html body:not(.inbattle) #side > #quick .qt { flex: 1 1 auto; width: auto !important; height: 40px !important; border-radius: 8px !important; position: relative; }
+  html body:not(.inbattle) #side > #quick .qt img { width: 100%; height: 100%; object-fit: cover; }
+  html body:not(.inbattle) #side > #quick .qt .qname { position: absolute; left: 0; right: 0; bottom: 0; font-size: 13px; line-height: 17px; padding: 0 6px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-style: normal; font-weight: 700; letter-spacing: .3px; color: #f6e6b4; text-shadow: 0 1px 2px #000; background: linear-gradient(transparent, rgba(0, 0, 0, .78)); }
+  html body:not(.inbattle) #side > #quick .qx { display: none !important; }
+  html body:not(.inbattle) #side > #quick .qcol { display: flex; flex-direction: row !important; flex-wrap: wrap; gap: 6px; max-height: none !important; }
+  html body:not(.inbattle) #side > #quick .qh { width: 46px !important; height: 46px !important; border-radius: 8px !important; }
+  html body:not(.inbattle) #side > #quick button { min-height: 0 !important; }
+  /* hero card */
+  html body:not(.inbattle) #side > #hero { order: 2; flex: none; }
+  html body:not(.inbattle) #side > #hero .hlist, html body:not(.inbattle) #side > #hero .hmood, html body:not(.inbattle) #side > #hero .hperks, html body:not(.inbattle) #side > #hero .hspells, html body:not(.inbattle) #side > #hero .hacts { display: none !important; }
+  html body:not(.inbattle) #side > #hero .hcard { display: grid !important; grid-template-columns: 56px 1fr !important; gap: 6px 10px; align-items: center; padding: 0 !important; }
+  html body:not(.inbattle) #side > #hero .hport, html body:not(.inbattle) #side > #hero .hport img { width: 56px !important; height: 56px !important; }
+  html body:not(.inbattle) #side > #hero .hhead { grid-row: 1; min-width: 0; }
+  html body:not(.inbattle) #side > #hero .hname { display: block; font-size: 17px; line-height: 1.15; }
+  html body:not(.inbattle) #side > #hero .hcls { font-size: 12px; }
+  html body:not(.inbattle) #side > #hero .hgrid { grid-column: 1 / -1; display: grid !important; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 0 !important; }
+  html body:not(.inbattle) #side > #hero .hst { display: flex !important; align-items: center; justify-content: center; gap: 4px; height: 26px; min-height: 0 !important; padding: 0 4px !important; position: relative; }
+  html body:not(.inbattle) #side > #hero .hst:nth-child(n+5) { grid-column: span 2; }
+  html body:not(.inbattle) #side > #hero .hst small { display: none !important; }
+  html body:not(.inbattle) #side > #hero .hst .hi .gi { width: 15px !important; height: 15px !important; }
+  html body:not(.inbattle) #side > #hero .hst b { font-size: 14px !important; line-height: 1; }
+  html body:not(.inbattle) #side > #hero .hst b em { font-size: 10px; }
+  html body:not(.inbattle) #side > #hero .hst u { position: absolute; left: 3px; right: 3px; bottom: 2px; height: 3px; display: block; }
+  html body:not(.inbattle) #side > #hero .hbar { display: block !important; height: 14px; margin: 2px 0 0; }
+  html body:not(.inbattle) #side > #hero .hbar span { font-size: 10px; line-height: 14px; }
+  /* army: amber counts beside the creature */
+  html body:not(.inbattle) #side > #army { order: 3; flex: none; display: grid !important; grid-template-columns: repeat(4, 1fr); gap: 5px; padding: 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; box-sizing: border-box; }
+  html body:not(.inbattle) #side > #army .slot { height: 46px !important; min-height: 0 !important; width: auto !important; max-width: none !important; min-width: 0 !important; aspect-ratio: auto !important; padding: 0 !important; }
+  html body:not(.inbattle) #side > #army .slot:not(.empty) { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: center; justify-content: space-between; gap: 3px; padding: 0 6px 0 4px !important; overflow: hidden; }
+  html body:not(.inbattle) #side > #army .slot .pic { width: 36px !important; height: 36px !important; flex: none; }
+  html body:not(.inbattle) #side > #army .slot small { position: static !important; display: block !important; flex: 1 1 auto; text-align: right; font-size: 15px !important; font-weight: 800; line-height: 1; color: #ffc93c !important; text-shadow: 0 1px 2px #000, 0 0 3px #000; margin: 0 !important; padding: 0 !important; min-width: 0; }
+  html body:not(.inbattle) #side > #army .sdeco, html body:not(.inbattle) #side > #army > .small { display: none !important; }
+  /* action buttons under the column */
+  html body.skin:not(.inbattle) #mbar { position: fixed !important; left: auto !important; top: auto !important; right: 0 !important; bottom: var(--strip) !important; width: var(--rail) !important; height: var(--mbarh) !important; display: grid !important; grid-template-columns: repeat(12, 1fr); grid-auto-rows: 44px; gap: 6px; padding: 8px 10px 8px 8px !important; box-sizing: border-box; flex-direction: row !important; align-content: start; border: 0 !important; border-top: 2px solid #8c6a22 !important; border-left: 2px solid #5a4222 !important; border-radius: 0 !important; background: var(--grain), linear-gradient(#2a1d10, #120c06) !important; box-shadow: inset 0 1px 0 rgba(255, 225, 160, .18) !important; z-index: 15; }
+  html body:not(.inbattle) #mbar #mTog, html body:not(.inbattle) #mbar #mArmy { display: none !important; }
+  html body:not(.inbattle) #mbar #mHero, html body:not(.inbattle) #mbar #mLand { display: flex !important; }
+  html body:not(.inbattle) #mbar #mHero, html body:not(.inbattle) #mbar #mGear, html body:not(.inbattle) #mbar #mLand, html body:not(.inbattle) #mbar #mDip { grid-column: span 3; }
+  html body:not(.inbattle) #mbar #mBuild, html body:not(.inbattle) #mbar #mTown, html body:not(.inbattle) #mbar #mMenu { grid-column: span 4; }
+  html body:not(.inbattle) #mbar:has(#mBuild[style*="none"]) #mTown, html body:not(.inbattle) #mbar:has(#mBuild[style*="none"]) #mMenu { grid-column: span 6; }
+  html body.skin:not(.inbattle) #mbar button { height: 44px !important; min-height: 0 !important; min-width: 0 !important; padding: 0 4px !important; display: flex !important; flex-direction: row !important; align-items: center; justify-content: center; gap: 6px; border: 1px solid #0d0803 !important; border-radius: 9px !important; background: var(--grain), radial-gradient(ellipse at 50% 0, rgba(255, 224, 150, .22), transparent 72%), linear-gradient(#4a3822, #1d140a) !important; box-shadow: inset 0 0 0 1px #8c6a22, inset 0 0 0 2px #0d0803, inset 0 1px 0 2px rgba(255, 225, 160, .16), 0 2px 4px rgba(0, 0, 0, .7) !important; flex: none !important; }
+  html body.skin:not(.inbattle) #mbar button:hover { filter: brightness(1.15); }
+  html body.skin:not(.inbattle) #mbar button:active { transform: translateY(1px); background: var(--grain), linear-gradient(#17100a, #33261a) !important; }
+  html body:not(.inbattle) #mbar button .ic { width: 26px !important; height: 26px !important; flex: none; }
+  html body:not(.inbattle) #mbar button span { font-size: 11px !important; letter-spacing: .6px !important; white-space: nowrap; color: #f1dea6; }
+  html body.skin:not(.inbattle) #mbar #mHero, html body.skin:not(.inbattle) #mbar #mGear, html body.skin:not(.inbattle) #mbar #mLand, html body.skin:not(.inbattle) #mbar #mDip { flex-direction: column !important; gap: 1px; padding: 2px 0 !important; }
+  html body:not(.inbattle) #mbar #mHero .ic, html body:not(.inbattle) #mbar #mGear .ic, html body:not(.inbattle) #mbar #mLand .ic, html body:not(.inbattle) #mbar #mDip .ic { width: 22px !important; height: 22px !important; }
+  html body:not(.inbattle) #mbar #mHero span, html body:not(.inbattle) #mbar #mGear span, html body:not(.inbattle) #mbar #mLand span, html body:not(.inbattle) #mbar #mDip span { font-size: 10px !important; letter-spacing: .3px !important; line-height: 1; }
+  html body.skin:not(.inbattle) #mbar #mEnd { order: 20; display: flex !important; grid-column: 1 / -1 !important; height: 40px !important; gap: 10px; border-radius: 10px !important; background: var(--grain), radial-gradient(ellipse at 50% 0, rgba(255, 245, 190, .55), transparent 75%), linear-gradient(#d9a634, #7a5110) !important; box-shadow: inset 0 0 0 1px #ffe08a, inset 0 0 0 2px #3a2506, 0 0 12px rgba(230, 191, 85, .45), 0 2px 4px rgba(0, 0, 0, .7) !important; animation: endGlow 2.6s ease-in-out infinite; }
+  html body:not(.inbattle) #mbar #mEnd span { font-size: 15px !important; letter-spacing: 1.8px !important; color: #2a1604 !important; text-shadow: 0 1px 0 rgba(255, 235, 170, .8) !important; font-weight: 800; }
+  html body:not(.inbattle) #mbar #mEnd .ic { width: 24px !important; height: 24px !important; }
+  html body:not(.inbattle) #mapEnd, html body:not(.inbattle) #miniTog { display: none !important; }
+  html body:not(.inbattle) #hint { bottom: calc(var(--strip) + 12px); }
+}
+
+/* bottom strip: the date reads on one line (Month - Week - Day) */
+@media (orientation: landscape) and (max-height: 540px), (min-width: 761px) and (min-height: 541px) {
+  html body:not(.inbattle) #top #date { display: flex !important; flex-direction: row !important; align-items: center !important; gap: 10px !important; height: auto !important; }
+  html body:not(.inbattle) #top #date .dtMain { display: flex !important; flex-direction: row !important; align-items: baseline; gap: 6px; white-space: nowrap; }
+  html body:not(.inbattle) #top #date .dtMain small { font-size: 11px !important; letter-spacing: .5px; }
+  html body:not(.inbattle) #top #date .dtMain b { font-size: 15px !important; line-height: 1; }
+  html body:not(.inbattle) #top #date .dtTurn { display: none !important; }
+}

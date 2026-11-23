@@ -908,7 +908,7 @@
     const towns = myTowns(), heroes = G.heroes;
     if (typeof Assets !== 'undefined') { const todo = towns.map(t => 'ui/town_' + t.fac).filter(k => !quickAsked.has(k)); if (todo.length) { todo.forEach(k => quickAsked.add(k)); Assets.need(todo).then(() => renderQuick()); } }
     // collapsed: only the town that matters (the one the selected hero stands in, else the first) and the selected hero; a toggle expands the full lists
-    const phoneL = matchMedia('(orientation: landscape) and (max-height: 540px)').matches;   // right-column selector: always the compact castle row, every hero portrait
+    const phoneL = matchMedia('(orientation: landscape) and (max-height: 540px)').matches || matchMedia('(min-width: 761px) and (min-height: 541px)').matches;   // right-column selector: always the compact castle row, every hero portrait
     const open = !phoneL && !!Settings.mem('quickOpen'), extra = Math.max(0, towns.length - 1) + Math.max(0, heroes.length - 1), here = G.hero && towns.findIndex(t => t.x === G.hero.x && t.y === G.hero.y);
     const cur = quickTi != null && quickTi < towns.length ? quickTi : (here >= 0 ? here : 0), tShow = (i) => open || i === cur, hShow = (h) => open || phoneL || h === G.hero;
     const tBtn = (t, i) => { const u = typeof Assets !== 'undefined' && Assets.has('ui/town_' + t.fac) ? Assets.src('ui/town_' + t.fac) : ''; return `<button class="qt" data-qt="${i}" title="${t.name} — open town">${u ? `<img src="${u}" alt="" draggable="false">` : `<span class="qic">${FACTIONS[t.fac].icon}</span>`}<em class="qname">${t.name}</em></button>`; };
@@ -3179,13 +3179,14 @@
   $('mGear').onclick = () => G && !busy && openEquip(G.hero);
   $('mLand').onclick = () => sheetOpen('🗺️ Territory', [$('minipanel'), $('terr')]);
   // phone landscape: the hero / town quick selector lives in the right column instead of covering the map
-  { const mq = matchMedia('(orientation: landscape) and (max-height: 540px)'), place = () => {
+  { const mqP = matchMedia('(orientation: landscape) and (max-height: 540px)'), mqD = matchMedia('(min-width: 761px) and (min-height: 541px)'), place = () => {
       const q = $('quick'), side = $('side'), stage = $('stage'); if (!q || !side || !stage) return;
+      const rail = mqP.matches || mqD.matches;   // phone landscape and PC/tablet: the selector lives in the right column
+      if (rail) { if (q.parentElement !== side) side.insertBefore(q, side.firstChild); } else if (q.parentElement !== stage) stage.appendChild(q);
+      const mp = $('minipanel'); if (mp) { if (mqP.matches) { if (mp.parentElement !== stage) stage.appendChild(mp); } else if (mp.parentElement !== side) side.insertBefore(mp, side.firstChild); }   // the minimap floats on the map only on a phone
       if (typeof G !== 'undefined' && G) renderQuick();
-      if (mq.matches) { if (q.parentElement !== side) side.insertBefore(q, side.firstChild); } else if (q.parentElement !== stage) stage.appendChild(q);
-      const mp = $('minipanel'); if (mp) { if (mq.matches) { if (mp.parentElement !== stage) stage.appendChild(mp); } else if (mp.parentElement !== side) side.insertBefore(mp, side.firstChild); }
     };
-    place(); if (mq.addEventListener) mq.addEventListener('change', place); else if (mq.addListener) mq.addListener(place); }
+    place(); [mqP, mqD].forEach((m) => { if (m.addEventListener) m.addEventListener('change', place); else if (m.addListener) m.addListener(place); }); }
   // minimap on the map (phone landscape): a small button minimises it to an icon and brings it back
   { const mp = $('minipanel'); if (mp && !$('miniTog')) { const b = document.createElement('button'); b.id = 'miniTog'; b.type = 'button'; b.title = 'Minimise or show the minimap'; mp.appendChild(b);
       const apply = (v) => { document.body.classList.toggle('minihid', v); b.textContent = v ? '🗺' : '–'; try { Settings.mem('minihid', v ? 1 : 0); } catch (e) { /* ignore */ } };

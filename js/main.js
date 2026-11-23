@@ -3091,11 +3091,11 @@
       <h4>Objective</h4><div class="scngoal">🎯 ${goalLine(cur.goal)}</div>
       <h4>Setup</h4><div class="hsspells"><span>${MAPS[cur.map.preset].name}</span><span>${SIZES[cur.map.size].name} ${SIZES[cur.map.size].w}×${SIZES[cur.map.size].h}</span><span>${cur.map.ais} rival${cur.map.ais > 1 ? 's' : ''}</span>${ally ? '<span>🤝 ally</span>' : ''}${bloc ? '<span>⚔⚔ allied rivals</span>' : ''}<span>Fog ${cur.map.fog === false ? 'off' : 'on'}</span>${cur.map.biome && cur.map.biome !== 'mixed' && cur.map.biome !== 'none' ? `<span>${cur.map.biome} lands</span>` : ''}${cur.bonus ? `<span>+${cur.bonus.gold} gold</span>` : ''}</div>
       <button class="primary hsgo" id="scGo">Choose your castle →</button></div>`;
-    $('mbox').innerHTML = `<div class="setup"><span data-bg="scenarios"></span><h2>Scenarios<span class="small">ready-made maps with an objective</span></h2><div class="hsbody"><div class="grid scngrid">${tiles}</div>${panel}</div><div class="mb"><button id="sBack">Back</button></div></div>`;
+    $('mbox').innerHTML = `<div class="setup"><span data-bg="scenarios"></span><h2>Scenarios<span class="small">ready-made maps with an objective</span></h2><div class="hsbody"><div class="grid scngrid">${tiles}</div>${panel}</div><div class="mb"><button id="sBack">Back</button><button class="primary hsgo2" id="scGo2">Choose your castle →</button></div></div>`;
     $('sBack').onclick = () => $('modal').classList.add('hide');
     $('mbox').querySelectorAll('[data-sc]').forEach(c => { c.onclick = () => showScenarios(c.dataset.sc); c.ondblclick = () => go(); });
     const go = () => showFactionSelect(cur.diff, { ...cur.map, color: 0, scn: cur });
-    $('scGo').onclick = go; $('modal').classList.remove('hide');
+    $('scGo').onclick = go; $('scGo2').onclick = go; $('modal').classList.remove('hide');
   }
   function showFactionSelect(diff = 'normal', map = {}) {
     const need = Object.keys(FACTIONS).map(k => 'ui/town_' + k);

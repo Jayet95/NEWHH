@@ -2350,3 +2350,9 @@ html body:not(.inbattle) #side > #army .sdeco.ml .mood { font-size: 12px; }
 /* the morale / luck cell everywhere (army sheet on phones, town, ...): a dark plate instead of the old shield */
 .sdeco.ml { display: flex; flex-direction: column; align-items: center; justify-content: space-evenly; gap: 2px; padding: 4px; border-radius: 9px; background: radial-gradient(ellipse at 50% 0, rgba(255, 224, 150, .16), transparent 70%), linear-gradient(#2e2114, #130c06) !important; border: 1px solid #8c6a22; box-shadow: inset 0 0 0 1px #0d0803, inset 0 1px 0 2px rgba(255, 225, 160, .12); }
 .sdeco.ml .mood { font-size: 18px; gap: 3px; }
+/* Scenarios reuse the hero-select structure; keep their bottom bar (Back / Choose your castle) pinned on a phone held upright */
+@media (max-width: 760px) and (orientation: portrait) {
+  body:has(#title:not(.hide)) #mbox:has(.scnpan) { display: block !important; min-height: 0 !important; }
+  body:has(#title:not(.hide)) #mbox:has(.scnpan) > .setup { display: block !important; }
+  body:has(#title:not(.hide)) .setup:has(.scnpan) > .mb { position: sticky !important; bottom: -12px; margin-top: 12px !important; z-index: 3; }
+}

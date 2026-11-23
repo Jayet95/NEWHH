@@ -2157,3 +2157,23 @@ body.skin .mkqty button { border-image: none !important; border: 2px solid #8c6a
   html body:not(.inbattle) #top #date .dtMain b { font-size: 15px !important; line-height: 1; }
   html body:not(.inbattle) #top #date .dtTurn { display: none !important; }
 }
+
+/* the resource/date strip only runs under the map; the right column and its buttons reach the bottom of the screen */
+@media (orientation: landscape) and (max-height: 540px) {
+  html body:not(.inbattle) #top { right: calc(var(--rail) + var(--sar, 0px)) !important; gap: 10px !important; }
+  html body:not(.inbattle) #top #res { flex: 0 1 auto !important; min-width: 0; }
+  html body:not(.inbattle) #top #res .chip { flex: 0 1 auto !important; }
+  html body:not(.inbattle) #top #date { margin-right: auto; }
+  html body:not(.inbattle) #side { bottom: calc(var(--sab, 0px) + 102px) !important; }
+  html body.skin:not(.inbattle) #mbar { bottom: var(--sab, 0px) !important; padding-bottom: 5px !important; }
+  html body:not(.inbattle) #side > #army .slot { height: 32px !important; }
+  html body:not(.inbattle) #side > #army .slot .pic { width: 26px !important; height: 26px !important; }
+}
+@media (min-width: 761px) and (min-height: 541px) {
+  html body:not(.inbattle) #top { right: var(--rail) !important; }
+  html body:not(.inbattle) #top #res { flex: 0 1 auto !important; min-width: 0; }
+  html body:not(.inbattle) #top #res .chip { flex: 0 1 auto !important; }
+  html body:not(.inbattle) #top #date { margin-right: auto; }
+  html body:not(.inbattle) #side { bottom: var(--mbarh) !important; }
+  html body.skin:not(.inbattle) #mbar { bottom: 0 !important; }
+}

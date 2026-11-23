@@ -1663,7 +1663,7 @@
   const SLOTS = 11;
   const TIER_HALL = [null, 0, 0, 1, 2, 3, 4, 5];
   const UP_HALL = { 2: 1, 3: 2, 4: 3, 5: 4 };
-  let curTown = null, townTab = null, garSel = null, GAR = null;
+  let curTown = null, townTab = null, townSub = 'dw', garSel = null, GAR = null;   // townSub: the side tab inside Buildings
   fetch('art/ui/garrison_sockets.json').then(r => (r.ok ? r.json() : null)).then(j => { GAR = j; }).catch(() => {});
   const townNeeded = new Set();
   const defaultTown = () => townAt(G.hero.x, G.hero.y) || nearestTown(G.hero.x, G.hero.y);
@@ -1759,6 +1759,7 @@
   // clicking a plot in the picture opens the matching warriors / buildings card below and flashes it
   function townSlotClick(t, i) {
     townTab = (i < 7 && slotInfo(t, i).built) ? 'war' : 'bld';
+    townSub = i < 7 ? 'dw' : ({ 7: 'econ', 9: 'econ', 10: 'econ', 14: 'def', 15: 'def', 13: 'def', 8: 'svc', 11: 'svc', 12: 'svc' }[i] || 'econ');
     openTown(t);
     const el = $('mbox').querySelector('[data-slot="' + i + '"]');
     if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('slotflash'); setTimeout(() => el.classList.remove('slotflash'), 1600); }
@@ -1968,8 +1969,18 @@
       : `<div class="small gnohero">No hero in this town — recruits join the garrison. Bring a hero to move troops.</div>`;
     const bsrc = (k) => (Assets.has('ui/town_btn_' + t.fac + '_' + k) && Assets.src('ui/town_btn_' + t.fac + '_' + k)) || null;
     const tabBtn = (k, label, ico) => { const u = bsrc(k === 'war' ? 'war' : 'bld'); return `<button class="ttab${townTab === k ? ' on' : ''}${u ? ' tbtn' : ''}" data-ttab="${k}" title="${label}">${u ? `<img src="${u}" alt="${label}" draggable="false">` : ico + ' ' + label}</button>`; };
+    // Buildings come in side tabs: dwellings, the town's economy, defences and services (each plot knows its group by its slot number)
+    const SUBS = [['dw', '🏠', 'Dwellings'], ['econ', '💰', 'Town'], ['def', '🛡️', 'Defense'], ['svc', '🔮', 'Services']];
+    const GRP = { 7: 'econ', 9: 'econ', 10: 'econ', 14: 'def', 15: 'def', 13: 'def', 8: 'svc', 11: 'svc', 12: 'svc' };
+    const bparts = (bld + smithy + garrRow).split(/(?=<div class="trow big")/).filter(s => s.trim());
+    const grp = { econ: '', def: '', svc: '' };
+    for (const p of bparts) { const m = /data-slot="(\d+)"/.exec(p); grp[m ? (GRP[+m[1]] || 'econ') : 'econ'] += p; }
+    if (!SUBS.some(s => s[0] === townSub)) townSub = 'dw';
+    const subHtml = { dw: `<h4>Creature dwellings</h4><div class="bgrid">${dwc}</div>`, econ: `<div class="bgrid">${cardify(grp.econ)}</div>` + caravanHtml(t, mt), def: `<div class="bgrid">${cardify(grp.def)}</div>`, svc: `<div class="bgrid">${cardify(grp.svc)}</div>` };
+    const sideBtn = ([k, ico, nm]) => `<button class="tside-b${townSub === k ? ' on' : ''}" data-tsub="${k}" title="${nm}"><span class="ti">${ico}</span><span class="tl">${nm}</span></button>`;
+    const bldTabs = `<div class="tpbody tsplit"><nav class="tside">${SUBS.map(sideBtn).join('')}</nav><div class="tcontent">${subHtml[townSub]}</div></div>`;
     // the whole screen is the town picture (like the original); the troops, two buttons and a panel for Warriors / Buildings sit on top of it
-    const panel = townTab ? `<div class="tpanel"><div class="tphead"><b>${townTab === 'bld' ? '🏗️ Buildings' : '⚔️ Warriors'}</b><span class="tpr">${townTab === 'bld' ? '' : '<button id="tBuyAll" class="tpall" title="Recruit as many of every creature as you can afford, strongest first">Recruit all</button>'}<button id="tpClose" class="tpx" title="Close">✕</button></span></div><div class="tpbody">${townTab !== 'bld' ? `<div class="bgrid wgrid">${wc}</div>` + outpostHtml(t) : `<h4>Creature dwellings</h4><div class="bgrid">${dwc}</div><h4>Town buildings</h4><div class="bgrid">${cardify(bld + smithy)}</div>` + caravanHtml(t, mt)}</div></div>` : '';
+    const panel = townTab ? `<div class="tpanel"><div class="tphead"><b>${townTab === 'bld' ? '🏗️ Buildings' : '⚔️ Warriors'}</b><span class="tpr">${townTab === 'bld' ? '' : '<button id="tBuyAll" class="tpall" title="Recruit as many of every creature as you can afford, strongest first">Recruit all</button>'}<button id="tpClose" class="tpx" title="Close">✕</button></span></div>${townTab !== 'bld' ? `<div class="tpbody"><div class="bgrid wgrid">${wc}</div>` + outpostHtml(t) + '</div>' : bldTabs}</div>` : '';
     const html = cvHtml + `<div class="tui">${mt.length > 1 ? `<button class="tarrow l" data-tnav="-1" title="Previous town: ${mt[(mt.indexOf(t) + mt.length - 1) % mt.length].name}">‹</button><button class="tarrow r" data-tnav="1" title="Next town: ${mt[(mt.indexOf(t) + 1) % mt.length].name}">›</button>` : ''}<div class="ttop">${topHtml}</div><div class="tfill"></div><div class="gstack">` + gTop + gHero + `</div><div class="tbar">${tabBtn('war', 'Warriors', '⚔️')}${tabBtn('bld', 'Buildings', '🏗️')}<button class="primary" id="tClose">Leave town</button></div>${panel}</div>`;
     $('mbox').innerHTML = html; $('mbox').classList.add('townfull'); $('modal').classList.remove('hide'); townHover = -1;
     { const cv = $('tcv'), at = (e) => { const r = cv.getBoundingClientRect(); return TownArt.slotAt((e.clientX - r.left - townV.x) / townV.k, (e.clientY - r.top - townV.y) / townV.k, TW, TH); };
@@ -1988,6 +1999,7 @@
     q('[data-tab]', b => b.onclick = () => openTown(mt[+b.dataset.tab]));
     q('[data-tnav]', b => b.onclick = () => { const at = Math.max(0, mt.indexOf(t)); openTown(mt[(at + +b.dataset.tnav + mt.length) % mt.length]); });
     q('[data-ttab]', b => b.onclick = () => { townTab = townTab === b.dataset.ttab ? null : b.dataset.ttab; openTown(t); });
+    q('[data-tsub]', b => b.onclick = () => { townSub = b.dataset.tsub; openTown(t); });
     q('[data-gr]', b => b.onclick = () => {
       const arrOf = (r) => r === 'g' ? t.garrison : th.army, r = b.dataset.gr, i = +b.dataset.gi;
       if (r === 'h' && !th) return;

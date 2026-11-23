@@ -1623,3 +1623,16 @@ body.skin .mkqty button { border-image: none !important; border: 2px solid #8c6a
 #mbox .trow select, #mbox .trow input[type=number], #tgD { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
 #mbox .trow[style*="90px"] { grid-template-columns: minmax(0, 1fr) 90px !important; }
 #tgD { display: block; margin-top: 4px; text-overflow: ellipsis; }
+
+/* ---------- town: Buildings in side tabs (Dwellings / Town / Defense / Services) ---------- */
+.tpbody.tsplit { flex-direction: row !important; padding: 0 !important; overflow: hidden !important; gap: 0; }
+.tside { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; padding: 8px 6px; overflow-y: auto; border-right: 1px solid var(--edge); background: rgba(0, 0, 0, .25); }
+.tside-b { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 74px; padding: 8px 4px; border-radius: 10px; border: 2px solid #4a381c; background: linear-gradient(#2a1d12, #1a1209); color: #d9c79a; font-family: var(--f-head); cursor: pointer; line-height: 1.1; }
+.tside-b .ti { font-size: 24px; } .tside-b .tl { font-size: 11px; letter-spacing: .02em; }
+.tside-b:hover { border-color: var(--gold-d); }
+.tside-b.on { border-color: var(--gold); background: linear-gradient(#5a4220, #35250f); color: #fff1c4; box-shadow: 0 0 10px rgba(212, 168, 74, .35), inset 0 0 0 1px #000; }
+.tcontent { flex: 1; min-width: 0; overflow-y: auto; padding: 8px 8px 10px; }
+@media (max-width: 760px) { .tside { padding: 6px 4px; gap: 5px; } .tside-b { width: 54px; padding: 6px 2px; } .tside-b .ti { font-size: 21px; } .tside-b .tl { font-size: 9.5px; } .tcontent { padding: 6px; } }
+@media (orientation: landscape) and (max-height: 540px) { .tside { flex-direction: column; gap: 4px; } .tside-b { width: 52px; padding: 4px 2px; } .tside-b .ti { font-size: 18px; } .tside-b .tl { font-size: 9px; } }
+
+.tui:has(.tpanel) .tarrow { display: none !important; }   /* the town arrows would sit on top of the side tabs */

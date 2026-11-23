@@ -1737,3 +1737,10 @@ body.skin .mkqty button { border-image: none !important; border: 2px solid #8c6a
   #sheetBody #mini { height: 205px !important; width: auto !important; max-width: 46vw; }
   #sheetBody:has(#mini) > :first-child { height: auto !important; }
 }
+
+/* ---------- phone portrait: screens opened from the main menu start at the top instead of sliding up from the bottom ---------- */
+@media (max-width: 760px) and (orientation: portrait) {
+  body:has(#title:not(.hide)) #modal { justify-content: flex-start !important; }
+  body:has(#title:not(.hide)) #mbox { border-radius: 0 0 16px 16px; border-width: 0 0 3px 0; max-height: calc(100dvh - var(--sat, 0px)); max-height: calc(100vh - var(--sat, 0px)); animation: sheetDown .22s ease-out; }
+}
+@keyframes sheetDown { from { transform: translateY(-40%); opacity: .4; } to { transform: none; opacity: 1; } }

@@ -56,6 +56,7 @@
   const tiersOf = (t) => factionTiers(t.fac || G.faction);
   const aiById = (id) => G.ais.find(a => a.id === id);
   const gst = (k, n) => { if (!G) return; (G.st = G.st || {})[k] = (G.st[k] || 0) + n; };
+  let misNewTiles = 0;   // map tiles uncovered since the last redraw (weekly missions)
   const note = (t, x, y) => { (G.report = G.report || []).push({ t, x, y }); };
   const allAiHeroes = () => G.ais.flatMap(a => a.heroes);
   const aiHeroAt = (x, y) => allAiHeroes().find(h => h.x === x && h.y === y);
@@ -242,8 +243,9 @@
     h.move = maxMove(h);
     G.heroes.push(h); setActive(0); learn(def.spells); rollTavern();
     if (map.scn && map.scn.bonus) for (const k in map.scn.bonus) G.res[k] = (G.res[k] || 0) + map.scn.bonus[k];
-    G.fog = map.fog !== false; initFog();
+    G.fog = map.fog !== false; initFog(); G.ms = Missions.fresh(1, diff);
     reindex(G); buildTerrain(); sizeMini(); centerOn(h.x, h.y); renderAll(); recentreSoon(); needHeroArt();
+    misNewTiles = 0; if (G.ms) G.ms.cnt = {}; misChip();
     toast(`${MAPS[preset].name} (${SIZES[size].name}, seed ${seed}) · ${D.name}: defeat ${nAI > 1 ? 'all ' + nAI + ' rivals by capturing their towns' : 'the rival by capturing their towns'}. Good luck, ${h.name}!`);
   }
   const saveJSON = () => JSON.stringify(G, (k, v) => (k === 'omap' || k === 'hero' || k[0] === '_') ? undefined : v);
@@ -260,7 +262,7 @@
       const s = localStorage.getItem(key); if (!s) return false;
       G = JSON.parse(s); if (!G.zone || !G.heroes || !G.ais) return false;
       WRAP_W = G.wrap ? G.W : 0; setFoodMode(!!G.food); if (G.food && G.res.food == null) G.res.food = FOOD.start;
-      G.tavern = (G.tavern || []).filter(id => HEROES[id]);
+      G.tavern = (G.tavern || []).filter(id => HEROES[id]); misEnsure();
       G.path = null; G.boats = G.boats || []; setFaction(G.faction); applyTheme(G.faction); setActive(Math.min(G.sel, G.heroes.length - 1));
       initFog(); reindex(G); buildTerrain(); sizeMini(); centerOn(G.hero.x, G.hero.y); renderAll(); recentreSoon(); needHeroArt(); return true;
     } catch (e) { return false; }
@@ -296,7 +298,7 @@
         let xx = x + dx; if (WRAP_W) xx = wrapX(xx); else if (xx < 0 || xx >= G.W) continue;
         const i = yy * G.W + xx;
         if (seeNow) vis[i] = 1;
-        if (G.expl[i] === 0) { G.expl[i] = 1; fogDirty = true; }
+        if (G.expl[i] === 0) { G.expl[i] = 1; fogDirty = true; misNewTiles++; }
       }
     }
   }
@@ -767,6 +769,8 @@
     if (!G) return;
     { const bb = $('mBuild'); if (bb) bb.style.display = G.build ? '' : 'none'; }
     quietSave();
+    if (misNewTiles) { const nt = misNewTiles; misNewTiles = 0; mis('explore', nt); }
+    misChip();
     recomputeVision();
     const gn = computeGain();
     const resHtml = RES.map(k => `<span class="chip" title="${k[0].toUpperCase() + k.slice(1)}: ${G.res[k]}${gn[k] ? ` (+${gn[k]}/day)` : ''}${k === 'food' && G.food ? ` · upkeep −${foodUpkeep()}/day` : ''}">${RES_ICON[k]} <b>${fmtN(G.res[k])}</b>${gn[k] ? `<small class="inc">+${fmtN(gn[k])}</small>` : ''}</span>`).join('');
@@ -839,7 +843,10 @@
       el.appendChild(b);
     });
     // the army is a tidy 4x2 grid: the spare eighth cell holds a heraldic plate
-    if (h.army.length % 4) { const dc = document.createElement('div'); dc.className = 'sdeco'; dc.setAttribute('aria-hidden', 'true'); el.appendChild(dc); }
+    if (h.army.length % 4) {   // the spare eighth cell shows the hero's morale and luck
+      const mo = heroMorale(h), lu = heroLuck(h), cl = (v) => v > 0 ? 'pos' : v < 0 ? 'neg' : '', dc = document.createElement('div');
+      dc.className = 'sdeco ml'; dc.title = `Morale ${sgn(mo)} (extra turns for your creatures) · Luck ${sgn(lu)} (lucky strikes)`;
+      dc.innerHTML = `<span class="mlr"><i>😀</i><b class="${cl(mo)}">${sgn(mo)}</b></span><span class="mlr"><i>🍀</i><b class="${cl(lu)}">${sgn(lu)}</b></span>`; el.appendChild(dc); }
     const sw = document.createElement('div'); sw.className = 'small'; sw.style.gridColumn = '1/-1'; sw.textContent = 'Drag a stack onto another slot — or tap two slots — to move, merge or swap.'; el.appendChild(sw);
     if (selSlot >= 0 && h.army[selSlot] && h.army[selSlot].n > 1 && h.army.some(x => !x)) { const a = h.army[selSlot], sp = document.createElement('button'); sp.style.gridColumn = '1/-1'; sp.className = 'splitb'; sp.textContent = `✂ Split ${Math.floor(a.n / 2)} into a new stack`; sp.onclick = () => { const e = h.army.findIndex(x => !x), k = Math.floor(a.n / 2); h.army[e] = { t: a.t, n: k }; a.n -= k; selSlot = -1; sfx('click'); renderAll(); }; el.appendChild(sp); }
     if (selSlot >= 0 && h.army[selSlot]) { const a = h.army[selSlot], db = document.createElement('button'); db.className = 'danger disb'; db.style.gridColumn = '1/-1'; db.textContent = `🗑 Disband ${a.n} ${C[a.t].n}`; db.onclick = () => disbandSlot(h.army, selSlot, a.n, db); el.appendChild(db); }
@@ -1158,7 +1165,7 @@
   function collect(o) {
     sfx('coin');
     if (o.t === 'pile') { G.res[o.kind] += o.amt; toast(`Collected ${o.amt} ${RES_ICON[o.kind]} ${o.kind}.`); }
-    else { G.res.gold += o.gold; Ach.event('chest'); toast(`The chest holds ${o.gold} 🪙 gold!`); }
+    else { G.res.gold += o.gold; Ach.event('chest'); mis('chests', 1); mis('gold', o.gold); toast(`The chest holds ${o.gold} 🪙 gold!`); }
     G.objs.splice(G.objs.indexOf(o), 1); reindex(G);
   }
   // ---------- adventure objects: dwellings, resource sites, stones, shrines, towers, banks, monoliths, seers ----------
@@ -1169,7 +1176,7 @@
   async function visitDwelling(o, h) {
     if (o.owner !== 0) {
       if (o.guard && o.guard.length && !(await fight(h, o.guard, { att: 0, def: 0 }, 'Dwelling guardians'))) return;
-      o.owner = 0; o.guard = []; sfx('build'); toast(`You now own the ${C[dwId(o)].n} dwelling!`); renderAll();
+      o.owner = 0; o.guard = []; mis('capture', 1); sfx('build'); toast(`You now own the ${C[dwId(o)].n} dwelling!`); renderAll();
     }
     openDwelling(o, h);
   }
@@ -1185,7 +1192,7 @@
       while (n > 0 && !canAfford(G.res, Object.fromEntries(Object.entries(c.cost).map(([k, v]) => [k, v * n])))) n--;
       if (n <= 0) return toast('Cannot recruit (resources or availability).');
       if (!addToArmy(h, id, n)) return toast('No free army slot.');
-      pay(G.res, c.cost, n); o.avail -= n; toast(`Recruited ${n} ${c.n}${n > 1 ? 's' : ''}.`); sfx('build'); renderAll(); openDwelling(o, h);
+      pay(G.res, c.cost, n); o.avail -= n; mis('recruit', n); toast(`Recruited ${n} ${c.n}${n > 1 ? 's' : ''}.`); sfx('build'); renderAll(); openDwelling(o, h);
     };
     $('modal').classList.remove('hide');
   }
@@ -1193,7 +1200,7 @@
   async function visitLair(o, h) {
     if (o.owner !== 0) {
       if (o.guard && o.guard.length && !(await fight(h, o.guard, { att: 0, def: 0 }, 'Dragon Lair guardians'))) return;
-      o.owner = 0; o.guard = []; Ach.event('lair'); sfx('build'); toast('The Dragon Lair is yours — dragons gather here every week!'); renderAll();
+      o.owner = 0; o.guard = []; Ach.event('lair'); mis('capture', 1); sfx('build'); toast('The Dragon Lair is yours — dragons gather here every week!'); renderAll();
     }
     openLair(o, h);
   }
@@ -1204,7 +1211,7 @@
         <div class="acts"><input type="number" min="1" max="${av}" value="${av}" data-ln="${id}"><button data-lb="${id}"${av ? '' : ' disabled'}>Recruit</button></div></div>`; }).join('');
     $('mbox').innerHTML = `<h2>🐲 Dragon Lair</h2><div class="small">These dragons cannot be recruited in any castle. While you hold the lair, new dragons arrive every week — buy them here and they join ${h.name}.</div>${rows}
       <div class="mb"><button id="lrAll">Buy all I can afford</button><button class="primary" id="lrClose">Close</button></div>`;
-    const buy = (id, want) => { const c = C[id]; let n = Math.min(want, o.avail[id] || 0); while (n > 0 && !canAfford(G.res, need(c, n))) n--; if (n <= 0) return 0; if (!addToArmy(h, id, n)) return -1; pay(G.res, c.cost, n); o.avail[id] -= n; Ach.event('lairBuy', { n, id }); return n; };
+    const buy = (id, want) => { const c = C[id]; let n = Math.min(want, o.avail[id] || 0); while (n > 0 && !canAfford(G.res, need(c, n))) n--; if (n <= 0) return 0; if (!addToArmy(h, id, n)) return -1; pay(G.res, c.cost, n); o.avail[id] -= n; Ach.event('lairBuy', { n, id }); mis('recruit', n); return n; };
     $('lrClose').onclick = () => { $('modal').classList.add('hide'); renderAll(); };
     $('mbox').querySelectorAll('[data-lb]').forEach(b => b.onclick = () => {
       const id = b.dataset.lb, r = buy(id, parseInt($('mbox').querySelector('[data-ln="' + id + '"]').value) || 0);
@@ -1374,13 +1381,13 @@
       if (eh) removeAiHero(eh);
       o.owner = 0; o.guard = []; o.garrison = emptyArmy();
       renderAll();
-      await showModal(`<h2>🏯 ${o.name} captured!</h2><p>The zone is yours: +${FORT_INCOME} 🪙/day, mine income in the zone, and +${MILITIA} militia per week. Station troops here to defend it from the enemy hero.</p>`);
+      mis('capture', 1); await showModal(`<h2>🏯 ${o.name} captured!</h2><p>The zone is yours: +${FORT_INCOME} 🪙/day, mine income in the zone, and +${MILITIA} militia per week. Station troops here to defend it from the enemy hero.</p>`);
       return openFort(o, h);
     }
     if (o.t === 'mine') {
       if (o.owner === 0) return toast('This mine is already yours.');
       if (o.guard && o.guard.length) { if (!(await fight(h, o.guard, { att: 0, def: 0 }, 'Mine guardians'))) return; o.guard = []; }
-      o.owner = 0; Ach.event('mine', { count: G.objs.filter(x => x.t === 'mine' && x.owner === 0).length }); return toast(`You now own the ${o.kind} mine!`);
+      o.owner = 0; mis('capture', 1); Ach.event('mine', { count: G.objs.filter(x => x.t === 'mine' && x.owner === 0).length }); return toast(`You now own the ${o.kind} mine!`);
     }
     if (o.t === 'art') {
       if (o.guard && o.guard.length) { if (!(await fight(h, o.guard, { att: 0, def: 0 }, 'Artifact guardians'))) return; o.guard = []; }
@@ -1437,7 +1444,7 @@
   function takeTown(o, newOwner) {
     o.owner = newOwner; o.guard = []; o.garrison = emptyArmy(); o.avail = {};
     for (let i = 1; i <= 7; i++) if (o.b[i]) o.avail[i] = GROWTH[i - 1];
-    if (newOwner === 0) { G.noTown = 0; Ach.event('town', { count: G.objs.filter(x => x.t === 'town' && x.owner === 0).length }); }
+    if (newOwner === 0) { G.noTown = 0; mis('capture', 1); Ach.event('town', { count: G.objs.filter(x => x.t === 'town' && x.owner === 0).length }); }
     reindex(G); renderAll();
   }
   // victory: every rival has lost all of its towns
@@ -1493,7 +1500,7 @@
     h.mana = res.mana; h.buff = null;
     if (res.win) {
       res.survivors.forEach((n, i) => { if (h.army[i]) { if (n > 0) h.army[i].n = n; else h.army[i] = null; } });
-      if (!h.ai) { gst('slain', slain0); gst('battles', 1); }
+      if (!h.ai) { gst('slain', slain0); gst('battles', 1); mis('slay', slain0); mis('battles', 1); }
       if (!h.ai) Ach.event('fightWon', { slain: slain0, ratio: th0 ? th0.ratio : undefined, lossPct: before0 ? (before0 - armyCount(h)) / before0 : 0, hero: !!(eHero && (eHero.real || eHero.arts)) });
       const nec = perk(h, 'necromancy');
       if (nec && res.xp > 0) {
@@ -1528,7 +1535,7 @@
   async function gainXp(h, xp) {
     h.xp += Math.round(xp * (1 + 0.1 * perk(h, 'learning')));
     while (h.xp >= need(h.lvl)) {
-      h.xp -= need(h.lvl); h.lvl++; sfx('level'); if (!h.ai) Ach.event('level', { lvl: h.lvl });
+      h.xp -= need(h.lvl); h.lvl++; sfx('level'); if (!h.ai) { Ach.event('level', { lvl: h.lvl }); mis('levels', 1); }
       const r = Math.random(), st = r < .3 ? 'att' : r < .6 ? 'def' : r < .8 ? 'sp' : 'kn';
       h[st]++;
       const statName = { att: 'Attack', def: 'Defense', sp: 'Spell Power', kn: 'Knowledge' }[st];
@@ -2067,21 +2074,21 @@
       while (n > 0 && !canAfford(G.res, Object.fromEntries(Object.entries(c.cost).map(([k, v]) => [k, v * n])))) n--;
       if (n <= 0) return toast('Cannot recruit (resources or availability).');
       if (!addToArmy(th || { army: t.garrison }, id, n)) return toast('No free army slot.');
-      pay(G.res, c.cost, n); if (o.t === 'lair') { o.avail[id] -= n; Ach.event('lairBuy', { n, id }); } else o.avail -= n;
+      pay(G.res, c.cost, n); if (o.t === 'lair') { o.avail[id] -= n; Ach.event('lairBuy', { n, id }); } else o.avail -= n; mis('recruit', n);
       toast(`Recruited ${n} ${c.n}${n > 1 ? 's' : ''} from your outpost.`); sfx('build'); again();
     });
     q('[data-caravan]', b => b.onclick = () => openCaravan(t));
     q('[data-farm]', b => b.onclick = () => {
       const nx = FOOD.town[(t.farm || 0) + 1]; if (t.farmBuild) return; if (!canAfford(G.res, nx.cost)) return toast('Not enough resources.');
-      pay(G.res, nx.cost); t.farmBuild = { left: 3 }; sfx('build'); toast(`🔨 ${nx.n} started — 3 days.`); again();
+      pay(G.res, nx.cost); t.farmBuild = { left: 3 }; mis('build', 1); sfx('build'); toast(`🔨 ${nx.n} started — 3 days.`); again();
     });
     q('[data-fortify]', b => b.onclick = () => {
       const nx = FORT_LEVELS[(t.fort || 0) + 1]; if (!canAfford(G.res, nx.cost)) return toast('Not enough resources.');
-      pay(G.res, nx.cost); t.fort = (t.fort || 0) + 1; Ach.event('fort', { lv: t.fort }); sfx('build'); toast(`${nx.n} built — the walls are stronger.`); again();
+      pay(G.res, nx.cost); t.fort = (t.fort || 0) + 1; mis('build', 1); Ach.event('fort', { lv: t.fort }); sfx('build'); toast(`${nx.n} built — the walls are stronger.`); again();
     });
     q('[data-minefield]', b => b.onclick = () => {
       const nx = MINE_LEVELS[(t.minel || 0) + 1]; if (!canAfford(G.res, nx.cost)) return toast('Not enough resources.');
-      pay(G.res, nx.cost); t.minel = (t.minel || 0) + 1; sfx('build'); toast(`${nx.n} laid: ${nx.stock} mines guard the approach.`); again();
+      pay(G.res, nx.cost); t.minel = (t.minel || 0) + 1; mis('build', 1); sfx('build'); toast(`${nx.n} laid: ${nx.stock} mines guard the approach.`); again();
     });
     q('[data-garr]', b => b.onclick = () => {
       if (!th) { toast('A hero must be in the town to move troops.'); return; }
@@ -2090,7 +2097,7 @@
     q('[data-build]', b => b.onclick = () => {
       const k = b.dataset.build, cost = k === 'market' ? MARKET_COST : k === 'ship' ? SHIPYARD_COST : DWELL_COST[+k];
       if (!canAfford(G.res, cost)) return toast('Not enough resources.');
-      pay(G.res, cost);
+      pay(G.res, cost); mis('build', 1);
       if (k === 'market') { t.b.market = 1; startTownAnim('build', 9); }
       else if (k === 'ship') { t.b.ship = 1; startTownAnim('build', 10); }
       else { t.b[k] = 1; t.avail[k] = GROWTH[+k - 1]; startTownAnim('build', +k - 1); }
@@ -2099,13 +2106,13 @@
     q('[data-hall]', b => b.onclick = () => {
       const nx = HALL_LEVELS[t.b.hall + 1];
       if (!canAfford(G.res, nx.cost)) return toast('Not enough resources.');
-      pay(G.res, nx.cost); t.b.hall++; Ach.event('hall', { lv: t.b.hall });
+      pay(G.res, nx.cost); t.b.hall++; mis('build', 1); Ach.event('hall', { lv: t.b.hall });
       toast(`${nx.n} built! Income +${nx.inc}/day. New buildings unlocked.`); startTownAnim('upgrade', 7); again();
     });
     q('[data-guild]', b => b.onclick = () => {
       const cost = GUILD_COST[t.b.guild + 1];
       if (!canAfford(G.res, cost)) return toast('Not enough resources.');
-      pay(G.res, cost); t.b.guild++; Ach.event('guild', { lv: t.b.guild });
+      pay(G.res, cost); t.b.guild++; mis('build', 1); Ach.event('guild', { lv: t.b.guild });
       const learned = GUILD_SPELLS[t.b.guild].filter(k => !G.spells.includes(k)); learn(learned);
       toast(`Arcane Lodge level ${t.b.guild}! Learned: ${learned.map(k => SPELLS[k].n).join(', ')}`);
       startTownAnim('build', 8); again();
@@ -2113,7 +2120,7 @@
     q('[data-up]', b => b.onclick = () => {
       const tier = +b.dataset.up, cost = upgradeCost(tier, t.up[tier] + 1);
       if (!canAfford(G.res, cost)) return toast('Not enough resources.');
-      pay(G.res, cost); t.up[tier]++;
+      pay(G.res, cost); t.up[tier]++; mis('build', 1);
       toast(`${C[lineType(tiersOf(t)[tier - 1], t.up[tier])].n} unlocked!`);
       startTownAnim('upgrade', tier - 1); again();
     });
@@ -2133,7 +2140,7 @@
         while (n > 0 && !canAfford(G.res, Object.fromEntries(Object.entries(c.cost).map(([k, v]) => [k, v * n])))) n--;
         if (n <= 0) continue;
         if (!addToArmy(th || { army: t.garrison }, type, n)) { full = true; continue; }
-        pay(G.res, c.cost, n); t.avail[tier] -= n; bought += n; got.push(n + ' ' + c.n);
+        pay(G.res, c.cost, n); t.avail[tier] -= n; bought += n; mis('recruit', n); got.push(n + ' ' + c.n);
       }
       if (!bought) return toast(full ? (here ? 'No free army slot.' : 'The garrison is full.') : 'Nothing to recruit (stock or resources).');
       sfx('click'); toast('Recruited ' + got.join(', ') + '.' + (full ? ' Some stacks did not fit.' : '')); again();
@@ -2148,7 +2155,7 @@
       while (n > 0 && !canAfford(G.res, Object.fromEntries(Object.entries(c.cost).map(([k, v]) => [k, v * n])))) n--;
       if (n <= 0) return toast('Cannot recruit (resources or availability).');
       if (!addToArmy(th || { army: t.garrison }, type, n)) return toast(here ? 'No free army slot.' : 'The garrison is full.');
-      pay(G.res, c.cost, n); t.avail[tier] -= n; toast(`Recruited ${n} ${c.n}${n > 1 ? 's' : ''}.`);
+      pay(G.res, c.cost, n); t.avail[tier] -= n; mis('recruit', n); toast(`Recruited ${n} ${c.n}${n > 1 ? 's' : ''}.`);
       again();
     });
     q('[data-boat]', b => b.onclick = () => {
@@ -2781,7 +2788,7 @@
     else if (o.build === 'road') { if (G.tiles[o.y][o.x] === T.GRASS || G.tiles[o.y][o.x] === T.SAND) { G.tiles[o.y][o.x] = T.ROAD; tilesChanged = true; } msg = 'The road is finished.'; }
     else if (o.build === 'tunnel') { G.tiles[o.y][o.x] = T.ROAD; (G.tunnels = G.tunnels || []).push({ x: o.x, y: o.y }); tilesChanged = true; msg = 'The tunnel is dug through the mountain!'; }
     reindex(G); if (tilesChanged) buildTerrain(); renderAll();
-    if (ow === 0) { toast('🔨 ' + msg); note('🔨 ' + msg, o.x, o.y); }
+    if (ow === 0) { toast('🔨 ' + msg); note('🔨 ' + msg, o.x, o.y); mis('build', 1); }
   }
   function advanceBuilds() {
     for (const o of G.objs.filter(x => x.t === 'site')) { o.left--; if (o.left <= 0) completeSite(o); }
@@ -2932,14 +2939,15 @@
     await turnReport();
     const newWeek = (G.day - 1) % 7 === 0;
     let wev = null;
-    if (newWeek) { G.wk = {}; wev = rollWeekEvent(); }
+    let prevMs = null;
+    if (newWeek) { G.wk = {}; wev = rollWeekEvent(); prevMs = G.ms; G.ms = Missions.fresh(G.day, G.diff, prevMs); }
     for (const h of G.heroes) { h.move = maxMove(h); h.mana = Math.min(maxMana(h), h.mana + 4 + 2 * perk(h, 'mysticism')); if (heroAtTown(h)) h.mana = maxMana(h); }
     const gain = computeGain();
     RES.forEach(k => { G.res[k] += gain[k]; });
     if (G.food) { G.res.food = Math.max(0, G.res.food - foodUpkeep()); }
     advanceBuilds();
     if (await goalCheck()) return;
-    gst('gold', gain.gold || 0);
+    gst('gold', gain.gold || 0); mis('gold', gain.gold || 0);
     Ach.event('day', { day: G.day, gold: gain.gold || 0, towns: myTowns().length, mines: G.objs.filter(x => x.t === 'mine' && x.owner === 0).length, azure: G.heroes.some(x => x.army.some(a => a && a.t === 'azured')) });
     moveCaravans();
     const parts = RES.filter(k => gain[k]).map(k => `+${gain[k]}${RES_ICON[k]}`);
@@ -2971,6 +2979,7 @@
       const ev = rollDayEvent();
       await showModal(`<h2>${ev[0]} ${ev[1]}</h2><p>${ev[2]}</p>`);
     }
+    if (newWeek) await misIntro(prevMs);
     busy = false; centerOn(G.hero.x, G.hero.y); renderAll();
     autosave();
   }
@@ -3225,14 +3234,14 @@
       <button data-mn="save">💾 Save / Load</button><button data-mn="set">⚙ Settings</button>
       <button data-mn="dip">🕊 Diplomacy</button><button data-mn="kd">📋 Kingdom</button><button data-mn="ach">🏆 Achievements</button>
       <button data-mn="lb">📊 Leaderboard</button><button data-mn="hint">💡 Hints on/off</button>
-      <button data-mn="rep">📜 Turn report</button><button data-mn="help">📖 Help & glossary</button>
+      <button data-mn="ms">🎯 Weekly missions</button><button data-mn="rep">📜 Turn report</button><button data-mn="help">📖 Help & glossary</button>
       <button data-mn="snd">${Sfx.on ? '🔇 Sound off' : '🔊 Sound on'}</button><button data-mn="fit">🗺 Zoom to fit</button>${G.build ? '<button data-mn="build">🔨 Build (road, mine, tunnel)</button>' : ''}${$('bFs').style.display === 'none' ? '' : `<button data-mn="fs">${fsOn() ? '🗗 Exit full screen' : '⛶ Full screen'}</button>`}
       </div><div class="mb"><button data-mn="exit" id="mnExit">🚪 Main menu</button><button class="primary" id="mnClose">Resume</button></div>`);
     $('mnClose').onclick = closeModal;
     $('mbox').querySelectorAll('[data-mn]').forEach(b => b.onclick = () => {
       const k = b.dataset.mn;
       if (k === 'dip') openDiplomacy(); else if (k === 'save') openSlots(); else if (k === 'set') openSettings(); else if (k === 'kd') openKingdom(); else if (k === 'ach') openAchievements(); else if (k === 'lb') openLeaderboard(); else if (k === 'hint') { Settings.set('hints', !Settings.hints); if (Settings.hints) Settings.resetHints(); toast(Settings.hints ? 'Hints on.' : 'Hints off.'); }
-      else if (k === 'rep') openReport(); else if (k === 'help') openHelp();
+      else if (k === 'ms') openMissions(openMenu); else if (k === 'rep') openReport(); else if (k === 'help') openHelp();
       else if (k === 'snd') { Sfx.toggle(); $('bSnd').textContent = Sfx.on ? '🔊' : '🔇'; openMenu(); }
       else if (k === 'build') { closeModal(); openBuildMenu(G.hero); }
       else if (k === 'fs') { closeModal(); toggleFs(); }
@@ -3466,9 +3475,50 @@
     });
     [home, ...towns].forEach(t => markView(t.x, t.y, 9, false)); G.res.gold += 20000; renderAll();
   }
+  // ---------- weekly missions (logic in js/missions.js) ----------
+  function misEnsure() { if (!G) return; if (!G.ms || G.ms.week !== Missions.weekOf(G.day)) G.ms = Missions.fresh(G.day, G.diff, G.ms); }
+  function misPay(m) {
+    const r = m.reward, T = Missions.TYPES[m.type];
+    G.res.gold += r.gold; G.res[r.rare] = (G.res[r.rare] || 0) + r.n;
+    sfx('coin'); toast(`🎯 Mission complete — ${T.text(m.target)}: +${r.gold}${RES_ICON.gold} +${r.n}${RES_ICON[r.rare]}`);
+  }
+  function mis(type, n = 1) {
+    if (!G || G.over || !(n > 0)) return;
+    misEnsure();
+    const done = Missions.add(G.ms, type, n);
+    done.forEach(misPay);
+    if (done.length && Missions.allDone(G.ms) && !G.ms.bonusPaid) {
+      G.ms.bonusPaid = true; G.res.gold += G.ms.bonus.gold; sfx('fanfare');
+      toast(`🏆 All weekly missions done! Bonus +${G.ms.bonus.gold}${RES_ICON.gold}`);
+    }
+    if (done.length) setTimeout(() => { try { renderAll(); } catch (e) { /* ignore */ } }, 0);
+  }
+  function misChip() {
+    const c = $('msChip'); if (!c || !G || !G.ms) return;
+    const d = Missions.doneCount(G.ms), n = G.ms.list.length;
+    c.textContent = `🎯 ${d}/${n}`; c.classList.toggle('done', d === n);
+    c.title = `Weekly missions: ${d} of ${n} done — ${Missions.daysLeft(G.day)} day(s) left`;
+  }
+  const misRows = () => G.ms.list.map((m) => {
+    const T = Missions.TYPES[m.type], tier = Missions.TIERS[m.tier], cnt = Math.min(G.ms.cnt[m.type] || 0, m.target), pct = Math.round(Missions.progress(G.ms, m) * 100);
+    return `<div class="msrow t${m.tier}${m.done ? ' done' : ''}"><div class="msi">${T.icon}</div><div class="msb"><b>${T.text(m.target)}</b><div class="msbar"><i style="width:${pct}%"></i><span>${m.done ? '✓ Done' : cnt + ' / ' + m.target}</span></div></div><div class="msr"><small>${tier.name}</small>${m.done ? '<b>✓</b>' : `<b>${m.reward.gold}${RES_ICON.gold}</b><b>${m.reward.n}${RES_ICON[m.reward.rare]}</b>`}</div></div>`;
+  }).join('');
+  function openMissions(back) {
+    if (!G) return; misEnsure();
+    const all = Missions.allDone(G.ms), left = Missions.daysLeft(G.day);
+    modalOpen(`<h2>🎯 Weekly missions</h2><div class="small">New missions in ${left} day${left > 1 ? 's' : ''} · ${Missions.doneCount(G.ms)} of ${G.ms.list.length} done${G.ms.streak ? ` · 🔥 ${G.ms.streak}-week streak` : ''}</div>${misRows()}<div class="msrow bonus${all ? ' done' : ''}"><div class="msi">🏆</div><div class="msb"><b>All three this week</b><div class="small">${all ? 'Bonus collected' : 'Bonus reward'}</div></div><div class="msr">${all ? '<b>✓</b>' : `<b>${G.ms.bonus.gold}${RES_ICON.gold}</b>`}</div></div><div class="mb"><button class="primary" id="msOk">${back ? 'Back' : 'Close'}</button></div>`);
+    $('msOk').onclick = () => back ? back() : closeModal();
+  }
+  async function misIntro(prev) {
+    misChip();
+    const sum = prev && prev.list ? `Last week: ${prev.list.filter(m => m.done).length} of ${prev.list.length} missions done. ` : '';
+    await showModal(`<h2>🎯 New weekly missions</h2><div class="small">${sum}They reset every week.</div>${misRows()}`);
+  }
+  { const c = $('msChip'); if (c) c.onclick = () => G && !busy && openMissions(); }
+
   // refreshing the page picks the game up where it was
   if (!/[?&]demo/.test(location.search) && Settings.resume && localStorage.getItem(SAVE)) Assets.ready.then(() => { if (!G && load()) $('title').classList.add('hide'); });
   if (/[?&]demo/.test(location.search)) Assets.ready.then(() => setTimeout(() => { try { newGame('castle', 'Orrin', 'normal', { size: 'medium', seed: 'demo', wrap: true, food: /[?&]food/.test(location.search) }); $('title').classList.add('hide'); demo(); } catch (e) { console.error('demo failed', e); } }, 400));
   window.__G = () => G;
-  window.__dbg = { endTurn, borderBlock, canCross, terrOwner, openDiplomacy, aiDiplomacy, declareWar, atWar, realmPower, demo, openBuildMenu, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
+  window.__dbg = { endTurn, borderBlock, canCross, terrOwner, openDiplomacy, aiDiplomacy, declareWar, atWar, realmPower, demo, openBuildMenu, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, mis, openMissions, misEnsure, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
 })();

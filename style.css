@@ -821,7 +821,7 @@ body.th-inferno, body.th-necropolis, body.th-dungeon, body.th-fortress { --fibre
   #mbox, body.skin #mbox { max-height: calc(100vh - 8px) !important; max-height: calc(100dvh - 8px) !important; max-width: 98vw !important; width: 98vw !important; padding: 4px 10px !important; border-width: 10px !important; border-image-width: 10px !important; }
   #mbox:has(> .setup), #mbox:has(.townwide) { width: 98vw !important; max-width: 98vw !important; }
   #mbox h2, #mbox h2 .small { margin: 0 0 4px !important; padding-bottom: 8px !important; font-size: 15px !important; }
-  #mbox h2 .small { display: inline; font-size: 11px !important; }
+  #mbox h2 .small { display: none; }
   #mbox .mb, body.skin #mbox .mb { margin-top: 4px !important; padding-top: 2px !important; bottom: -4px !important; gap: 6px; }
   #mbox .mb button { padding: 6px 12px !important; min-height: 34px !important; font-size: 13px !important; }
   .scngrid { grid-template-columns: repeat(3, 1fr) !important; gap: 6px !important; }
@@ -852,6 +852,15 @@ body.th-inferno, body.th-necropolis, body.th-dungeon, body.th-fortress { --fibre
   /* army sheet: slots in one compact row instead of tall squares */
   #sheetBody #army { grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)) !important; gap: 5px !important; }
   #sheetBody #army .slot { aspect-ratio: 1 / 1.1 !important; min-height: 0 !important; }
+  /* settings: two columns of compact rows */
+  #mbox:has(> .setrow) { display: grid !important; grid-template-columns: 1fr 1fr; column-gap: 14px; align-content: start; }
+  #mbox:has(> .setrow) > h2, #mbox:has(> .setrow) > .mb { grid-column: 1 / -1; }
+  #mbox > .setrow { padding: 4px 0 !important; gap: 6px !important; min-width: 0; }
+  #mbox > .setrow > div:first-child { flex: 1 1 110px; font-size: 13px; } #mbox > .setrow .small { font-size: 10px; }
+  #mbox > .setrow button { padding: 3px 9px !important; min-height: 28px !important; font-size: 11px !important; }
+  #mbox > .setrow input[type=range] { width: 110px; }
+  /* how to play: text flows in two columns */
+  #mbox .helpbody { grid-template-columns: 1fr 1fr; align-items: start; gap: 6px 10px; } #mbox .helpbody p { padding: 6px 10px 6px 12px; font-size: 12.5px; line-height: 1.4; }
   /* hero sheet: the six stats in one row */
   #mbox .hgrid { grid-template-columns: repeat(6, 1fr) !important; gap: 4px !important; }
   #mbox .hst { padding: 4px 2px !important; } #mbox .hst b { font-size: 14px !important; } #mbox .hst small, #mbox .hst span { font-size: 9px !important; }

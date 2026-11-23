@@ -24,7 +24,8 @@ function makeEnv() {
   vm.createContext(sb);
   const src = ['data.js', 'map.js', 'battle.js'].map(f => fs.readFileSync(path.join(root, 'js', f), 'utf8')).join('\n');
   vm.runInContext(src, sb);
-  const api = vm.runInContext('({ C, Battle, FACTIONS, factionTiers, lineType, armyValue, GROWTH })', sb);
+  const api = vm.runInContext('({ C, Battle, FACTIONS, factionTiers, lineType, armyValue, GROWTH, genMap, MINE_YIELD, HALL_LEVELS, DWELL_COST, DIFFICULTY, MARKET_COST, SHIPYARD_COST, FORT_LEVELS, MINE_LEVELS, GUILD_COST, upgradeCost, MAX_LV })', sb);
+  api.run = (code) => vm.runInContext(code, sb);
   api.els = els;
   return api;
 }

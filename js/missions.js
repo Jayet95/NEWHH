@@ -13,8 +13,10 @@ const Missions = (() => {
     chests:  { cat: 'map', icon: '🎁', text: (n) => `Open ${n} treasure chest${n > 1 ? 's' : ''}` },
   };
   const CATS = ['war', 'eco', 'map'];
-  // what a steady player does in a week (week 1, normal difficulty); measured with tools/missions-sim.js and the in-game bot, then rounded
-  const PACE = { slay: 60, battles: 4, levels: 1, build: 3, recruit: 40, gold: 3500, capture: 2, explore: 150, chests: 2 };
+  // what a normal-tier mission asks for in a week (normal difficulty): about half of what the steady bot of tools/missions-sim.js manages, because people play less efficiently than a bot.
+  // gold is not fixed: it follows the current daily income of the realm.  GROW = how fast a target rises per week (levels, chests and explore do not: the map and the XP curve do not allow it).
+  const PACE = { slay: 50, battles: 7, levels: 1, build: 2, recruit: 55, gold: 0, capture: 3, explore: 300, chests: 2 };
+  const GROW = { slay: 0.10, battles: 0.10, recruit: 0.08, gold: 0, levels: 0, build: 0.04, capture: 0.03, explore: 0, chests: 0 };
   const TIERS = [
     { k: 'easy', name: 'Easy', mul: 0.55, rew: 1 },
     { k: 'normal', name: 'Normal', mul: 1, rew: 2 },
@@ -25,9 +27,16 @@ const Missions = (() => {
 
   const weekOf = (day) => Math.floor((day - 1) / 7);
   const daysLeft = (day) => 7 - ((day - 1) % 7);
-  const weekScale = (week) => Math.min(2.5, 1 + 0.12 * week);
+  const growth = (type, week) => Math.min(2.2, 1 + (GROW[type] || 0) * week);
   const nice = (v) => { v = Math.max(1, v); if (v >= 1000) return Math.round(v / 100) * 100; if (v >= 100) return Math.round(v / 10) * 10; if (v >= 20) return Math.round(v / 5) * 5; return Math.max(1, Math.round(v)); };
-  const target = (type, tier, week, diff) => nice(PACE[type] * TIERS[tier].mul * weekScale(week) * (DIFF_MUL[diff] || 1));
+  // ctx (optional) describes the game: { income: gold per day, cap: { explore, chests, capture, build, slay, battles } = how much of each is still left to do }
+  const available = (type, ctx) => !ctx || !ctx.cap || ctx.cap[type] === undefined || ctx.cap[type] >= 1;
+  const target = (type, tier, week, diff, ctx) => {
+    const base = type === 'gold' ? 7 * Math.max(600, (ctx && ctx.income) || 0) * 0.85 : PACE[type];
+    let v = base * TIERS[tier].mul * growth(type, week) * (DIFF_MUL[diff] || 1);
+    if (ctx && ctx.cap && ctx.cap[type] !== undefined) v = Math.min(v, Math.max(1, Math.floor(ctx.cap[type])));
+    return nice(v);
+  };
   const reward = (tier, week, rng = Math.random) => {
     const t = TIERS[tier], gold = Math.round(250 * t.rew * (1 + 0.2 * week) / 50) * 50;
     return { gold, rare: RARES[Math.floor(rng() * RARES.length)], n: Math.round(2 * t.rew) };
@@ -36,16 +45,16 @@ const Missions = (() => {
 
   const shuffle = (a, rng) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   // one mission per category, tiers shuffled across them; avoid last week's types where possible
-  function roll(day, diff, prevTypes = [], rng = Math.random) {
+  function roll(day, diff, prevTypes = [], rng = Math.random, ctx = null) {
     const week = weekOf(day), tiers = shuffle([0, 1, 2], rng), list = [];
     CATS.forEach((cat, i) => {
-      const pool = Object.keys(TYPES).filter(t => TYPES[t].cat === cat), fresh = pool.filter(t => !prevTypes.includes(t)), from = fresh.length ? fresh : pool;
+      const all = Object.keys(TYPES).filter(t => TYPES[t].cat === cat), usable = all.filter(t => available(t, ctx)), pool = usable.length ? usable : all, fresh = pool.filter(t => !prevTypes.includes(t)), from = fresh.length ? fresh : pool;
       const type = from[Math.floor(rng() * from.length)], tier = tiers[i];
-      list.push({ type, tier, target: target(type, tier, week, diff), reward: reward(tier, week, rng), done: false });
+      list.push({ type, tier, target: target(type, tier, week, diff, ctx), reward: reward(tier, week, rng), done: false });
     });
     return list.sort((a, b) => a.tier - b.tier);
   }
-  const fresh = (day, diff, prev, rng) => ({ week: weekOf(day), cnt: {}, list: roll(day, diff, prev && prev.list ? prev.list.map(m => m.type) : [], rng), bonus: bonus(weekOf(day)), bonusPaid: false, streak: (prev && prev.list && prev.list.every(m => m.done)) ? ((prev.streak || 0) + 1) : 0 });
+  const fresh = (day, diff, prev, rng, ctx) => ({ week: weekOf(day), cnt: {}, list: roll(day, diff, prev && prev.list ? prev.list.map(m => m.type) : [], rng, ctx), bonus: bonus(weekOf(day)), bonusPaid: false, streak: (prev && prev.list && prev.list.every(m => m.done)) ? ((prev.streak || 0) + 1) : 0 });
   // count progress; returns the missions this call completed (and flags the weekly bonus when all three are done)
   function add(ms, type, n = 1) {
     const out = [];
@@ -57,6 +66,6 @@ const Missions = (() => {
   const doneCount = (ms) => ms ? ms.list.filter(m => m.done).length : 0;
   const allDone = (ms) => !!ms && ms.list.length > 0 && ms.list.every(m => m.done);
   const progress = (ms, m) => Math.min(1, ((ms.cnt[m.type] || 0) / m.target));
-  return { TYPES, CATS, PACE, TIERS, DIFF_MUL, weekOf, daysLeft, weekScale, target, reward, bonus, roll, fresh, add, doneCount, allDone, progress };
+  return { TYPES, CATS, PACE, GROW, TIERS, DIFF_MUL, weekOf, daysLeft, growth, available, target, reward, bonus, roll, fresh, add, doneCount, allDone, progress };
 })();
 if (typeof module !== 'undefined') module.exports = Missions;

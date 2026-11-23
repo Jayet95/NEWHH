@@ -243,7 +243,7 @@
     h.move = maxMove(h);
     G.heroes.push(h); setActive(0); learn(def.spells); rollTavern();
     if (map.scn && map.scn.bonus) for (const k in map.scn.bonus) G.res[k] = (G.res[k] || 0) + map.scn.bonus[k];
-    G.fog = map.fog !== false; initFog(); G.ms = Missions.fresh(1, diff);
+    G.fog = map.fog !== false; initFog(); G.ms = Missions.fresh(1, diff, null, Math.random, misCtx());
     reindex(G); buildTerrain(); sizeMini(); centerOn(h.x, h.y); renderAll(); recentreSoon(); needHeroArt();
     misNewTiles = 0; if (G.ms) G.ms.cnt = {}; misChip();
     toast(`${MAPS[preset].name} (${SIZES[size].name}, seed ${seed}) · ${D.name}: defeat ${nAI > 1 ? 'all ' + nAI + ' rivals by capturing their towns' : 'the rival by capturing their towns'}. Good luck, ${h.name}!`);
@@ -2941,7 +2941,7 @@
     const newWeek = (G.day - 1) % 7 === 0;
     let wev = null;
     let prevMs = null;
-    if (newWeek) { G.wk = {}; wev = rollWeekEvent(); prevMs = G.ms; G.ms = Missions.fresh(G.day, G.diff, prevMs); }
+    if (newWeek) { G.wk = {}; wev = rollWeekEvent(); prevMs = G.ms; G.ms = Missions.fresh(G.day, G.diff, prevMs, Math.random, misCtx()); }
     for (const h of G.heroes) { h.move = maxMove(h); h.mana = Math.min(maxMana(h), h.mana + 4 + 2 * perk(h, 'mysticism')); if (heroAtTown(h)) h.mana = maxMana(h); }
     const gain = computeGain();
     RES.forEach(k => { G.res[k] += gain[k]; });
@@ -3478,7 +3478,17 @@
     [home, ...towns].forEach(t => markView(t.x, t.y, 9, false)); G.res.gold += 20000; renderAll();
   }
   // ---------- weekly missions (logic in js/missions.js) ----------
-  function misEnsure() { if (!G) return; if (!G.ms || G.ms.week !== Missions.weekOf(G.day)) G.ms = Missions.fresh(G.day, G.diff, G.ms); }
+  // what is still left to do on this map: keeps a mission from asking for more than the world can give
+  function misCtx() {
+    try {
+      const unexpl = G.expl ? G.expl.reduce((s, v) => s + (v ? 0 : 1), 0) : 0, mine = myTowns();
+      let build = 0;
+      for (const t of mine) { for (let i = 1; i <= 7; i++) build += t.b[i] ? Math.max(0, MAX_LV - ((t.up && t.up[i]) || 1)) : 1; build += (HALL_LEVELS.length - 1) - (t.b.hall || 0) + (3 - (t.fort || 0)) + (3 - (t.minel || 0)) + (3 - (t.b.guild || 0)) + (t.b.market ? 0 : 1); }
+      const mon = G.objs.filter(o => o.t === 'monster').length;
+      return { income: computeGain().gold || 0, cap: { explore: unexpl * 0.5, chests: G.objs.filter(o => o.t === 'chest').length * 0.7, capture: G.objs.filter(o => (o.t === 'mine' || o.t === 'dwelling') && (o.owner === null || o.owner === undefined)).length * 0.5, build: build * 0.6, slay: mon * 8, battles: mon * 0.7 } };
+    } catch (e) { return null; }
+  }
+  function misEnsure() { if (!G) return; if (!G.ms || G.ms.week !== Missions.weekOf(G.day)) G.ms = Missions.fresh(G.day, G.diff, G.ms, Math.random, misCtx()); }
   function misPay(m) {
     const r = m.reward, T = Missions.TYPES[m.type];
     G.res.gold += r.gold; G.res[r.rare] = (G.res[r.rare] || 0) + r.n;

@@ -1730,3 +1730,10 @@ body.skin .mkqty button { border-image: none !important; border: 2px solid #8c6a
   .tpbody .bgrid:not(.wgrid) > .bcard { font-size: 11px; }
   .tpbody .bgrid:not(.wgrid) > .bcard b { font-size: 12px; }
 }
+
+/* ---------- phone landscape: Territory screen shows the map and its details side by side ---------- */
+@media (orientation: landscape) and (max-height: 540px) {
+  #sheetBody:has(#mini) { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; }
+  #sheetBody #mini { height: 205px !important; width: auto !important; max-width: 46vw; }
+  #sheetBody:has(#mini) > :first-child { height: auto !important; }
+}

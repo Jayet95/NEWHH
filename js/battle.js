@@ -47,6 +47,7 @@ const Battle = (() => {
       const cw = c.clientWidth, ch = c.clientHeight;   // forces layout with the new zoom
       let top = Math.max(0, ((y0 + y1) / 2 / 640) * ch - Hs / 2); const maxTop = Math.max(0, ch - Hs);
       top = Math.min(top, maxTop);
+      if (cur && (y1 - y0) / 640 * ch > Hs) top = Math.max(0, Math.min(maxTop, (cur.py / 640) * ch - Hs * 0.5));   // the whole action does not fit: keep the unit whose turn it is in view
       st.scrollTo({ left: Math.max(0, ((x0 + x1) / 2 / 960) * cw - Ws / 2), top, behavior: smooth ? 'smooth' : 'auto' });
       return true;
     } catch (e) { return false; }

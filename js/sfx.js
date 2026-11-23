@@ -3,6 +3,7 @@
 const Sfx = (() => {
   let qmul = 1, ac = null, on = true, master = null, musicGain = null, mood = 'map', musicTimer = null, step = 0;
   try { on = localStorage.getItem('h3js_snd') !== '0'; } catch (e) { /* ignore */ }
+  const FX = 4.2;   // effects were ~20 dB below the music and almost inaudible on a phone speaker: this lifts them, the limiter below keeps the loudest mixes from clipping
   const sv = () => (typeof Settings !== 'undefined' ? Settings.sfxVol : 0.8), mv = () => (typeof Settings !== 'undefined' ? Settings.musicVol : 0.35);
   // browsers only let sound start after a tap or key press; before that stay silent instead of spamming console warnings
   let gest = false;
@@ -11,7 +12,7 @@ const Sfx = (() => {
     if (!ac) {
       if (!unlocked()) return null;
       const A = window.AudioContext || window.webkitAudioContext;
-      if (A) { ac = new A(); master = ac.createGain(); master.connect(ac.destination); musicGain = ac.createGain(); musicGain.connect(ac.destination); }
+      if (A) { ac = new A(); const comp = ac.createDynamicsCompressor(); comp.threshold.value = -14; comp.knee.value = 20; comp.ratio.value = 8; comp.attack.value = 0.002; comp.release.value = 0.2; master = ac.createGain(); master.connect(comp); comp.connect(ac.destination); musicGain = ac.createGain(); musicGain.connect(ac.destination); }
     }
     if (ac && ac.state === 'suspended') ac.resume();
     return ac;
@@ -19,7 +20,7 @@ const Sfx = (() => {
   function tone(f, d = 0.1, type = 'square', vol = 0.05, slide = 0, delay = 0, bus) {
     if (!on) return;
     const a = ctx(); if (!a) return;
-    const t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain(), v = vol * (bus === 'music' ? 1 : sv() * 1.25 * qmul);
+    const t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain(), v = vol * (bus === 'music' ? 1 : sv() * 1.25 * qmul * FX);
     if (v <= 0.0002) return;
     o.type = type; o.frequency.setValueAtTime(f, t);
     if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, f + slide), t + d);
@@ -33,7 +34,7 @@ const Sfx = (() => {
   function noise(d = 0.1, vol = 0.05, f = 1200, q = 0.7, type = 'bandpass', delay = 0, sweep = 0, bus) {
     if (!on) return;
     const a = ctx(); if (!a) return;
-    const v = vol * (bus === 'music' ? 1 : sv() * 1.25 * qmul); if (v <= 0.0002) return;
+    const v = vol * (bus === 'music' ? 1 : sv() * 1.25 * qmul * FX); if (v <= 0.0002) return;
     const t = a.currentTime + delay, s = a.createBufferSource(), flt = a.createBiquadFilter(), g = a.createGain();
     s.buffer = noiseBuf(a); s.loop = true; flt.type = type; flt.Q.value = q; flt.frequency.setValueAtTime(f, t);
     if (sweep) flt.frequency.exponentialRampToValueAtTime(Math.max(60, f + sweep), t + d);
@@ -47,7 +48,7 @@ const Sfx = (() => {
     tick: () => { tone(1900, 0.02, 'sine', 0.01); noise(0.015, 0.01, 5000, 1, 'highpass'); },
     step: footstep,
     foot: footstep,
-    hit: () => { noise(0.1, 0.09, 1500, 0.8, 'bandpass', 0, -1000); tone(160, 0.12, 'sawtooth', 0.06, -80); tone(90, 0.1, 'square', 0.045, -30, 0.02); },
+    hit: () => { noise(0.1, 0.09, 1500, 0.8, 'bandpass', 0, -1000); tone(160, 0.12, 'sawtooth', 0.06, -80); tone(90, 0.1, 'square', 0.045, -30, 0.02); if (Math.random() < 0.4) S.clang(); else S.thud(); },
     shoot: () => { noise(0.18, 0.05, 1900, 1.4, 'bandpass', 0, -1300); tone(700, 0.1, 'triangle', 0.04, -400); },
     spell: () => { tone(400, 0.25, 'sine', 0.06, 500); tone(600, 0.25, 'sine', 0.04, 500, 0.05); noise(0.4, 0.035, 2200, 3, 'bandpass', 0, 2600); [1300, 1700, 2200].forEach((f, i) => tone(f, 0.12, 'sine', 0.018, 0, 0.12 + i * 0.07)); },
     crash: () => { tone(110, 0.3, 'sawtooth', 0.08, -60); tone(70, 0.35, 'square', 0.06, -20, 0.05); noise(0.4, 0.07, 900, 0.7, 'lowpass', 0, -700); },
@@ -61,6 +62,14 @@ const Sfx = (() => {
     turn: () => tone(330, 0.1, 'sine', 0.04),
     day: () => seq([392, 523], 0.12, 'sine', 0.05, 0.1),
     ach: () => seq([659, 880, 1175, 1568], 0.16, 'triangle', 0.06, 0.1),
+    tap: () => tone(700, 0.035, 'triangle', 0.028),
+    swing: () => noise(0.15, 0.1, 1000, 0.9, 'bandpass', 0, 1600),
+    thud: () => { tone(72, 0.18, 'sine', 0.1, -30); noise(0.07, 0.06, 320, 1, 'lowpass'); },
+    clang: () => { [1850, 2710, 3480].forEach((f, i) => tone(f, 0.3 - i * 0.06, 'sine', 0.03 - i * 0.006)); noise(0.05, 0.05, 4200, 1.2, 'highpass'); },
+    chest: () => { tone(300, 0.08, 'square', 0.04); noise(0.1, 0.04, 800, 1, 'bandpass'); seq([880, 1108, 1319, 1760], 0.09, 'triangle', 0.045, 0.07); },
+    magic: () => { seq([660, 880, 1320], 0.18, 'sine', 0.045, 0.08); noise(0.4, 0.02, 3000, 2, 'bandpass', 0, 1500); },
+    capture: () => { seq([392, 523, 659, 784], 0.13, 'square', 0.035, 0.07); tone(196, 0.3, 'sawtooth', 0.04, 0, 0.05); },
+    deny: () => { tone(160, 0.16, 'sawtooth', 0.05, -40); tone(130, 0.2, 'square', 0.035, -30, 0.08); },
   };
   // ---- creature voices ----
   // Each creature has its own attack, defend (hurt), death and (for shooters) shot sound. A recording audio/sfx/<creature id>_<kind>.mp3
@@ -126,9 +135,9 @@ const Sfx = (() => {
     loadVoiceIndex(); const base = String(id).replace(/_\d$/, '');
     if (playVoiceFile(id + '_' + kind) || playVoiceFile(base + '_' + kind)) return;
     if (!on) return;
-    if (kind === 'shoot') { qmul = 0.5; try { (SHOT[shot] || S.shoot)(); } finally { qmul = 1; } return; }
+    if (kind === 'shoot') { qmul = 1; try { (SHOT[shot] || S.shoot)(); } finally { qmul = 1; } return; }
     let h = 7; for (let i = 0; i < base.length; i++) h = (h * 31 + base.charCodeAt(i)) % 997;
-    qmul = 0.45;     // creature voices sit quietly under the music and the main hit sounds
+    qmul = 1;     // creature voices (the effects level is already lifted above the music)
     try { voice(VOICE[base] || 'grunt', kind, 0.86 + (h % 40) / 100); } finally { qmul = 1; }
   }
   const BUZZ = { hit: 14, crash: 40, win: [30, 40, 30], level: [20, 30, 20], build: 18, ach: [25, 40, 25] };

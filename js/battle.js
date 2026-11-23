@@ -556,7 +556,7 @@ const Battle = (() => {
   async function strike(s, t) {
     const a = hexPx(s.c, s.r), p = hexPx(t.c, t.r), now = performance.now();
     const ad = animDur(s.t, 'attack'), hitAt = ad ? (2.5 - atkSkip(s.t)) * ANIM_MS.attack : 120;    // with its own frames the blow lands on the impact frame
-    s.anim = { kind: 'lunge', t0: now, dur: ad || 300 / spd(), dx: p.x - a.x, dy: p.y - a.y }; csfx(s.t, 'attack'); faceTo(s, p.x, (ad || 300) + 400);
+    s.anim = { kind: 'lunge', t0: now, dur: ad || 300 / spd(), dx: p.x - a.x, dy: p.y - a.y }; sfx('swing'); csfx(s.t, 'attack'); faceTo(s, p.x, (ad || 300) + 400);
     push((a.x + p.x) / 2, (a.y + p.y) / 2, 0.026, 560);
     (B.slashes = B.slashes || []).push({ x: p.x, y: p.y, t0: now + (ad ? (2 - atkSkip(s.t)) * ANIM_MS.attack : 110) / spd(), dur: 340 / spd(), style: styleOf(s).melee, mc: styleOf(s).mc, ang: Math.atan2(p.y - a.y, p.x - a.x) });
     await sleep(hitAt);

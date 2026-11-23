@@ -17,6 +17,7 @@
 
   // ---------- helpers ----------
   window.toast = (t) => {
+    try { if (/not enough|cannot|can't|no free|no army|too far|blocked|is full|no towns/i.test(String(t))) sfx('deny'); } catch (e) { /* ignore */ }
     const d = document.createElement('div'); d.innerHTML = t; $('toast').appendChild(d);
     setTimeout(() => d.remove(), 2800);
   };
@@ -96,7 +97,7 @@
     const b = $('banner'); b.innerHTML = `<b>${text}</b>${sub ? `<span>${sub}</span>` : ''}`;
     b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
   }
-  document.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('button') && !e.target.closest('#bat')) sfx('click'); });
+  document.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('button, .card, .htile, .tside-b') && !e.target.closest('#bat')) sfx('click'); });
   $('bSnd').onclick = () => { const on = Sfx.toggle(); $('bSnd').textContent = on ? '🔊' : '🔇'; };
   $('bSnd').textContent = Sfx.on ? '🔊' : '🔇';
   // full screen (web): the map and battles get the whole display; hidden where the browser has no Fullscreen API (e.g. iPhone) or the app is installed
@@ -1103,7 +1104,7 @@
   });
   { let md = false;
     const jump = (ev) => { if (!G) return; const r = mini.getBoundingClientRect(), py = (ev.clientY - r.top) / r.height * mini.height / MV, px = (ev.clientX - r.left) / r.width * mini.width / MK - 0.5 * (Math.floor(py) & 1); centerOn(Math.max(0, Math.min(G.W - 1, px)), Math.max(0, Math.min(G.H - 1, py))); };
-    mini.addEventListener('pointerdown', (ev) => { md = true; try { mini.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ } jump(ev); });
+    mini.addEventListener('pointerdown', (ev) => { sfx('tick'); md = true; try { mini.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ } jump(ev); });
     mini.addEventListener('pointermove', (ev) => { if (md) jump(ev); });
     const up = () => { if (md) { md = false; if (!$('modal').classList.contains('hide') && !document.body.classList.contains('inbattle')) $('modal').classList.add('hide'); } };
     mini.addEventListener('pointerup', up); mini.addEventListener('pointercancel', () => { md = false; }); }
@@ -1340,6 +1341,7 @@
     return tmp.filter(Boolean);
   }
   async function interact(o, h, eh) {
+    { const IS = { chest: 'chest', shrine: 'magic', stone: 'magic', tower: 'magic', obelisk: 'magic', seer: 'magic', mono: 'magic', gate: 'magic', keytent: 'magic', questgate: 'magic', prison: 'capture', mine: 'capture', resobj: 'coin', bank: 'coin', wreck: 'coin' }; if (IS[o.t] && h && !h.ai) sfx(IS[o.t]); }   // every kind of place answers with a sound
     if (o.owner !== null && o.owner !== undefined && o.owner !== 0 && allyOfPlayer(o.owner)) return toast(`${o.name || 'This place'} belongs to your ally — you are welcome to pass, but it is not yours to take.`);
     if (o.owner !== null && o.owner !== undefined && o.owner !== 0 && !atWar(0, o.owner) && !(await confirmWar(o.owner))) return;
     if (o.t === 'wreck') {
@@ -3493,7 +3495,7 @@
   function misPay(m) {
     const r = m.reward, T = Missions.TYPES[m.type];
     G.res.gold += r.gold; G.res[r.rare] = (G.res[r.rare] || 0) + r.n;
-    sfx('coin'); toast(`🎯 Mission complete — ${T.text(m.target)}: +${r.gold}${RES_ICON.gold} +${r.n}${RES_ICON[r.rare]}`);
+    sfx('ach'); toast(`🎯 Mission complete — ${T.text(m.target)}: +${r.gold}${RES_ICON.gold} +${r.n}${RES_ICON[r.rare]}`);
   }
   function mis(type, n = 1) {
     if (!G || G.over || !(n > 0)) return;

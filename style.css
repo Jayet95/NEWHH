@@ -1744,3 +1744,15 @@ body.skin .mkqty button { border-image: none !important; border: 2px solid #8c6a
   body:has(#title:not(.hide)) #mbox { border-radius: 0 0 16px 16px; border-width: 0 0 3px 0; max-height: calc(100dvh - var(--sat, 0px)); max-height: calc(100vh - var(--sat, 0px)); animation: sheetDown .22s ease-out; }
 }
 @keyframes sheetDown { from { transform: translateY(-40%); opacity: .4; } to { transform: none; opacity: 1; } }
+
+/* ---------- narrow phones: button captions stay inside the ornate frame (all skinned buttons) ---------- */
+@media (max-width: 480px) {
+  body.skin #mbox button, body.skin .opts button, body.skin .seg button, body.skin .ttab, body.skin .seedrow button { letter-spacing: 0 !important; padding-left: 5px !important; padding-right: 5px !important; gap: 3px !important; min-width: 0; }
+  body.skin .seg button, body.skin .opts button, body.skin #mbox .grid3 button, body.skin #mbox .seg.three button { font-size: 14px !important; }
+  body.skin #mbox button .gi, body.skin #mbox button img.ico { width: 16px !important; height: 16px !important; font-size: 14px !important; }
+}
+@media (max-width: 380px) {
+  body.skin .seg button, body.skin .opts button, body.skin #mbox .grid3 button { font-size: 12.5px !important; padding-left: 3px !important; padding-right: 3px !important; }
+  body.skin #mbox button .gi, body.skin #mbox button img.ico { width: 14px !important; height: 14px !important; }
+}
+#mbar button span { letter-spacing: 0 !important; white-space: nowrap; font-size: 9.5px; }

@@ -845,9 +845,9 @@
     });
     // the army is a tidy 4x2 grid: the spare eighth cell holds a heraldic plate
     if (h.army.length % 4) {   // the spare eighth cell shows the hero's morale and luck
-      const mo = heroMorale(h), lu = heroLuck(h), cl = (v) => v > 0 ? 'pos' : v < 0 ? 'neg' : '', dc = document.createElement('div');
+      const mo = Math.max(-3, Math.min(3, Math.round(heroMorale(h)) || 0)), lu = Math.max(-3, Math.min(3, Math.round(heroLuck(h)) || 0)), cl = (v) => v > 0 ? 'pos' : v < 0 ? 'neg' : '', dc = document.createElement('div');
       dc.className = 'sdeco ml'; dc.title = `Morale ${sgn(mo)} (extra turns for your creatures) · Luck ${sgn(lu)} (lucky strikes)`;
-      dc.innerHTML = `<span class="mlr"><i>😀</i><b class="${cl(mo)}">${sgn(mo)}</b></span><span class="mlr"><i>🍀</i><b class="${cl(lu)}">${sgn(lu)}</b></span>`; el.appendChild(dc); }
+      dc.innerHTML = `<span class="mlr ${cl(mo)}"><i class="mle">😀</i><b>${sgn(mo)}</b><u class="mlbar"><s style="${mo >= 0 ? 'left:50%' : 'right:50%'};width:${Math.abs(mo) / 3 * 50}%"></s></u></span><span class="mlr ${cl(lu)}"><i class="mle">🍀</i><b>${sgn(lu)}</b><u class="mlbar"><s style="${lu >= 0 ? 'left:50%' : 'right:50%'};width:${Math.abs(lu) / 3 * 50}%"></s></u></span>`; el.appendChild(dc); }
     const sw = document.createElement('div'); sw.className = 'small'; sw.style.gridColumn = '1/-1'; sw.textContent = 'Drag a stack onto another slot — or tap two slots — to move, merge or swap.'; el.appendChild(sw);
     if (selSlot >= 0 && h.army[selSlot] && h.army[selSlot].n > 1 && h.army.some(x => !x)) { const a = h.army[selSlot], sp = document.createElement('button'); sp.style.gridColumn = '1/-1'; sp.className = 'splitb'; sp.textContent = `✂ Split ${Math.floor(a.n / 2)} into a new stack`; sp.onclick = () => { const e = h.army.findIndex(x => !x), k = Math.floor(a.n / 2); h.army[e] = { t: a.t, n: k }; a.n -= k; selSlot = -1; sfx('click'); renderAll(); }; el.appendChild(sp); }
     if (selSlot >= 0 && h.army[selSlot]) { const a = h.army[selSlot], db = document.createElement('button'); db.className = 'danger disb'; db.style.gridColumn = '1/-1'; db.textContent = `🗑 Disband ${a.n} ${C[a.t].n}`; db.onclick = () => disbandSlot(h.army, selSlot, a.n, db); el.appendChild(db); }

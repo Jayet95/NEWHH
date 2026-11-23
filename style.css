@@ -1882,3 +1882,10 @@ body.skin .mkqty button { border-image: none !important; border: 2px solid #8c6a
   .bigcr .wstats.big span { font-size: 13px; padding: 2px 8px; }
   .bigcr button { grid-column: 2; margin-top: 6px; }
 }
+
+/* PC / tablet: Warriors rows keep the height their content needs (they used to be squeezed into equal slices and overlap); the panel scrolls instead */
+@media (min-width: 761px) and (min-height: 541px) {
+  #mbox .tpbody .bgrid.wgrid { grid-auto-rows: auto !important; flex: 0 0 auto !important; align-content: start; min-height: 0 !important; }
+  .tpbody .wcard { min-height: min-content; overflow: hidden; padding-top: 6px !important; padding-bottom: 6px !important; }
+  .tpbody .wcard .bpic.wpic { height: clamp(52px, 9vh, 76px); width: clamp(52px, 9vh, 76px); }
+}

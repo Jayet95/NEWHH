@@ -2322,3 +2322,5 @@ html body:not(.inbattle) #side > #army .sdeco.ml { background: linear-gradient(#
   html body:not(.inbattle) #side > #hero .hname { font-size: 11px !important; }
   html body:not(.inbattle) #side > #hero .hbar { display: none !important; }
 }
+/* the map HUD already fits the screen height, so the "Interface size" zoom must not stack on top of it (it made the column taller than its space) */
+@media (orientation: landscape) and (max-height: 540px) { html body:not(.inbattle) #top, html body:not(.inbattle) #side, html body:not(.inbattle) #mbar { zoom: 1 !important; } }

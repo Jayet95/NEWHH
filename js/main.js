@@ -908,10 +908,11 @@
     const towns = myTowns(), heroes = G.heroes;
     if (typeof Assets !== 'undefined') { const todo = towns.map(t => 'ui/town_' + t.fac).filter(k => !quickAsked.has(k)); if (todo.length) { todo.forEach(k => quickAsked.add(k)); Assets.need(todo).then(() => renderQuick()); } }
     // collapsed: only the town that matters (the one the selected hero stands in, else the first) and the selected hero; a toggle expands the full lists
-    const open = !!Settings.mem('quickOpen'), extra = Math.max(0, towns.length - 1) + Math.max(0, heroes.length - 1), here = G.hero && towns.findIndex(t => t.x === G.hero.x && t.y === G.hero.y);
-    const cur = quickTi != null && quickTi < towns.length ? quickTi : (here >= 0 ? here : 0), tShow = (i) => open || i === cur, hShow = (h) => open || h === G.hero;
+    const phoneL = matchMedia('(orientation: landscape) and (max-height: 540px)').matches;   // right-column selector: always the compact castle row, every hero portrait
+    const open = !phoneL && !!Settings.mem('quickOpen'), extra = Math.max(0, towns.length - 1) + Math.max(0, heroes.length - 1), here = G.hero && towns.findIndex(t => t.x === G.hero.x && t.y === G.hero.y);
+    const cur = quickTi != null && quickTi < towns.length ? quickTi : (here >= 0 ? here : 0), tShow = (i) => open || i === cur, hShow = (h) => open || phoneL || h === G.hero;
     const tBtn = (t, i) => { const u = typeof Assets !== 'undefined' && Assets.has('ui/town_' + t.fac) ? Assets.src('ui/town_' + t.fac) : ''; return `<button class="qt" data-qt="${i}" title="${t.name} — open town">${u ? `<img src="${u}" alt="" draggable="false">` : `<span class="qic">${FACTIONS[t.fac].icon}</span>`}<em class="qname">${t.name}</em></button>`; };
-    const xBtn = extra ? `<button class="qx" data-qx="1" title="${open ? 'Collapse' : 'Show all castles and heroes'}">${open ? '◂' : '▸'}${open ? '' : '<small>+' + extra + '</small>'}</button>` : '';
+    const xBtn = extra && !phoneL ? `<button class="qx" data-qx="1" title="${open ? 'Collapse' : 'Show all castles and heroes'}">${open ? '◂' : '▸'}${open ? '' : '<small>+' + extra + '</small>'}</button>` : '';
     const nav = (d) => (towns.length > 1 && !open ? `<button class="qa" data-qa="${d}" title="${d < 0 ? 'Previous' : 'Next'} town">${d < 0 ? '‹' : '›'}</button>` : '');
     q.innerHTML = '<div class="qrow">' + nav(-1) + towns.map((t, i) => tShow(i) ? tBtn(t, i) : '').join('') + nav(1) + xBtn + '</div><div class="qcol">'
       + heroes.map((h, i) => { if (!hShow(h)) return ''; const has = typeof Assets !== 'undefined' && h.pid && Assets.has('heroes/' + h.pid); return `<button class="qh${h === G.hero ? ' on' : ''}" data-qh="${i}" title="${h.name} (${clsLabel(h.cls)} L${h.lvl}) — ${h === G.hero ? 'open hero sheet' : 'select'}">${has ? `<img src="${Assets.src('heroes/' + h.pid)}" alt="" draggable="false">` : Art.heroPic(h.icon, ownCol(0), 44, h.pid)}</button>`; }).join('')
@@ -3166,8 +3167,9 @@
     if (!G || busy) return;
     if (sheetBack) sheetBack();
     $('mbox').innerHTML = `<h2>${title}</h2><div id="sheetBody"></div><div class="mb"><button class="primary" id="shClose">Close</button></div>`;
+    const homes = els.map(e => e.parentElement);
     els.forEach(e => $('sheetBody').appendChild(e));
-    sheetBack = () => { sheetBack = null; els.forEach(e => $('side').appendChild(e)); };
+    sheetBack = () => { sheetBack = null; els.forEach((e, i) => (homes[i] || $('side')).appendChild(e)); };
     $('modal').classList.remove('hide'); $('shClose').onclick = () => $('modal').classList.add('hide');
   };
   new MutationObserver(() => { if (sheetBack && !$('sheetBody')) sheetBack(); }).observe($('mbox'), { childList: true });
@@ -3176,6 +3178,18 @@
   $('mArmy').onclick = () => G && sheetOpen(`⚔️ ${G.hero.name} — Army`, [$('army')]);
   $('mGear').onclick = () => G && !busy && openEquip(G.hero);
   $('mLand').onclick = () => sheetOpen('🗺️ Territory', [$('minipanel'), $('terr')]);
+  // phone landscape: the hero / town quick selector lives in the right column instead of covering the map
+  { const mq = matchMedia('(orientation: landscape) and (max-height: 540px)'), place = () => {
+      const q = $('quick'), side = $('side'), stage = $('stage'); if (!q || !side || !stage) return;
+      if (typeof G !== 'undefined' && G) renderQuick();
+      if (mq.matches) { if (q.parentElement !== side) side.insertBefore(q, side.firstChild); } else if (q.parentElement !== stage) stage.appendChild(q);
+      const mp = $('minipanel'); if (mp) { if (mq.matches) { if (mp.parentElement !== stage) stage.appendChild(mp); } else if (mp.parentElement !== side) side.insertBefore(mp, side.firstChild); }
+    };
+    place(); if (mq.addEventListener) mq.addEventListener('change', place); else if (mq.addListener) mq.addListener(place); }
+  // minimap on the map (phone landscape): a small button minimises it to an icon and brings it back
+  { const mp = $('minipanel'); if (mp && !$('miniTog')) { const b = document.createElement('button'); b.id = 'miniTog'; b.type = 'button'; b.title = 'Minimise or show the minimap'; mp.appendChild(b);
+      const apply = (v) => { document.body.classList.toggle('minihid', v); b.textContent = v ? '🗺' : '–'; try { Settings.mem('minihid', v ? 1 : 0); } catch (e) { /* ignore */ } };
+      apply(!!Settings.mem('minihid')); b.onclick = (e) => { e.stopPropagation(); apply(!document.body.classList.contains('minihid')); }; } }
   $('mMenu').onclick = () => openMenu();
   $('mBuild').onclick = () => { if (G && !busy && G.build) openBuildMenu(G.hero); };
   $('mDip').onclick = $('bDip').onclick = () => G && !busy && (G.dip ? openDiplomacy() : toast('Diplomacy is off in this game (old rules: everyone is an enemy).'));

@@ -1957,3 +1957,112 @@ body.skin .mkqty button { border-image: none !important; border: 2px solid #8c6a
   html body:not(.inbattle) #side > #hero { order: 2; }
   html body:not(.inbattle) #side > #army { order: 3; }
 }
+
+/* ---- landscape map, round 2: minimap floats on the map; the column holds town/hero selector, hero card, army and big action buttons ---- */
+@media (orientation: landscape) and (max-height: 540px) {
+  html body:not(.inbattle) #side { bottom: calc(var(--strip) + var(--sab, 0px) + 83px) !important; justify-content: flex-start; }
+  /* minimap on the map, top-right, semi-transparent */
+  html body:not(.inbattle) #stage > #minipanel { position: absolute !important; right: 8px; top: 8px; width: 112px; height: auto !important; flex: none; display: block !important; z-index: 9; padding: 2px; background: rgba(12, 8, 4, .72) !important; border: 2px solid #8c6a22 !important; border-radius: 6px; box-shadow: 0 2px 8px rgba(0, 0, 0, .7); opacity: .92; }
+  html body:not(.inbattle) #stage > #minipanel #mini { width: 100% !important; height: auto !important; display: block; border-radius: 3px; }
+  html body:not(.inbattle) #stage > #minipanel .compass { display: none; }
+  /* town + hero selector */
+  html body:not(.inbattle) #side > #quick { order: 1; position: static !important; flex: none; display: flex !important; flex-direction: column; gap: 3px; width: 100%; max-height: none !important; overflow: visible !important; }
+  html body:not(.inbattle) #side > #quick .qrow { display: flex; gap: 3px; height: 26px; align-items: stretch; }
+  html body:not(.inbattle) #side > #quick .qa { width: 18px !important; height: 26px !important; font-size: 15px !important; border-radius: 6px !important; }
+  html body:not(.inbattle) #side > #quick .qt { flex: 1 1 auto; width: auto !important; height: 26px !important; border-radius: 6px !important; position: relative; }
+  html body:not(.inbattle) #side > #quick .qt img { width: 100%; height: 100%; object-fit: cover; }
+  html body:not(.inbattle) #side > #quick .qt .qname { position: absolute; left: 0; right: 0; bottom: 0; font-size: 10px; line-height: 12px; padding: 0 2px; background: rgba(0, 0, 0, .55); }
+  html body:not(.inbattle) #side > #quick .qx { width: 30px !important; height: 26px !important; }
+  html body:not(.inbattle) #side > #quick .qcol { display: flex; flex-direction: row !important; flex-wrap: wrap; gap: 3px; max-height: none !important; }
+  html body:not(.inbattle) #side > #quick .qh { width: 31px !important; height: 31px !important; border-radius: 6px !important; }
+  /* hero card: portrait, name, stats, xp bar */
+  html body:not(.inbattle) #side > #hero { order: 2; }
+  html body:not(.inbattle) #side > #hero .hport { display: block !important; }
+  html body:not(.inbattle) #side > #hero .hcard { grid-template-columns: 40px 1fr !important; }
+  html body:not(.inbattle) #side > #hero .hport, html body:not(.inbattle) #side > #hero .hport img { width: 40px !important; height: 40px !important; }
+  html body:not(.inbattle) #side > #hero .hhead { grid-row: 1; white-space: normal; }
+  html body:not(.inbattle) #side > #hero .hname { display: block; font-size: 13px; }
+  html body:not(.inbattle) #side > #hero .hcls { margin: 0; font-size: 9px; }
+  html body:not(.inbattle) #side > #hero .hbar { display: block !important; height: 11px; margin: 2px 0 0; }
+  html body:not(.inbattle) #side > #hero .hbar span { font-size: 8px; line-height: 11px; }
+  /* army: bigger slots */
+  html body:not(.inbattle) #side > #army { order: 3; }
+  html body:not(.inbattle) #side > #army .slot { height: 34px !important; }
+  html body:not(.inbattle) #side > #army .slot .pic { width: 28px !important; height: 28px !important; }
+  /* action buttons: two rows, bigger */
+  html body:not(.inbattle) #mbar { height: 83px !important; grid-auto-rows: 36px; }
+  html body:not(.inbattle) #mbar button { height: 36px !important; }
+  html body:not(.inbattle) #mbar button .ic { width: 20px; height: 20px; }
+  html body:not(.inbattle) #mbar button span { font-size: 9px; }
+  html body:not(.inbattle) #mbar #mEnd { grid-column: auto !important; height: 36px !important; flex-direction: column; gap: 0; }
+  html body:not(.inbattle) #mbar #mEnd span { font-size: 9px; }
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  html body:not(.inbattle) #side > #quick button { min-height: 0 !important; }
+  html body:not(.inbattle) #side > #army .slot { min-height: 0 !important; }
+}
+@media (orientation: landscape) and (max-height: 540px) { html body:not(.inbattle) #side > #hero .hbar { display: none !important; } }
+/* army slots in the right column: creature picture on the left, its count on the side in amber */
+@media (orientation: landscape) and (max-height: 540px) {
+  html body:not(.inbattle) #side > #army .slot:not(.empty) { display: flex !important; align-items: center; justify-content: space-between; gap: 2px; padding: 0 4px 0 3px !important; }
+  html body:not(.inbattle) #side > #army .slot .pic { flex: none; }
+  html body:not(.inbattle) #side > #army .slot small { position: static !important; flex: 1 1 auto; text-align: right; font-size: 12px !important; font-weight: 800; line-height: 1; color: #ffc93c !important; text-shadow: 0 1px 2px #000, 0 0 3px #000; margin: 0 !important; padding: 0 !important; min-width: 0; }
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  html body:not(.inbattle) { --rail: 196px; }
+  html body:not(.inbattle) #side > #army .slot .pic { width: 24px !important; height: 24px !important; }
+  html body:not(.inbattle) #side > #army .slot:not(.empty) { padding: 0 3px 0 2px !important; }
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  html body:not(.inbattle) #side > #army .slot:not(.empty) { flex-direction: row !important; flex-wrap: nowrap !important; overflow: hidden; }
+  html body:not(.inbattle) #side > #army .slot small { display: block !important; width: auto; height: auto; bottom: auto !important; right: auto !important; top: auto !important; left: auto !important; }
+}
+@media (orientation: landscape) and (max-height: 540px) { html body:not(.inbattle) #side > #army { width: 100% !important; max-width: none !important; margin: 0 !important; box-sizing: border-box; } }
+@media (orientation: landscape) and (max-height: 540px) { html body:not(.inbattle) #side > #army .slot { width: auto !important; max-width: none !important; min-width: 0 !important; } }
+@media (orientation: landscape) and (max-height: 540px) { html body:not(.inbattle) #side > #army .slot { aspect-ratio: auto !important; } }
+
+/* ---- landscape map, round 3: action buttons styled like the rest of the game ---- */
+@media (orientation: landscape) and (max-height: 540px) {
+  html body:not(.inbattle) #side { bottom: calc(var(--strip) + var(--sab, 0px) + 102px) !important; }
+  html body:not(.inbattle) #side > #hero .hport, html body:not(.inbattle) #side > #hero .hport img { width: 38px !important; height: 38px !important; }
+  html body:not(.inbattle) #side > #hero .hcard { grid-template-columns: 38px 1fr !important; }
+  html body:not(.inbattle) #side > #army .slot { height: 32px !important; }
+  /* the panel */
+  html body.skin:not(.inbattle) #mbar { height: 102px !important; display: grid !important; grid-template-columns: repeat(12, 1fr); grid-auto-rows: 30px; gap: 3px; padding: 5px 6px 5px 5px !important; border: 0 !important; border-top: 2px solid #8c6a22 !important; border-left: 2px solid #5a4222 !important; border-radius: 0 !important; background: var(--grain), linear-gradient(#2a1d10, #120c06) !important; box-shadow: inset 0 1px 0 rgba(255, 225, 160, .18) !important; }
+  html body:not(.inbattle) #mbar #mHero, html body:not(.inbattle) #mbar #mGear, html body:not(.inbattle) #mbar #mLand, html body:not(.inbattle) #mbar #mDip { grid-column: span 3; }
+  html body:not(.inbattle) #mbar #mBuild, html body:not(.inbattle) #mbar #mTown, html body:not(.inbattle) #mbar #mMenu { grid-column: span 4; }
+  html body:not(.inbattle) #mbar:has(#mBuild[style*="none"]) #mTown, html body:not(.inbattle) #mbar:has(#mBuild[style*="none"]) #mMenu { grid-column: span 6; }
+  html body:not(.inbattle) #mbar #mEnd { grid-column: 1 / -1 !important; order: 20; }
+  /* plates */
+  html body.skin:not(.inbattle) #mbar button { height: 30px !important; min-height: 0 !important; padding: 0 3px !important; display: flex !important; flex-direction: row !important; align-items: center; justify-content: center; gap: 4px; border: 1px solid #0d0803 !important; border-radius: 7px !important; background: var(--grain), radial-gradient(ellipse at 50% 0, rgba(255, 224, 150, .22), transparent 72%), linear-gradient(#4a3822, #1d140a) !important; box-shadow: inset 0 0 0 1px #8c6a22, inset 0 0 0 2px #0d0803, inset 0 1px 0 2px rgba(255, 225, 160, .16), 0 2px 3px rgba(0, 0, 0, .7) !important; }
+  html body:not(.inbattle) #mbar button .ic { width: 20px !important; height: 20px !important; flex: none; }
+  html body:not(.inbattle) #mbar button span { font-size: 9px !important; letter-spacing: .4px !important; white-space: nowrap; color: #f1dea6; }
+  html body.skin:not(.inbattle) #mbar button:active { transform: translateY(1px); background: var(--grain), linear-gradient(#17100a, #33261a) !important; }
+  /* the four top tools stack icon over label (they are narrower) */
+  html body.skin:not(.inbattle) #mbar #mHero, html body.skin:not(.inbattle) #mbar #mGear, html body.skin:not(.inbattle) #mbar #mLand, html body.skin:not(.inbattle) #mbar #mDip { flex-direction: column !important; gap: 0; padding: 1px 0 !important; }
+  html body:not(.inbattle) #mbar #mHero .ic, html body:not(.inbattle) #mbar #mGear .ic, html body:not(.inbattle) #mbar #mLand .ic, html body:not(.inbattle) #mbar #mDip .ic { width: 18px !important; height: 18px !important; }
+  html body:not(.inbattle) #mbar #mHero span, html body:not(.inbattle) #mbar #mGear span, html body:not(.inbattle) #mbar #mLand span, html body:not(.inbattle) #mbar #mDip span { font-size: 8px !important; letter-spacing: .2px !important; line-height: 1; }
+  /* End turn: a wide gold bar */
+  html body.skin:not(.inbattle) #mbar #mEnd { height: 28px !important; grid-column: 1 / -1 !important; gap: 8px; border-radius: 8px !important; background: var(--grain), radial-gradient(ellipse at 50% 0, rgba(255, 245, 190, .55), transparent 75%), linear-gradient(#d9a634, #7a5110) !important; box-shadow: inset 0 0 0 1px #ffe08a, inset 0 0 0 2px #3a2506, 0 0 10px rgba(230, 191, 85, .45), 0 2px 3px rgba(0, 0, 0, .7) !important; animation: endGlow 2.6s ease-in-out infinite; }
+  html body:not(.inbattle) #mbar #mEnd span { font-size: 12px !important; letter-spacing: 1.4px !important; color: #2a1604 !important; text-shadow: 0 1px 0 rgba(255, 235, 170, .8) !important; font-weight: 800; }
+  html body:not(.inbattle) #mbar #mEnd .ic { width: 20px !important; height: 20px !important; }
+}
+/* minimap minimise toggle (only on the map in phone landscape) + army fit */
+#miniTog { display: none; }
+@media (orientation: landscape) and (max-height: 540px) {
+  html body:not(.inbattle) #side > #army .slot { height: 29px !important; }
+  html body:not(.inbattle) #stage > #minipanel #miniTog { display: grid; place-items: center; position: absolute; left: -2px; top: -2px; width: 20px; height: 20px; min-height: 0 !important; padding: 0 !important; font-size: 13px; line-height: 1; font-weight: 800; color: #f1dea6; background: rgba(20, 14, 8, .92) !important; border: 1px solid #8c6a22 !important; border-radius: 5px 0 5px 0 !important; box-shadow: none !important; z-index: 2; cursor: pointer; }
+  html body.minihid:not(.inbattle) #stage > #minipanel { width: 30px !important; height: 30px !important; padding: 0 !important; overflow: hidden; }
+  html body.minihid:not(.inbattle) #stage > #minipanel #mini { display: none !important; }
+  html body.minihid:not(.inbattle) #stage > #minipanel #miniTog { left: 0; top: 0; width: 100%; height: 100%; font-size: 16px; border: 0 !important; border-radius: 4px !important; background: transparent !important; }
+}
+/* castle / hero selector in the column: roomy castle row (arrows + picture + full name), hero portraits below */
+@media (orientation: landscape) and (max-height: 540px) {
+  html body:not(.inbattle) #side > #quick .qrow { height: 32px; gap: 4px; }
+  html body:not(.inbattle) #side > #quick .qa { width: 22px !important; height: 32px !important; font-size: 18px !important; }
+  html body:not(.inbattle) #side > #quick .qt { height: 32px !important; border-radius: 7px !important; }
+  html body:not(.inbattle) #side > #quick .qt .qname { font-size: 11px; line-height: 14px; padding: 0 4px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-style: normal; font-weight: 700; letter-spacing: .3px; color: #f6e6b4; text-shadow: 0 1px 2px #000; background: linear-gradient(transparent, rgba(0, 0, 0, .78)); }
+  html body:not(.inbattle) #side > #quick .qcol { gap: 4px; }
+}
+@media (orientation: landscape) and (max-height: 540px) { html body:not(.inbattle) #side > #army .slot { height: 27px !important; } html body:not(.inbattle) #side > #army .slot .pic { width: 22px !important; height: 22px !important; } }
+@media (orientation: landscape) and (max-height: 540px) { html body:not(.inbattle) #side > #army .slot { height: 26px !important; } }

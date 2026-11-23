@@ -1660,3 +1660,12 @@ body.skin .mkqty button { border-image: none !important; border: 2px solid #8c6a
 @media (orientation: landscape) and (max-height: 540px) { .tside { flex-direction: column; gap: 4px; } .tside-b { width: 52px; padding: 4px 2px; } .tside-b .ti { font-size: 18px; } .tside-b .tl { font-size: 9px; } }
 
 .tui:has(.tpanel) .tarrow { display: none !important; }   /* the town arrows would sit on top of the side tabs */
+
+/* ---------- phone landscape: all resource chips stay on ONE line in the header ---------- */
+@media (orientation: landscape) and (max-height: 540px) {
+  body:not(.inbattle) #top #res { flex: 1 1 100% !important; flex-wrap: nowrap !important; overflow: hidden !important; gap: 3px !important; justify-content: space-between !important; min-width: 0; }
+  body:not(.inbattle) #top #res .chip { flex: 1 1 0 !important; min-width: 0; min-height: 26px !important; font-size: 12px !important; padding: 1px 4px !important; gap: 3px !important; justify-content: center; }
+  body:not(.inbattle) #top #res .chip .gi { width: 17px !important; height: 17px !important; font-size: 15px !important; }
+  body:not(.inbattle) #top #res .chip b { font-size: 12px !important; }
+  body:not(.inbattle) #top #res .chip small { font-size: 9px !important; }
+}

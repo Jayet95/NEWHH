@@ -2042,10 +2042,20 @@
     }));
     q('[data-gmove]', b => b.onclick = () => {
       if (!th) return;
-      const from = b.dataset.gmove === 'toHero' ? t.garrison : th.army, to = b.dataset.gmove === 'toHero' ? th.army : t.garrison;
-      const toGarr = from === th.army; let left = from.filter(Boolean).length;
-      from.forEach((a, i) => { if (!a || (toGarr && left <= 1)) return; if (addToArmy({ army: to }, a.t, a.n)) { from[i] = null; left--; } });
-      if (toGarr && left === 1) toast('The hero keeps one troop: a hero cannot march alone.');
+      const toHero = b.dataset.gmove === 'toHero', from = toHero ? t.garrison : th.army, to = toHero ? th.army : t.garrison;
+      // a hero cannot march alone: when the hero army is emptied, ONE creature of its weakest stack stays behind
+      let keep = -1; if (!toHero) { let low = Infinity; from.forEach((a, i) => { if (a && C[a.t].v < low) { low = C[a.t].v; keep = i; } }); }
+      let stuck = 0, moved = 0;
+      from.forEach((a, i) => {
+        if (!a) return;
+        const n = i === keep ? a.n - 1 : a.n; if (n <= 0) return;
+        if (addToArmy({ army: to }, a.t, n)) { a.n -= n; moved += n; if (a.n <= 0) from[i] = null; } else stuck++;
+      });
+      const msgs = [];
+      if (stuck) msgs.push(toHero ? `The hero army is full: ${stuck} stack${stuck > 1 ? 's' : ''} stay in the garrison.` : `The garrison is full: ${stuck} stack${stuck > 1 ? 's' : ''} stay with the hero.`);
+      if (!toHero && keep >= 0 && from[keep]) msgs.push('The hero keeps 1 troop: a hero cannot march alone.');
+      if (!moved && !stuck && !msgs.length) msgs.push('Nothing to move.');
+      if (msgs.length) toast(msgs.join(' '));
       garSel = null; openTown(t); renderAll();
     });
     q('[data-outbuy]', b => b.onclick = () => {

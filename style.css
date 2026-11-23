@@ -1757,3 +1757,40 @@ body.skin .mkqty button { border-image: none !important; border: 2px solid #8c6a
 }
 #mbar button span { letter-spacing: 0 !important; white-space: nowrap; font-size: 9.5px; }
 @media (max-width: 420px) { #mbar button { padding-left: 1px !important; padding-right: 1px !important; min-width: 0; } #mbar button span { font-size: 9px; } }
+
+/* ---------- phone portrait: main-menu screens sit a little lower (not glued to the top); hero select fills the height ---------- */
+@media (max-width: 760px) and (orientation: portrait) {
+  body:has(#title:not(.hide)) #modal { padding-top: calc(var(--sat, 0px) + 26px) !important; padding-bottom: calc(var(--sab, 0px) + 10px) !important; padding-left: 8px !important; padding-right: 8px !important; box-sizing: border-box; }
+  body:has(#title:not(.hide)) #mbox { border-radius: 16px; border-width: 3px; max-height: 100%; width: 100%; box-sizing: border-box; animation: sheetDown .22s ease-out; }
+  body:has(#title:not(.hide)) #mbox:has(> .setup .hsbody) { min-height: min(100%, 700px); display: flex; flex-direction: column; }
+  body:has(#title:not(.hide)) #mbox:has(> .setup .hsbody) > .setup { flex: 1 1 auto; display: flex; flex-direction: column; }
+  body:has(#title:not(.hide)) .setup .hsbody { flex: 0 0 auto; }
+  body:has(#title:not(.hide)) .setup:has(.hsbody) > .mb { margin-top: auto; position: static; }
+}
+
+/* ---------- phone landscape: hero select = roster on the left (scrolls), hero details fixed on the right ---------- */
+@media (orientation: landscape) and (max-height: 540px) {
+  #mbox .hsbody { grid-template-columns: minmax(0, 1fr) 290px !important; height: calc(100dvh - 124px); min-height: 0; align-items: stretch; }
+  #mbox:has(.hsbody) > .setup > .small { display: none !important; }
+  #mbox .hsbody > .hsgrid { overflow-y: auto; align-content: start; min-height: 0; padding-right: 2px; scrollbar-width: thin; }
+  #mbox .hspan { display: grid !important; grid-template-columns: 74px minmax(0, 1fr); gap: 0 8px; align-content: start; align-items: center; padding: 6px 8px !important; overflow-y: auto; min-height: 0; }
+  #mbox .hspan .hsbig { grid-row: 1 / 3; grid-column: 1; width: max-content; height: max-content; padding: 3px !important; border-width: 12px !important; box-sizing: content-box; justify-self: start; align-self: center; }
+  #mbox .hspan .hsbig .pic, #mbox .hspan .hsbig .hart { width: 54px !important; height: 54px !important; max-width: none !important; display: block; margin: 0; }
+  #mbox .hspan h3 { grid-column: 2; margin: 0 !important; font-size: 15px; text-align: left; }
+  #mbox .hspan .hscls { grid-column: 2; margin: 0 !important; text-align: left; font-size: 11px; }
+  #mbox .hspan .hsstats { grid-column: 1 / -1; margin: 5px 0 !important; gap: 4px; }
+  #mbox .hspan .hsstats div { padding: 2px 0; } #mbox .hspan .hsstats b { font-size: 14px; } #mbox .hspan .hsstats span { font-size: 9px; }
+  #mbox .hspan h4 { display: none !important; }
+  #mbox .hspan .hsspells, #mbox .hspan .hsarmy { grid-column: 1 / -1; margin-top: 4px; }
+  #mbox .hspan .hsspells > span { font-size: 10px; padding: 1px 6px; }
+  #mbox .hspan .hsarmy .pic { width: 34px !important; height: 34px !important; } #mbox .hspan .hsarmy div { width: 60px; font-size: 9px; }
+  #mbox .hspan .hsgo { display: none !important; }
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  #mbox .hspan { padding: 4px 8px !important; }
+  #mbox .hspan .hsbig .pic, #mbox .hspan .hsbig .hart { width: 44px !important; height: 44px !important; }
+  #mbox .hspan .hsbig { border-width: 10px !important; padding: 2px !important; }
+  #mbox .hspan .hsstats { margin: 3px 0 !important; }
+  #mbox .hspan .hsspells { gap: 3px; margin-top: 2px; } #mbox .hspan .hsspells > span { font-size: 9.5px; padding: 0 5px; }
+  #mbox .hspan .hsarmy { margin-top: 2px; gap: 4px; } #mbox .hspan .hsarmy .pic { width: 30px !important; height: 30px !important; } #mbox .hspan .hsarmy div { font-size: 8.5px; width: 62px; }
+}

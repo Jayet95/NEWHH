@@ -1870,3 +1870,15 @@ body.skin .mkqty button { border-image: none !important; border: 2px solid #8c6a
   #mbox:has(> .vic-score) > .mb button { min-height: 36px !important; width: auto; flex: 1 1 0; }
 }
 @media (max-width: 340px) { #mbox > .vic-army .vic-unit { width: 70px; } #mbox > .vic-army { gap: 5px; } #mbox > .vic .vic-ribbon { font-size: 24px; padding: 5px 32px 7px; letter-spacing: 5px; } }
+
+/* phone landscape: creature detail card = picture on the left, details on the right */
+@media (orientation: landscape) and (max-height: 540px) {
+  .bigcr { padding: 6px; }
+  .bigcr .bcbox { max-width: 660px; max-height: calc(100vh - 12px); max-height: calc(100dvh - 12px); display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 16px; align-content: center; align-items: center; text-align: left; padding: 10px 16px; }
+  .bigcr .bcpic { grid-row: 1 / 6; }
+  .bigcr .bcpic img { width: min(60vh, 250px) !important; }
+  .bigcr h3 { margin: 0; font-size: 22px; }
+  .bigcr .wstats.big { justify-content: flex-start; margin: 8px 0; gap: 5px; }
+  .bigcr .wstats.big span { font-size: 13px; padding: 2px 8px; }
+  .bigcr button { grid-column: 2; margin-top: 6px; }
+}

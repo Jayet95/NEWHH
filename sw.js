@@ -1,15 +1,15 @@
 'use strict';
 // Offline-first service worker. __VERSION__ is replaced at build time (tools/build.js) so every deploy refreshes the cache.
 const VERSION = '__VERSION__';
-const CACHE = 'heroes3-js-' + VERSION;
-const ART = 'heroes3-art';          // art/audio keep their own cache across deploys (refreshed in the background), so an update never re-downloads them all
+const CACHE = 'hexkingdoms-js-' + VERSION;
+const ART = 'hexkingdoms-art';          // art/audio keep their own cache across deploys (refreshed in the background), so an update never re-downloads them all
 const ASSETS = ['./', './index.html', './style.css', './manifest.webmanifest', './js/settings.js', './js/assets.js', './js/sfx.js', './js/fx.js', './js/data.js', './js/names.js', './js/art.js', './js/figures.js', './js/townart.js', './js/icons.js', './js/gi.js', './js/ach.js', './js/board.js', './js/map.js', './js/battle.js', './js/main.js', './js/uifx.js', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', (e) => {
-  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith('heroes3-js-') && k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => (k.startsWith('heroes3-') || k.startsWith('hexkingdoms-')) && k !== CACHE && k !== ART).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 // heavy static files (art, audio, fonts, themes, icons) are served from the cache at once, then refreshed in the background, so a returning player
 // skips the download and a changed file arrives on the next visit. Code and pages stay network-first so a deploy never mixes old and new files.

@@ -1672,7 +1672,8 @@ body.skin .mkqty button { border-image: none !important; border: 2px solid #8c6a
 
 /* ---------- phone landscape: the town screen fits one screen (resources on one line, troops side by side, buttons visible) ---------- */
 @media (orientation: landscape) and (max-height: 540px) {
-  body #modal #mres, body.skin #modal #mres { flex-wrap: nowrap !important; overflow: hidden !important; gap: 3px !important; padding: 0 !important; width: min(100%, 640px); max-width: none; border-width: 7px !important; border-image-width: 7px !important; transform: translateX(-50%) !important; margin: 0 !important; }
+  body #modal #mres, body.skin #modal #mres { flex-wrap: nowrap !important; overflow: hidden !important; gap: 3px !important; padding: 0 !important; width: min(100%, 640px); max-width: none; border-width: 7px !important; border-image-width: 7px !important; transform: none !important; margin: 0 !important; }
+  body #modal:has(#mbox.townfull) #mres { transform: translateX(-50%) !important; }
   body #modal #mres .chip { flex: 1 1 0 !important; min-width: 0; min-height: 22px !important; font-size: 12px !important; padding: 0 3px !important; gap: 2px !important; justify-content: center; }
   body #modal #mres .chip .gi { width: 16px !important; height: 16px !important; font-size: 14px !important; }
   body #modal #mres .chip b { font-size: 12px !important; }
@@ -1697,4 +1698,9 @@ body.skin .mkqty button { border-image: none !important; border: 2px solid #8c6a
   body #mbox .tui .gstack > .gcol { min-height: 0 !important; height: 20px !important; padding: 0 10px !important; font-size: 11px !important; line-height: 18px; border-width: 1px !important; border-image: none !important; width: auto; }
   body #mbox .tui .gstack > .gacts { max-width: 480px; width: 100%; justify-self: center; margin: 2px 0 0; gap: 4px; }
   body #mbox .tui .gstack > .gacts button { min-height: 24px !important; height: 24px; padding: 0 4px !important; font-size: 11px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+
+/* phone landscape battle: the side margins beside the board are grass-green instead of black */
+@media (orientation: landscape) and (max-height: 540px) {
+  body.inbattle #stage { background: linear-gradient(90deg, #2c4a1a, #3d5f26 50%, #2c4a1a) !important; }
 }

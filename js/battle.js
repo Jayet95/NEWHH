@@ -41,7 +41,8 @@ const Battle = (() => {
       const bw = Math.max(240, x1 - x0), bh = Math.max(200, y1 - y0);
       const Hs = st.clientHeight, Ws = st.clientWidth;
       const H = Math.min(Ws * 640 / bw, Hs * 640 / bh);
-      const k = Math.max(1, Math.min(1.9, H / Hs));
+      const cover = 0.85 * Ws / (1.5 * Hs);   // nearly fill the width: only thin grass margins at the sides
+      const k = Math.min(2.4, Math.max(1, cover, Math.min(1.9, H / Hs)));
       st.style.setProperty('--bk', k.toFixed(3));
       const cw = c.clientWidth, ch = c.clientHeight;   // forces layout with the new zoom
       let top = Math.max(0, ((y0 + y1) / 2 / 640) * ch - Hs / 2); const maxTop = Math.max(0, ch - Hs);

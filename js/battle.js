@@ -1366,7 +1366,7 @@ const Battle = (() => {
     const da = px(A), di = px(I); let d = 0; for (let k = 0; k < da.length; k++) d += Math.abs(da[k] - di[k]);
     return (skipCache[key] = d / da.length < 2.5 && a.length >= 4 ? 1 : 0);
   }
-  const idleMs = (t) => (C[t] && C[t].fly ? 200 : ANIM_MS.idle);      // wings beat far faster than a creature breathes
+  const idleMs = (t) => (C[t] && C[t].fly ? 330 : ANIM_MS.idle);      // wings beat far faster than a creature breathes
   const atkFrames = (t) => { const q = seqOf(t, 'attack'); return q ? q.slice(atkSkip(t)) : null; };
   const animDur = (t, state) => { const q = state === 'attack' ? atkFrames(t) : seqOf(t, state); return q && q.length ? q.length * ANIM_MS[state] / spd() : 0; };
   // ---- facing: a creature turns toward what it attacks and the way it walks (a quick flip), then turns back to face the enemy side ----
@@ -1669,7 +1669,7 @@ const Battle = (() => {
       const pose = fr || poseOf(s, pst), pf = profOf(s.t); s._fimg = fr || null;
       let nxImg = null, nxK = 0; if (fr && (pst === 'idle' || pst === 'walking')) { const bl = frameBlend(s, pst === 'walking' ? 'walk' : 'idle', now); if (bl && bl.next.width === fr.width && bl.next.height === fr.height) { nxImg = bl.next; nxK = bl.k; } }
       // idle breathing: a tiny squash and stretch about the feet (own speed per creature, out of step between stacks); flyers also flap
-      const bph = now / (pf.fly ? 560 : pf.spd) + pf.ph + s.c * 1.7 + s.r * 0.9, breathing = !fighting && !defending && !reduced();
+      const bph = now / (pf.fly ? 900 : pf.spd) + pf.ph + s.c * 1.7 + s.r * 0.9, breathing = !fighting && !defending && !reduced();
       const ba = pf.amp * (fr ? 0.6 : 1); let bry = breathing ? 1 + ba * Math.sin(bph) : 1, brx = breathing ? 1 - ba * 0.55 * Math.sin(bph) : 1;   // a creature with its own frames only gets a gentle extra breath
       if (breathing && pf.fly && !fr) { const fl = Math.sin(now / 110 + pf.ph); brx *= 1 + 0.045 * fl; bry *= 1 - 0.03 * fl; }
       brx *= off.sx; bry *= off.sy;
@@ -1755,7 +1755,7 @@ const Battle = (() => {
     let x = 0, y = hasFr ? 0 : Math.sin(now / (fly ? 260 : pf.spd * 0.77) + s.c * 3 + s.r) * (fly ? 2.6 : 1.2) - (fly ? 4 : 0), rot = 0, sx = 1, sy = 1;
     if (fly && hasFr && !reduced()) {      // hovering: a slow rise and fall, a drifting side to side, a bank into the drift and an occasional strong beat
       const ph = pf.ph + s.c * 2.1 + s.r * 1.3, gust = Math.pow(Math.max(0, Math.sin(now / 2300 + ph * 1.7)), 6);
-      y = -9 + Math.sin(now / (pf.spd * 0.95) + ph) * 3.4 - gust * 3.5; x = Math.sin(now / (pf.spd * 1.9) + ph * 0.6) * 2.4; rot = Math.cos(now / (pf.spd * 1.9) + ph * 0.6) * 0.05; sy *= 1 + gust * 0.02; }
+      y = -9 + Math.sin(now / (pf.spd * 1.8) + ph) * 3.4 - gust * 3.5; x = Math.sin(now / (pf.spd * 3.2) + ph * 0.6) * 2.4; rot = Math.cos(now / (pf.spd * 3.2) + ph * 0.6) * 0.05; sy *= 1 + gust * 0.02; }
     const a = s.anim, own = !!seqOf(s.t, 'attack');
     if (a) {
       const k = (now - a.t0) / a.dur;

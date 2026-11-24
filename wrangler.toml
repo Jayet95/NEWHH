@@ -2,8 +2,13 @@ name = "newhh"
 main = "worker/index.js"
 compatibility_date = "2025-01-01"
 
-# publish on https://newhh.jayet95.workers.dev
+# publish on https://melton-g.com (custom domain, bought through Cloudflare: deploy attaches it and the certificate) and keep the old
+# https://newhh.jayet95.workers.dev address working too (the Android app still talks to it)
 workers_dev = true
+routes = [
+  { pattern = "melton-g.com", custom_domain = true },
+  { pattern = "www.melton-g.com", custom_domain = true },
+]
 
 # Static game bundle produced by `node tools/build.js`. Files are served from here first;
 # anything else (the /api/* leaderboard routes) goes to the Worker in worker/index.js.

@@ -152,7 +152,8 @@ const Battle = (() => {
     target.flash = now + dl; target.hurt = target.flash; if (target.dead) target.deadAt = target.flash;
     if (target.side === 1) B.xp += killed * C[target.t].hp;
     const p = hexPx(target.c, target.r);
-    B.fx.push({ x: p.x, y: p.y - 20, txt: '-' + dmg, col: '#ff6a5a', t0: now + dl, kind, big: dmg >= pool * 0.3 });
+    B.fx.push({ x: p.x, y: p.y - 20, txt: '-' + dmg, col: '#ff6a5a', t0: now + dl, kind, big: dmg >= pool * 0.3, sub: killed > 0 ? '☠ ' + killed : '' });
+    if (target.dead) later(dl * spd() + 80, () => burst(p.x, p.y + 16, 9, { kind: 'smoke', col: PAL.dust, v0: 14, v1: 70, l0: 380, l1: 760, s0: 3, s1: 6, drag: 2.4, grow: 1.4 }));
     fxHit(target, dmg, pool, kind, dn);
     log(`${label} ${C[target.t].n}: ${dmg} dmg, ${killed} killed.`);
     return killed;
@@ -479,14 +480,14 @@ const Battle = (() => {
     return p.reverse();
   }
 
-  async function tweenTo(s, x, y, ms) {
+  async function tweenTo(s, x, y, ms, mode) {
     if (typeof document !== 'undefined' && document.hidden) { s.px = x; s.py = y; return; }
     ms /= spd(); s.walkMs = Math.max(55, Math.min(130, ms * 0.5)); faceTo(s, x, ms + 350); if (!s.walkUntil || performance.now() > s.walkUntil) s.walkT0 = performance.now(); s.walkUntil = performance.now() + ms + 40;      // face the way it walks
     const x0 = s.px, y0 = s.py, t0 = performance.now();
     for (;;) {
-      const k = Math.min(1, (performance.now() - t0) / ms);
+      const k0 = Math.min(1, (performance.now() - t0) / ms), k = mode === 'both' ? k0 * k0 * (3 - 2 * k0) : mode === 'in' ? k0 * k0 * (2 - k0) : mode === 'out' ? 1 - (1 - k0) * (1 - k0) * (1 + k0) : k0;
       s.px = x0 + (x - x0) * k; s.py = y0 + (y - y0) * k;
-      if (k >= 1) break;
+      if (k0 >= 1) { if (mode && !(B && C[s.t].fly)) burst(x, y + 16, 3, { kind: 'smoke', col: PAL.dust, v0: 8, v1: 34, l0: 240, l1: 460, s0: 2, s1: 3.6, drag: 2.6, grow: 1.2, jit: 5 }); break; }
       await raf();
     }
   }
@@ -496,7 +497,7 @@ const Battle = (() => {
     const fly = C[s.t].fly, path = fly ? [{ c: s.c, r: s.r }, hex] : pathTo(B.reach, hex);
     for (let i = 1; i < path.length; i++) {
       const p = hexPx(path[i].c, path[i].r);
-      await tweenTo(s, p.x, p.y, fly ? Math.max(320, Math.min(760, hexDist({ c: s.c, r: s.r }, hex) * pace(s.t) * 0.6)) : pace(s.t));
+      await tweenTo(s, p.x, p.y, fly ? Math.max(320, Math.min(760, hexDist({ c: s.c, r: s.r }, hex) * pace(s.t) * 0.6)) : pace(s.t), path.length === 2 ? 'both' : i === 1 ? 'in' : i === path.length - 1 ? 'out' : null);
       if (!fly && B.mines && B.mines.has(key(path[i].c, path[i].r))) { s.c = path[i].c; s.r = path[i].r; detonate(s); return; }
     }
     s.c = hex.c; s.r = hex.r;
@@ -555,16 +556,18 @@ const Battle = (() => {
   };
   async function strike(s, t) {
     const a = hexPx(s.c, s.r), p = hexPx(t.c, t.r), now = performance.now();
-    const ad = animDur(s.t, 'attack'), hitAt = ad ? (2.5 - atkSkip(s.t)) * ANIM_MS.attack : 120;    // with its own frames the blow lands on the impact frame
-    s.anim = { kind: 'lunge', t0: now, dur: ad || 300 / spd(), dx: p.x - a.x, dy: p.y - a.y }; sfx('swing'); csfx(s.t, 'attack'); faceTo(s, p.x, (ad || 300) + 400);
+    const ad = animDur(s.t, 'attack'), hitAt = ad ? (2.5 - atkSkip(s.t)) * ANIM_MS.attack : 152 / spd();    // with its own frames the blow lands on the impact frame
+    s.anim = { kind: 'lunge', t0: now, dur: ad || 380 / spd(), dx: p.x - a.x, dy: p.y - a.y }; sfx('swing'); csfx(s.t, 'attack'); faceTo(s, p.x, (ad || 380) + 400);
+    { const dd = Math.hypot(p.x - a.x, p.y - a.y) || 1; t.knock = { ux: (p.x - a.x) / dd, uy: (p.y - a.y) / dd, amp: 8 }; }      // the target is pushed back along the blow
     push((a.x + p.x) / 2, (a.y + p.y) / 2, 0.026, 560);
-    (B.slashes = B.slashes || []).push({ x: p.x, y: p.y, t0: now + (ad ? (2 - atkSkip(s.t)) * ANIM_MS.attack : 110) / spd(), dur: 340 / spd(), style: styleOf(s).melee, mc: styleOf(s).mc, ang: Math.atan2(p.y - a.y, p.x - a.x) });
+    (B.slashes = B.slashes || []).push({ x: p.x, y: p.y, t0: now + (ad ? (2 - atkSkip(s.t)) * ANIM_MS.attack : 150) / spd(), dur: 340 / spd(), style: styleOf(s).melee, mc: styleOf(s).mc, ang: Math.atan2(p.y - a.y, p.x - a.x) });
     await sleep(hitAt);
   }
   // quick = the second arrow of a double shot: a shorter draw and flight, so the pair reads as one quick volley
   async function fireProj(s, tg, quick) {
     const a = hexPx(s.c, s.r), p = hexPx(tg.c, tg.r), now = performance.now(), st = styleOf(s), dur = Math.max(220, Math.min(520, Math.hypot(p.x - a.x, p.y - a.y) * 1.1)) * (quick ? 0.85 : 1) / spd(), ad = animDur(s.t, 'attack'), lead = ad ? (quick ? 0.9 : 2.2 - atkSkip(s.t)) * ANIM_MS.attack : quick ? 40 : 130;
     s.anim = { kind: 'shoot', t0: now, dur: ad || (quick ? 240 : 320) / spd(), dx: p.x - a.x, dy: p.y - a.y }; faceTo(s, p.x, (ad || 320) + lead + 500);
+    { const dd = Math.hypot(p.x - a.x, p.y - a.y) || 1; tg.knock = { ux: (p.x - a.x) / dd, uy: (p.y - a.y) / dd, amp: 4.5 }; }
     push((a.x + p.x) / 2, (a.y + p.y) / 2, 0.02, Math.min(900, 520 + dur * spd()));
     (B.proj = B.proj || []).push({ ax: a.x, ay: a.y - 6, bx: p.x, by: p.y - 6, t0: now + lead / spd(), dur, style: st.shoot, col: st.col });
     await sleep(lead + dur * spd());
@@ -1364,6 +1367,7 @@ const Battle = (() => {
         if (wd) p.x += (s.side === 0 ? -1 : 1) * HW * 0.5;
         unitBase(p.x, fy, wd ? 36 : 21, wd ? 9 : 7.5, s.side, s === B.cur, flash, now);
         ctx.save(); ctx.translate(p.x, fy); ctx.rotate(off.rot * 0.4); ctx.scale(brx, bry); if (fsx !== 1) ctx.scale(fsx, 1); if (flash) ctx.globalAlpha = 0.88;
+        if (flash && fa < 170 && !reduced() && 'filter' in ctx) ctx.filter = 'brightness(' + (1 + 1.15 * (1 - fa / 170)).toFixed(2) + ')';      // a quick white-hot flash on impact
         if (s._xf && fit) { const xk = (now - s._xf.t0) / 90; if (xk < 1) { ctx.save(); ctx.globalAlpha *= 1 - xk; ctx.drawImage(s._xf.img, -fit.cx * kk, -fit.by * kk, s._xf.img.width * kk, s._xf.img.height * kk); ctx.restore(); } else s._xf = null; }
         if (s === B.cur && !B.over) { ctx.shadowColor = s.side === 0 ? 'rgba(255,214,90,.95)' : 'rgba(255,120,90,.95)'; ctx.shadowBlur = 16 + (reduced() ? 0 : 5 * Math.sin(now / 260)); }
         if (fit) ctx.drawImage(pose, -fit.cx * kk, -fit.by * kk, pw, ph); else ctx.drawImage(pose, -pw / 2, -ph, pw, ph); ctx.restore();
@@ -1404,6 +1408,7 @@ const Battle = (() => {
       ctx.save(); ctx.globalAlpha = Math.min(1, (1 - k) * 1.7); ctx.fillStyle = col; ctx.font = 'bold ' + size + 'px sans-serif'; ctx.textAlign = 'center';
       if (magic || kd === 'heal') { ctx.shadowColor = col; ctx.shadowBlur = 9; }
       if (typeof GI !== 'undefined') GI.text(ctx, f.txt, fx0, fy, size, { fill: col, stroke: '#000' }); else { ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeText(f.txt, fx0, fy); ctx.fillText(f.txt, fx0, fy); }
+      if (f.sub) { ctx.font = 'bold ' + Math.max(11, Math.round(size * 0.62)) + 'px sans-serif'; ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.fillStyle = '#ffe9c8'; ctx.strokeText(f.sub, fx0, fy + size * 0.85); ctx.fillText(f.sub, fx0, fy + size * 0.85); }
       ctx.restore();
     }
     // highlight enemies the active stack can reach / shoot
@@ -1436,7 +1441,15 @@ const Battle = (() => {
       else {
         const d = Math.hypot(a.dx, a.dy) || 1, ux = a.dx / d, uy = a.dy / d, sg = Math.sign(ux) || 1, f = own ? 0.4 : 1;
         if (a.kind === 'lunge') {
-          const pr = k < 0.4 ? k / 0.4 : 1 - (k - 0.4) / 0.6, e = pr * pr * (3 - 2 * pr), m = Math.min(pf.lunge, d * 0.55);
+          const sm = (t) => t * t * (3 - 2 * t);
+          // frames of their own keep the old, gentler curve; the code-made motion gets a real wind-up (draw back), a fast strike, a short hold on impact and a soft settle
+          let e;
+          if (own) { const pr = k < 0.4 ? k / 0.4 : 1 - (k - 0.4) / 0.6; e = sm(pr); }
+          else if (k < 0.22) e = -0.3 * Math.sin(k / 0.22 * Math.PI / 2);
+          else if (k < 0.4) { const t = (k - 0.22) / 0.18; e = -0.3 + 1.3 * t * t; }
+          else if (k < 0.52) e = 1 + 0.04 * Math.sin((k - 0.4) / 0.12 * Math.PI);
+          else { const t = (k - 0.52) / 0.48; e = 1 - sm(t) * 1.03 + 0.03 * Math.sin(t * Math.PI); }
+          const m = Math.min(pf.lunge * (own ? 1 : 1.3), d * 0.6);
           x += ux * e * m * f; y += uy * e * m * f; rot = e * 0.28 * sg * f;
           if (!own) {
             if (style === 'swoop') { y -= Math.sin(k * Math.PI) * 16; rot = e * 0.4 * sg; }                                   // flyers dive in along an arc
@@ -1448,7 +1461,9 @@ const Battle = (() => {
     }
     if (s.walkUntil && now < s.walkUntil && !a && !seqOf(s.t, 'walk')) {      // real walk frames carry their own motion; the stepping bob is only for the idle-frame stand-in
       const st = Math.sin(now / 95); y -= Math.abs(st) * (fly ? 1.5 : 3); rot += st * 0.035; }
-    if (s.hurt) { const k = (now - s.hurt) / 280; if (k >= 0 && k < 1) { x += Math.sin(k * 40) * (1 - k) * 4; if (!seqOf(s.t, 'defend')) { sy *= 1 - 0.06 * Math.sin(k * Math.PI); sx *= 1 + 0.04 * Math.sin(k * Math.PI); } } }
+    if (s.hurt) { const k = (now - s.hurt) / 320; if (k >= 0 && k < 1) {
+      if (s.knock) { const kb = k < 0.22 ? Math.sin(k / 0.22 * Math.PI / 2) : 1 - (() => { const t = (k - 0.22) / 0.78; return t * t * (3 - 2 * t); })(); x += s.knock.ux * kb * s.knock.amp; y += s.knock.uy * kb * s.knock.amp * 0.6; x += Math.sin(k * 34) * (1 - k) * 1.6; }
+      else x += Math.sin(k * 40) * (1 - k) * 4; if (!seqOf(s.t, 'defend')) { sy *= 1 - 0.06 * Math.sin(k * Math.PI); sx *= 1 + 0.04 * Math.sin(k * Math.PI); } } }
     return { x, y, rot, sx, sy };
   }
   // landing sparks per shot style (colour lists for burst, r,g,b for the spark star)

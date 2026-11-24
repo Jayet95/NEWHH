@@ -23,6 +23,9 @@
   };
   window.showModal = (html, buttons = ['OK']) => new Promise(res => {
     $('mbox').innerHTML = html + '<div class="mb"></div>';
+    // plain notices, defeat and retreat get the painted parchment-in-wood screens (art/ui/screens); busy panels (towns, setup, victory) keep their own layout
+    { const h = String(html), kind = /vic lose|💀 Defeat/.test(h) ? 'defeat' : /🏳️ Retreat/.test(h) ? 'retreat' : (h.length < 900 && !/class=|<table|<canvas|<img|<select|<input/.test(h) && /^s*<h2>/.test(h)) ? 'msg' : '';
+      if (kind) { $('mbox').dataset.scr = kind; $('modal').dataset.scr = kind; } else { delete $('mbox').dataset.scr; delete $('modal').dataset.scr; } }
     buttons.forEach((b, i) => {
       const el = document.createElement('button'); el.innerHTML = b; if (i === 0) el.className = 'primary';
       el.onclick = () => { $('modal').classList.add('hide'); res(i); };

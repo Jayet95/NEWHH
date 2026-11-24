@@ -2383,3 +2383,15 @@ html body:not(.inbattle) #side > #army .sdeco.ml .mood { font-size: 12px; }
 #studio video { width: 100%; height: 100%; object-fit: contain; background: #100b06; }
 .studio-mark { position: absolute; left: 50%; bottom: calc(var(--sab, 0px) + 8px); width: clamp(120px, 30vmin, 210px); aspect-ratio: 1665 / 949; transform: translateX(-50%); background: url(brand/melton-mark.webp) center / contain no-repeat; filter: drop-shadow(0 0 5px #000) drop-shadow(0 0 9px #000) drop-shadow(0 2px 3px #000); pointer-events: none; }
 @media (orientation: landscape) and (max-height: 540px) { .studio-mark { left: calc(var(--sal, 0px) + 10px); bottom: calc(var(--sab, 0px) + 8px); transform: none; width: clamp(96px, 20vw, 140px); } }
+
+/* ---- painted notice screens: wood frame, parchment, dark battlefield backdrop (art/ui/screens) ---- */
+body #modal[data-scr] { background: linear-gradient(rgba(0,0,0,.35), rgba(0,0,0,.68)), url(art/ui/screens/bg_battlefield.webp) center / cover no-repeat !important; position: fixed; }
+body #modal[data-scr]::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: url(art/ui/screens/vignette_dark.webp) center / 100% 100% no-repeat; opacity: .8; }
+body #modal[data-scr=defeat]::after { background: url(art/ui/screens/art_defeat_banner_sword.webp) left 3% center / min(44%, 430px) auto no-repeat, url(art/ui/screens/vignette_red.webp) center / 100% 100% no-repeat; opacity: 1; }
+body #modal[data-scr=retreat]::after { background: url(art/ui/screens/art_retreat_rider.webp) left 3% center / min(44%, 430px) auto no-repeat, url(art/ui/screens/vignette_dark.webp) center / 100% 100% no-repeat; opacity: 1; }
+body #modal #mbox[data-scr] { position: relative; z-index: 1; border: 24px solid transparent !important; border-image: url(art/ui/screens/frame_wood.webp) 72 / 24px stretch !important; border-radius: 0 !important; background: url(art/ui/screens/parchment.webp) center / cover padding-box !important; color: #2c1a0a; max-width: min(480px, 92vw); min-width: 0; width: auto; padding: 10px 14px; text-align: center; box-shadow: 0 14px 40px rgba(0,0,0,.7); }
+body #modal[data-scr=defeat] #mbox, body #modal[data-scr=retreat] #mbox { margin-left: auto; margin-right: 6%; }
+body #modal #mbox[data-scr] h2 { color: #4a2a0c; text-shadow: 0 1px 0 rgba(255, 240, 200, .7); font-variant: small-caps; letter-spacing: .08em; text-align: center; margin: 0 0 8px; }
+body #modal #mbox[data-scr] p, body #modal #mbox[data-scr] b { color: #2c1a0a; text-shadow: none; }
+body #modal #mbox[data-scr] .mb { background: none; justify-content: center; position: static; margin-top: 10px; }
+body #modal[data-scr=defeat] #mbox h2, body #modal[data-scr=retreat] #mbox h2 { font-size: 1.5em; }

@@ -4,7 +4,7 @@
 // packs/index.json: { packs: [{ f, n, core }], files: { "<stem>": [pack, offset, length, "webp|png|..."] } }
 // The game falls back to the single files when the packs are not there (for example the python dev server).
 const fs = require('fs'), path = require('path');
-const LATER = /^(poses|mounted|anim|buildings|heroes)\/|^battle\/(obs|mach|siege)\/|^ui\/(castle_select|hero_select|adventure|town_)/;
+const LATER = /^(poses|mounted|anim|buildings|heroes)\/|^battle\/(obs|mach|siege)\/|^ui\/(screens|castle_select|hero_select|adventure|town_)/;
 function pack(root, outDir) {
   const art = path.join(root, 'art'), list = JSON.parse(fs.readFileSync(path.join(art, 'manifest.json'), 'utf8')).files;
   outDir = outDir || path.join(art, 'packs'); fs.rmSync(outDir, { recursive: true, force: true }); fs.mkdirSync(outDir, { recursive: true });

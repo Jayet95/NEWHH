@@ -2356,3 +2356,24 @@ html body:not(.inbattle) #side > #army .sdeco.ml .mood { font-size: 12px; }
   body:has(#title:not(.hide)) #mbox:has(.scnpan) > .setup { display: block !important; }
   body:has(#title:not(.hide)) .setup:has(.scnpan) > .mb { position: sticky !important; bottom: -12px; margin-top: 12px !important; z-index: 3; }
 }
+
+/* resource chips: the "+income" next to an amount stays inside its plate - chips never shrink below their content; on a very narrow strip the small +income is dropped (it is still in the tooltip and the income line) */
+@media (min-width: 700px), (orientation: portrait) {
+  html body #top #res .chip, html body #modal #mres .chip { flex: 1 0 auto !important; min-width: min-content !important; overflow: hidden; }
+  html body #top #res .chip small.inc, html body #modal #mres .chip small.inc { margin-left: 1px !important; letter-spacing: -.2px; }
+}
+@media (max-width: 699px) and (orientation: landscape) { html body #top #res .chip small.inc { display: none !important; } html body #top #res .chip { overflow: hidden; } }
+/* narrow phone landscape (about 560-700px): the resources get the room - sun orb off, date and mission chip smaller, chips tight, so no amount is cut */
+@media (max-width: 699px) and (orientation: landscape) and (max-height: 540px) {
+  html body:not(.inbattle) #top #orb { display: none !important; }
+  html body:not(.inbattle) #top #res { flex: 1 1 auto !important; min-width: 0; }
+  html body:not(.inbattle) #top #res .chip { flex: 1 1 auto !important; min-width: min-content !important; padding: 0 3px !important; gap: 1px !important; font-size: 10px !important; }
+  html body:not(.inbattle) #top #res .chip b { font-size: 10px !important; }
+  html body:not(.inbattle) #top #res .chip .gi { width: 12px !important; height: 12px !important; }
+  html body:not(.inbattle) #top #date { transform-origin: left center; font-size: 9px !important; }
+  html body:not(.inbattle) #top #date * { font-size: inherit !important; letter-spacing: 0 !important; }
+  html body:not(.inbattle) #top #msChip { padding: 0 4px !important; }
+  html body:not(.inbattle) #top #date .dtDiff, html body:not(.inbattle) #top #date .dtTurn { display: none !important; }
+}
+@media (min-width: 700px) { html body:not(.inbattle) #top #res { flex: 1 1 auto !important; min-width: 0; } }
+@media (min-width: 700px) and (max-width: 1500px) and (min-height: 541px) { html body:not(.inbattle) #top #res { gap: 3px !important; } html body:not(.inbattle) #top #res .chip { padding: 0 6px !important; gap: 3px !important; font-size: 12px !important; } html body:not(.inbattle) #top #res .chip b { font-size: 12px !important; } html body:not(.inbattle) #top #res .chip small.inc { font-size: 9px !important; } }

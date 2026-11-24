@@ -41,35 +41,86 @@ const Sfx = (() => {
     g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + Math.min(0.012, d / 4)); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
     s.connect(flt); flt.connect(g); g.connect(bus === 'music' ? musicGain : master); s.start(t, Math.random()); s.stop(t + d + 0.02);
   }
+  // ---- medieval voices: plucked strings (lute / harp), tuned bells, struck metal, wood, war drums and brass horns ----
+  const vmul = (bus) => (bus === 'music' ? 1 : sv() * 1.25 * qmul * FX);
+  const ksCache = {};
+  // Karplus-Strong plucked string, rendered once per pitch: a real string sound instead of a beep
+  function ksBuf(a, f, d) {
+    const key = Math.round(f * 2) + '_' + d; if (ksCache[key]) return ksCache[key];
+    const sr = a.sampleRate, n = Math.floor(sr * d), L = Math.max(2, Math.round(sr / f)), b = a.createBuffer(1, n, sr), o = b.getChannelData(0), line = new Float32Array(L);
+    let prev = 0; for (let i = 0; i < L; i++) { const w = Math.random() * 2 - 1; prev = prev * 0.5 + w * 0.5; line[i] = prev; }   // a softly filtered pluck
+    let p = 0, mx = 0.0001;
+    for (let i = 0; i < n; i++) { const nx = (p + 1) % L; o[i] = line[p]; line[p] = (line[p] + line[nx]) * 0.4985; p = nx; if (Math.abs(o[i]) > mx) mx = Math.abs(o[i]); }
+    for (let i = 0; i < n; i++) o[i] /= mx;
+    return (ksCache[key] = b);
+  }
+  function pluck(f, vol = 0.1, delay = 0, d = 1.2, bus) {
+    if (!on) return; const a = ctx(); if (!a) return;
+    const v = vol * vmul(bus); if (v <= 0.0002) return;
+    const t = a.currentTime + delay, s = a.createBufferSource(), g = a.createGain(), flt = a.createBiquadFilter();
+    s.buffer = ksBuf(a, f, d); flt.type = 'lowpass'; flt.frequency.value = Math.min(9000, f * 9); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    s.connect(flt); flt.connect(g); g.connect(bus === 'music' ? musicGain : master); s.start(t); s.stop(t + d + 0.02);
+  }
+  // inharmonic partials: [ratio, amplitude, decay share] - a struck bell, a sword ring, a coin
+  function ring(f, parts, vol, d, delay = 0, bus) {
+    if (!on) return; const a = ctx(); if (!a) return;
+    const v = vol * vmul(bus); if (v <= 0.0002) return;
+    const t = a.currentTime + delay;
+    parts.forEach(([r, amp, dk]) => {
+      const o = a.createOscillator(), g = a.createGain(), dd = d * dk; o.type = 'sine'; o.frequency.value = f * r;
+      g.gain.setValueAtTime(v * amp, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dd); o.connect(g); g.connect(bus === 'music' ? musicGain : master); o.start(t); o.stop(t + dd + 0.02);
+    });
+  }
+  const BELL = [[1, 1, 1], [2, 0.55, 0.75], [2.76, 0.4, 0.55], [4.07, 0.22, 0.4], [5.4, 0.14, 0.3]];
+  const METAL = [[1, 1, 1], [2.32, 0.7, 0.8], [3.17, 0.55, 0.65], [4.8, 0.35, 0.5], [6.7, 0.25, 0.4]];
+  const bell = (f, vol = 0.05, d = 1.6, delay = 0, bus) => ring(f, BELL, vol, d, delay, bus);
+  // a brass horn: two slightly detuned saws through a filter that opens as the note swells
+  function horn(f, d = 0.5, vol = 0.05, delay = 0) {
+    if (!on) return; const a = ctx(); if (!a) return;
+    const v = vol * vmul(); if (v <= 0.0002) return;
+    const t = a.currentTime + delay, g = a.createGain(), flt = a.createBiquadFilter();
+    flt.type = 'lowpass'; flt.Q.value = 1.6; flt.frequency.setValueAtTime(f * 1.2, t); flt.frequency.linearRampToValueAtTime(f * 4.2, t + Math.min(0.12, d * 0.4)); flt.frequency.linearRampToValueAtTime(f * 2.2, t + d);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + Math.min(0.07, d * 0.3)); g.gain.setValueAtTime(v, t + d * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.08);
+    [-5, 4].forEach((c) => { const o = a.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(f, t); o.detune.value = c; o.connect(flt); o.start(t); o.stop(t + d + 0.1); });
+    flt.connect(g); g.connect(master);
+  }
+  // a war drum: a skin hit that drops in pitch, plus a breath of rumble
+  const drum = (f = 90, vol = 0.1, delay = 0) => { tone(f * 1.6, 0.22, 'sine', vol, -f * 0.9, delay); tone(f, 0.3, 'sine', vol * 0.8, -f * 0.4, delay); noise(0.09, vol * 0.5, 500, 0.8, 'lowpass', delay); };
+  // knock on wood: a short, hollow tap
+  const wood = (vol = 0.06, f = 240, delay = 0) => { tone(f * (0.92 + Math.random() * 0.16), 0.05, 'sine', vol, -f * 0.45, delay); noise(0.035, vol * 0.6, 1500, 1.6, 'bandpass', delay); };
+  // D dorian: the notes of a lute tune
+  const D = { d3: 146.8, a3: 220, d4: 293.7, e4: 329.6, f4: 349.2, g4: 392, a4: 440, b4: 493.9, c5: 523.3, d5: 587.3, e5: 659.3, f5: 698.5, g5: 784, a5: 880, d6: 1174.7 };
+  const run = (notes, gap, vol, d = 1.1) => notes.forEach((f, i) => pluck(f, vol, i * gap, d));
   let foot = 0;
-  const footstep = () => { foot ^= 1; noise(0.06, 0.05, foot ? 240 : 300, 1.1, 'lowpass'); tone(foot ? 150 : 170, 0.05, 'sine', 0.03, -40); };
+  const footstep = () => { foot ^= 1; noise(0.07, 0.06, foot ? 220 : 280, 1.1, 'lowpass'); tone(foot ? 120 : 140, 0.06, 'sine', 0.035, -35); };
+  const clang = () => { const f = 900 + Math.random() * 500; ring(f, METAL, 0.045, 0.5); noise(0.05, 0.06, 4500, 1.2, 'highpass'); };
   const S = {
-    click: () => tone(520, 0.05, 'triangle', 0.04),
-    tick: () => { tone(1900, 0.02, 'sine', 0.01); noise(0.015, 0.01, 5000, 1, 'highpass'); },
+    click: () => wood(0.07),
+    tick: () => wood(0.03, 330),
+    tap: () => wood(0.04, 300),
     step: footstep,
     foot: footstep,
-    hit: () => { noise(0.1, 0.09, 1500, 0.8, 'bandpass', 0, -1000); tone(160, 0.12, 'sawtooth', 0.06, -80); tone(90, 0.1, 'square', 0.045, -30, 0.02); if (Math.random() < 0.4) S.clang(); else S.thud(); },
-    shoot: () => { noise(0.18, 0.05, 1900, 1.4, 'bandpass', 0, -1300); tone(700, 0.1, 'triangle', 0.04, -400); },
-    spell: () => { tone(400, 0.25, 'sine', 0.06, 500); tone(600, 0.25, 'sine', 0.04, 500, 0.05); noise(0.4, 0.035, 2200, 3, 'bandpass', 0, 2600); [1300, 1700, 2200].forEach((f, i) => tone(f, 0.12, 'sine', 0.018, 0, 0.12 + i * 0.07)); },
-    crash: () => { tone(110, 0.3, 'sawtooth', 0.08, -60); tone(70, 0.35, 'square', 0.06, -20, 0.05); noise(0.4, 0.07, 900, 0.7, 'lowpass', 0, -700); },
-    death: () => { tone(230, 0.55, 'sawtooth', 0.045, -150); tone(110, 0.65, 'sine', 0.06, -55, 0.05); noise(0.5, 0.05, 700, 0.8, 'lowpass', 0.02, -520); },
-    coin: () => { tone(880, 0.07, 'square', 0.04); tone(1320, 0.12, 'square', 0.04, 0, 0.07); },
-    build: () => seq([220, 330, 440], 0.1, 'square', 0.05, 0.09),
-    level: () => seq([523, 659, 784, 988, 1319], 0.14, 'triangle', 0.06, 0.09),
-    fanfare: () => seq([523, 659, 784, 1047, 784, 1047, 1319, 1568], 0.2, 'triangle', 0.06, 0.15),
-    win: () => seq([523, 659, 784, 1047], 0.18, 'triangle', 0.06, 0.14),
-    lose: () => seq([392, 330, 262, 196], 0.22, 'sawtooth', 0.05, 0.18),
-    turn: () => tone(330, 0.1, 'sine', 0.04),
-    day: () => seq([392, 523], 0.12, 'sine', 0.05, 0.1),
-    ach: () => seq([659, 880, 1175, 1568], 0.16, 'triangle', 0.06, 0.1),
-    tap: () => tone(700, 0.035, 'triangle', 0.028),
-    swing: () => noise(0.15, 0.1, 1000, 0.9, 'bandpass', 0, 1600),
-    thud: () => { tone(72, 0.18, 'sine', 0.1, -30); noise(0.07, 0.06, 320, 1, 'lowpass'); },
-    clang: () => { [1850, 2710, 3480].forEach((f, i) => tone(f, 0.3 - i * 0.06, 'sine', 0.03 - i * 0.006)); noise(0.05, 0.05, 4200, 1.2, 'highpass'); },
-    chest: () => { tone(300, 0.08, 'square', 0.04); noise(0.1, 0.04, 800, 1, 'bandpass'); seq([880, 1108, 1319, 1760], 0.09, 'triangle', 0.045, 0.07); },
-    magic: () => { seq([660, 880, 1320], 0.18, 'sine', 0.045, 0.08); noise(0.4, 0.02, 3000, 2, 'bandpass', 0, 1500); },
-    capture: () => { seq([392, 523, 659, 784], 0.13, 'square', 0.035, 0.07); tone(196, 0.3, 'sawtooth', 0.04, 0, 0.05); },
-    deny: () => { tone(160, 0.16, 'sawtooth', 0.05, -40); tone(130, 0.2, 'square', 0.035, -30, 0.08); },
+    hit: () => { noise(0.1, 0.1, 1100, 0.8, 'bandpass', 0, -700); drum(80, 0.08); if (Math.random() < 0.5) clang(); else S.thud(); },
+    shoot: () => { pluck(196, 0.14, 0, 0.35); noise(0.2, 0.05, 2000, 1.2, 'bandpass', 0.03, -1300); },
+    spell: () => { run([D.d5, D.f5, D.a5, D.d6], 0.06, 0.07, 0.9); bell(1568, 0.025, 1.4, 0.1); noise(0.45, 0.025, 2600, 2.5, 'bandpass', 0, 2200); },
+    crash: () => { drum(55, 0.14); noise(0.5, 0.09, 700, 0.7, 'lowpass', 0, -500); noise(0.3, 0.05, 2500, 0.8, 'bandpass', 0.05, -1500); },
+    death: () => { drum(60, 0.1); tone(130, 0.5, 'sine', 0.05, -70, 0.05); noise(0.5, 0.05, 600, 0.8, 'lowpass', 0.02, -380); pluck(D.d3, 0.08, 0.1, 1.2); },
+    coin: () => { ring(2500, METAL, 0.026, 0.28); ring(3300, METAL, 0.02, 0.25, 0.07); },
+    build: () => { wood(0.09, 200); wood(0.09, 190, 0.18); ring(1250, METAL, 0.04, 0.55, 0.36); wood(0.08, 210, 0.36); },
+    level: () => { run([D.d4, D.f4, D.a4, D.d5, D.f5, D.a5], 0.075, 0.09, 1.2); bell(D.d6, 0.035, 1.8, 0.45); },
+    fanfare: () => { horn(D.d4, 0.35, 0.06); horn(D.a4, 0.35, 0.06, 0.38); horn(D.d5, 0.8, 0.07, 0.76); drum(90, 0.1, 0); drum(90, 0.1, 0.38); drum(70, 0.12, 0.76); bell(D.d6, 0.03, 2, 0.8); },
+    win: () => { horn(D.d4, 0.3, 0.06); horn(D.f4, 0.3, 0.06, 0.28); horn(D.a4, 0.7, 0.07, 0.56); drum(80, 0.1, 0.56); },
+    lose: () => { horn(D.a3, 0.5, 0.06); horn(D.f4 / 1.5, 0.6, 0.06, 0.5); horn(D.d3, 1.1, 0.07, 1.05); drum(50, 0.12, 1.05); },
+    turn: () => bell(392, 0.03, 1.2),
+    day: () => { pluck(D.a4, 0.09, 0, 1); pluck(D.d5, 0.09, 0.12, 1.2); },
+    ach: () => { run([D.d5, D.f5, D.a5, D.d6], 0.08, 0.09, 1.2); bell(1760, 0.03, 1.8, 0.3); },
+    swing: () => noise(0.18, 0.1, 900, 0.9, 'bandpass', 0, 1700),
+    thud: () => { drum(70, 0.09); wood(0.05, 140); },
+    clang,
+    chest: () => { wood(0.08, 170); noise(0.12, 0.05, 700, 1, 'bandpass', 0.05); ring(2200, METAL, 0.025, 0.3, 0.18); ring(2900, METAL, 0.02, 0.3, 0.26); run([D.d5, D.a5], 0.09, 0.06, 0.8); },
+    magic: () => { run([D.a4, D.d5, D.e5, D.a5, D.d6], 0.07, 0.07, 1); bell(2349, 0.02, 1.6, 0.2); noise(0.5, 0.02, 3200, 2, 'bandpass', 0, 1500); },
+    capture: () => { horn(D.d4, 0.25, 0.055); horn(D.a4, 0.55, 0.06, 0.26); drum(80, 0.1); drum(80, 0.1, 0.26); },
+    deny: () => { wood(0.08, 120); tone(95, 0.22, 'sine', 0.05, -30, 0.02); pluck(D.d3, 0.07, 0.1, 0.5); },
   };
   // ---- creature voices ----
   // Each creature has its own attack, defend (hurt), death and (for shooters) shot sound. A recording audio/sfx/<creature id>_<kind>.mp3
@@ -107,13 +158,13 @@ const Sfx = (() => {
   }
   // the sound of each kind of shot leaving the shooter
   const SHOT = {
-    bolt: () => { noise(0.08, 0.06, 500, 1, 'lowpass'); tone(200, 0.1, 'square', 0.05, -90); },
-    twin: () => { S.shoot(); tone(900, 0.06, 'triangle', 0.025, -300, 0.07); },
+    bolt: () => { pluck(150, 0.16, 0, 0.3); noise(0.08, 0.06, 500, 1, 'lowpass'); },
+    twin: () => { S.shoot(); pluck(240, 0.1, 0.07, 0.25); },
     glow: () => { noise(0.14, 0.04, 3400, 1.2, 'highpass', 0, -1500); tone(1100, 0.12, 'sine', 0.03, -500); },
     javelin: () => noise(0.3, 0.06, 700, 1.2, 'bandpass', 0, 1200),
     zap: () => { noise(0.22, 0.06, 4200, 1, 'highpass'); tone(1400, 0.2, 'sawtooth', 0.035, -1000); },
     fire: () => { noise(0.35, 0.07, 800, 0.8, 'bandpass', 0, 900); tone(120, 0.3, 'sawtooth', 0.04, 80); },
-    holy: () => { tone(880, 0.3, 'sine', 0.045, 0); tone(1320, 0.35, 'sine', 0.03, 0, 0.05); tone(1760, 0.3, 'sine', 0.02, 0, 0.1); },
+    holy: () => { bell(880, 0.04, 1.4); bell(1320, 0.025, 1.2, 0.05); },
     death: () => { tone(180, 0.5, 'sine', 0.06, -70); noise(0.45, 0.04, 600, 1, 'lowpass', 0, -300); },
     venom: () => { noise(0.1, 0.05, 1800, 1.4, 'bandpass', 0, -900); tone(500, 0.1, 'sine', 0.04, -200); },
     rock: () => { tone(100, 0.25, 'square', 0.06, -40); noise(0.3, 0.06, 350, 0.8, 'lowpass'); },
@@ -148,7 +199,7 @@ const Sfx = (() => {
     const a = ctx(); if (!a) return;
     const sc = SCALE[mood], vol = 0.035 * mv() * 2.2;
     const f = sc[(step * 3 + ((Math.random() * 3) | 0)) % sc.length] * (Math.random() < 0.2 ? 2 : 1);
-    tone(f, mood === 'battle' ? 0.5 : 1.6, 'triangle', vol, 0, 0, 'music');
+    pluck(f, vol * 2.2, 0, mood === 'battle' ? 0.8 : 1.8, 'music');
     if (step % 4 === 0) tone(sc[0] / 2, 3.2, 'sine', vol * 0.9, 0, 0, 'music');
     step++;
   }

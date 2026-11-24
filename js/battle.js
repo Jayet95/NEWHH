@@ -652,7 +652,7 @@ const Battle = (() => {
   }
   function detonate(s) {
     const k = key(s.c, s.r); B.mines.delete(k);
-    const p = hexPx(s.c, s.r); s.px = p.x; s.py = p.y;
+    const p = hexPx(s.c, s.r); s.px = p.x; s.py = p.y; (B.mineFx = B.mineFx || []).push({ x: p.x, y: p.y, t0: performance.now() });
     B.fx.push({ x: p.x, y: p.y - 6, txt: '💥', col: '#fff', t0: performance.now() });
     sfx('crash'); fxMine(p); hit(s, B.mineDmg, '💣 A mine explodes under', 'mine');
   }
@@ -693,6 +693,14 @@ const Battle = (() => {
   // ---- siege: the attackers' catapult and the defenders' arrow towers act in the open instead of damaging the walls out of sight ----
   const catPos = () => { const side = 1 - B.siege.dside, p = hexPx(side === 0 ? 0 : BW - 1, BH - 1); return { x: p.x + (side === 0 ? -4 : 4), y: p.y + 4, dir: side === 0 ? 1 : -1 }; };
   function drawCatapult(now) {
+    const cp = catPos(), t = B.catT0 ? now - B.catT0 : 99999, rel = 260 / spd(), back = 1300 / spd(), idle = machImg('catapult_cocked_basic');
+    if (idle) {
+      let f = 'cocked'; if (t < rel * 0.5) f = 'throw1'; else if (t < rel) f = 'throw2'; else if (t < rel + 200) f = 'released'; else if (t < rel + 200 + back) f = 'winch' + (1 + Math.min(2, Math.floor((t - rel - 200) / back * 3)));
+      machDraw(machImg('catapult_' + f + '_basic') || idle, idle, cp.x, cp.y + 14, 84, cp.dir < 0); return;
+    }
+    drawCatapultCode(now);
+  }
+  function drawCatapultCode(now) {
     const cp = catPos(), t = B.catT0 ? now - B.catT0 : 99999, rel = 260 / spd(), back = 1300 / spd(), sm = (u) => u * u * (3 - 2 * u);
     // arm angle: cocked back, a fast throw forward, then winched slowly back
     let a = -2.55; if (t < rel) a = -2.55 + 2.4 * sm(t / rel); else if (t < rel + 200) a = -0.15; else if (t < rel + 200 + back) a = -0.15 - 2.4 * sm((t - rel - 200) / back);
@@ -745,6 +753,7 @@ const Battle = (() => {
   // what fortifications look like: pennants on every tower, torches from a Citadel up, braziers on the walls from a Castle up, golden trim on a Fortress
   function siegeDeco(st, p, now) {
     const lvl = Math.min(3, (B.siege && B.siege.fort) || 0), dcol = B.siege.dside === 0 ? '#3a6fc4' : '#c4473f', fl = Math.sin(now / 230 + st.r * 1.3), fl2 = Math.sin(now / 90 + st.r * 2.1);
+    if (siegeImg('tower', 'intact')) { if (st.k === 'tower' && st.shotAt && now - st.shotAt < 220) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(255,230,160,' + (0.8 * (1 - (now - st.shotAt) / 220)).toFixed(2) + ')'; ctx.beginPath(); ctx.arc(p.x + (B.siege.dside === 1 ? -14 : 14), p.y - 40, 9, 0, 7); ctx.fill(); ctx.restore(); } return; }
     ctx.save();
     if (st.k === 'tower') {
       const fx = p.x + 3, fy = p.y - 36;
@@ -768,7 +777,7 @@ const Battle = (() => {
     if (B.round > 60) { log('Stalemate — the attackers withdraw.'); finish(false, false); return; }
     for (const s of alive()) { s.ret = true; s.waited = false; }
     B.queue = alive().sort((a, b) => speedOf(b) - speedOf(a) || a.side - b.side);
-    if (B.mach && B.mach.cart) for (const s of alive(0)) if (C[s.t].shoot && s.ammo < s.ammoMax) s.ammo++;
+    if (B.mach && B.mach.cart) { B.cartT0 = performance.now(); for (const s of alive(0)) if (C[s.t].shoot && s.ammo < s.ammoMax) s.ammo++; }
     for (const s of alive()) { for (const f of ['weak', 'disr', 'noshoot', 'berserk']) if (s[f] > 0) s[f]--; if (s.hyp > 0 && --s.hyp === 0) { s.side = s.origSide; log(C[s.t].n + ' shakes off the mind grip.'); } }
     B.queue = alive().sort((a, c) => speedOf(c) - speedOf(a) || a.side - c.side);
     B.waitQ = []; B.strikeUsed = false; B.mineUsed = false; B.balUsed = false; B.tentUsed = false;
@@ -1007,7 +1016,7 @@ const Battle = (() => {
   function fireBallista(t) {
     if (!t || t.side !== 1) return toast('Pick an enemy stack.');
     if (B.balUsed) return toast('The ballista already fired this round.');
-    B.balUsed = true; B.spell = null;
+    B.balUsed = true; B.spell = null; B.balT0 = performance.now();
     const dmg = Math.floor((10 + 3 * B.hero.att) * (1 + 0.2 * perk('ballistics')));
     B.shot = { ax: HERO_POS[0].x + 14, ay: HERO_POS[0].y + 30, b: { c: t.c, r: t.r }, t0: performance.now(), col: '#d9c07a' };
     hit(t, dmg, 'The ballista fires', 'ranged');
@@ -1018,7 +1027,7 @@ const Battle = (() => {
     if (B.tentUsed) return toast('The first aid tent already worked this round.');
     const g = healStack(t, 40 + 12 * B.hero.sp, t.maxN);
     if (g <= 0) return toast('That stack is unhurt.');
-    B.tentUsed = true; B.spell = null; { const p = hexPx(t.c, t.r); B.fx.push({ x: p.x, y: p.y - 20, txt: '+' + Math.round(g), col: '#7dff9a', t0: performance.now(), kind: 'heal' }); fxHeal(t); } log('The first aid tent patches up ' + C[t.t].n + '.');
+    B.tentUsed = true; B.tentT0 = performance.now(); B.spell = null; { const p = hexPx(t.c, t.r); B.fx.push({ x: p.x, y: p.y - 20, txt: '+' + Math.round(g), col: '#7dff9a', t0: performance.now(), kind: 'heal' }); fxHeal(t); } log('The first aid tent patches up ' + C[t.t].n + '.');
     refreshButtons();
   }
   function heroStrike(t) {
@@ -1477,8 +1486,68 @@ const Battle = (() => {
     const ao = ARCH_OF[id], an = Array.isArray(ao) ? ao[0] : ao, ar = Object.assign({}, ARCH[an || 'foot'], Array.isArray(ao) ? ao[1] : null);
     return (PROF[id] = Object.assign(base, ar, { lunge: base.lunge * ar.lm, arch: an || 'foot' }));
   }
+  // ---- painted battle art (art/battle/obs, mach, siege): trimmed to its visible box so every picture sits on the ground the same way ----
+  const _trim = new WeakMap();
+  function trimOf(img) {
+    let t = _trim.get(img); if (t) return t;
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height).data; let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+    for (let y = 0; y < c.height; y += 2) for (let x = 0; x < c.width; x += 2) if (d[(y * c.width + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    t = x1 < 0 ? { x: 0, y: 0, w: img.width, h: img.height } : { x: x0, y: y0, w: x1 - x0 + 2, h: y1 - y0 + 2 }; _trim.set(img, t); return t;
+  }
+  const biome = () => { const n = bgName(); return n === 'ship' || n === 'grass' ? '' : n; };
+  function obsArt(oe, c, r) {
+    if (typeof Assets === 'undefined') return null;
+    const seed = c * 17 + r * 31 + 3, n = 1 + seed % 3, b = biome(), sx = b ? '_' + b : '';
+    const nm = { '🪨': 'boulders' + sx + '_' + n, '⛰️': 'outcrop' + sx + '_' + n, '🌲': 'pine' + sx + '_' + n, '🌳': b ? 'tree_' + b + '_' + n : 'oak_' + n,
+      '🌿': b ? 'bush_' + b + '_' + n : ['bush_berries_1', 'bush_flowers_1', 'bush_yellow_1'][seed % 3], '🪵': 'log_' + n, '🌾': 'haystack_' + n, '🏚️': 'ruinwall_' + n, '🍄': 'stump_' + n,
+      '🪦': 'graves_' + n, '🚧': 'fence_' + n, '💧': 'pond_' + n }[oe];
+    return nm ? Assets.get('battle/obs/obstacle_' + nm) : null;
+  }
+  function drawObsArt(im, oe, p, c, r) {
+    const t = trimOf(im), k = Math.min(HW * 1.1 / t.w, 84 / t.h), w = t.w * k, h = t.h * k, plant = oe === '🌲' || oe === '🌳' || oe === '🌿' || oe === '🌾';
+    const sw = plant && !reduced() ? Math.sin(performance.now() / (oe === '🌿' ? 700 : 1100) + c * 1.7 + r * 0.9) * (oe === '🌿' ? 0.03 : 0.018) : 0;
+    ctx.save(); ctx.translate(p.x, p.y + 19); if (sw) ctx.transform(1, 0, sw, 1, 0, 0); ctx.drawImage(im, t.x, t.y, t.w, t.h, -w / 2, -h, w, h); ctx.restore();
+  }
+  const FORT_NAME = ['palisade', 'citadel', 'castle', 'fortress'];
+  const siegeImg = (part, state, lvlOpt) => typeof Assets === 'undefined' || !B.siege ? null : Assets.get('battle/siege/siege_' + part + '_' + state + '_' + FORT_NAME[Math.max(0, Math.min(3, lvlOpt === undefined ? (B.siege.fort || 0) : lvlOpt))] + (B.siege.dside === 0 ? '_mirror' : ''));
+  const siegeTile = (img, p) => ctx.drawImage(img, p.x - 40, p.y - 80.7, 80, 120);      // tiles are 240x360 with the hex centred at (120,242) and a hex radius of 90 (our 30 is a third)
+  const machImg = (n) => typeof Assets === 'undefined' ? null : Assets.get('battle/mach/machine_' + n);
+  // draws a machine picture at a fixed scale taken from its resting picture, so animation frames never jump
+  function machDraw(img, ref, x, y, maxW, flip) {
+    if (!img || !ref) return false; const t = trimOf(ref), k = Math.min(maxW / t.w, 96 / t.h), cx = t.x + t.w / 2, by = t.y + t.h;
+    ctx.save(); ctx.translate(x, y); if (flip) ctx.scale(-1, 1); ctx.drawImage(img, -cx * k, -by * k, img.width * k, img.height * k); ctx.restore(); return true;
+  }
+  const MACH_POS = { ballista: { x: 40, y: 176, w: 68 }, tent: { x: 40, y: 256, w: 64 }, cart: { x: 40, y: 470, w: 64 } };
+  function drawMachines(now) {
+    const mc = (B.hero && B.hero.mach) || {}; if (!mc.ballista && !mc.tent && !mc.cart) return;
+    const seq = (t0, fr, ms) => { if (!t0) return null; const e = (now - t0) * spd() / ms, i = Math.floor(e); return i >= 0 && i < fr.length ? fr[i] : null; };
+    if (mc.ballista) {
+      const P = MACH_POS.ballista; let f = 'idle';
+      if (B.spell === '__ballista' && B.hover) f = B.hover.r < 4 ? 'aim1' : B.hover.r > 6 ? 'aim3' : 'aim2'; else if (B.spell === '__ballista') f = 'aim2';
+      const s = seq(B.balT0, ['fire1', 'fire2', 'fire2', 'reload1', 'reload2', 'reload3'], 150); if (s) f = s;
+      machDraw(machImg('ballista_' + f + '_basic') || machImg('ballista_idle_basic'), machImg('ballista_idle_basic'), P.x, P.y, P.w);
+    }
+    if (mc.tent) {
+      const P = MACH_POS.tent, s = seq(B.tentT0, ['heal1', 'heal2', 'heal3', 'heal1', 'heal2', 'heal3', 'heal1', 'heal2', 'heal3'], 170);
+      machDraw(machImg('tent_' + (s || 'idle') + '_basic') || machImg('tent_idle_basic'), machImg('tent_idle_basic'), P.x, P.y, P.w);
+    }
+    if (mc.cart) {
+      const P = MACH_POS.cart, s = seq(B.cartT0, ['resupply1', 'resupply2', 'resupply1', 'resupply2'], 200);
+      machDraw(machImg('cart_' + (s || 'idle') + '_basic') || machImg('cart_idle_basic'), machImg('cart_idle_basic'), P.x, P.y, P.w);
+    }
+  }
+  function drawMineBlasts(now) {
+    B.mineFx = (B.mineFx || []).filter(m => {
+      const i = Math.floor((now - m.t0) * spd() / 85); if (i < 0) return true; if (i > 5) return false;
+      const im = machImg('mine_detonate' + (i + 1) + '_all'); if (!im) return false; const k = 0.5; ctx.drawImage(im, m.x - 128 * k, m.y + 8 - 150 * k, 256 * k, 256 * k); return true;
+    });
+  }
   function structSprite(st, p) {
     if (typeof Assets === 'undefined') return false;
+    { const fr = st.hp / st.max, im = st.k === 'tower' ? siegeImg('tower', fr > 0.5 ? 'intact' : 'damaged') : st.k === 'gate' ? siegeImg('gate', 'closed')
+        : (st.r === 0 || st.r === 10) && fr > 0.6 ? siegeImg(st.r === 0 ? 'corner' : 'endcap', 'intact') : siegeImg('wall', fr > 0.6 ? 'intact' : 'damaged');
+      if (im) { siegeTile(im, p); return true; } }
     const frac = st.hp / st.max;
     const img = st.k === 'wall' ? Assets.get(frac > 0.6 ? 'battle/wall_intact' : 'battle/wall_damaged') : st.k === 'gate' ? Assets.get('battle/gate_closed') : Assets.get(frac > 0.5 ? 'battle/tower' : 'battle/tower_damaged');
     if (!img) return false;
@@ -1508,19 +1577,20 @@ const Battle = (() => {
       if (B.siege && (!B._board || B._bg)) {
         const inside = B.siege.dside === 1 ? c > B.cw : c < B.cw;
         if (inside) { ctx.fillStyle = 'rgba(170,130,80,.30)'; ctx.fill(); }
-        if (B.moat.has(k)) { ctx.fillStyle = 'rgba(40,120,200,.65)'; ctx.fill(); }
+        if (B.moat.has(k) && !siegeImg('moat_frame1', '', 0)) { ctx.fillStyle = 'rgba(40,120,200,.65)'; ctx.fill(); }
       }
       const walk = input && B.reach.has(k) && !B.spell && B.reach.get(k).d > 0;
       if (walk) { ctx.fillStyle = 'rgba(255, 236, 150, .30)'; ctx.fill(); }
       ctx.strokeStyle = walk ? 'rgba(255, 224, 110, .95)' : B._board ? 'rgba(0,0,0,.16)' : 'rgba(0,0,0,.26)'; ctx.lineWidth = walk ? 2 : 1; ctx.stroke();
-      if (B.obs.has(k)) { const oe = B.obs.get(k), ob = obstacleSprite(oe, c, r); if (ob) { const plant = oe === '🌲' || oe === '🌳' || oe === '🌿' || oe === '🌾', sw = plant && !reduced() ? Math.sin(performance.now() / (oe === '🌿' ? 700 : 1100) + c * 1.7 + r * 0.9) * (oe === '🌿' ? 0.03 : 0.018) : 0; if (sw) { ctx.save(); ctx.translate(p.x, p.y + 15 * OBK); ctx.transform(1, 0, sw, 1, 0, 0); ctx.drawImage(ob.cv, -ob.ox * OBK, -ob.oy * OBK - 15 * OBK, ob.w * OBK, ob.h * OBK); ctx.restore(); } else ctx.drawImage(ob.cv, p.x - ob.ox * OBK, p.y - ob.oy * OBK, ob.w * OBK, ob.h * OBK); } else { const oi = typeof Assets !== 'undefined' ? Assets.get(oe === '🌲' ? 'terrain/forest_overlay' : (oe === '🪨' || oe === '⛰️') ? 'terrain/mountain_overlay' : '') : null; if (oi) sprite(oi, p.x, p.y, oe === '🌲' ? 44 : 40); else { ctx.fillStyle = '#fff'; emoji(oe, p.x, p.y, 30); } } }
-      if (B.siege && B.moat.has(k) && (!B._board || B._bg)) {      // the moat: slow ripples and glints
+      if (B.obs.has(k)) { const oe = B.obs.get(k), oa = obsArt(oe, c, r), ob = oa ? null : obstacleSprite(oe, c, r); if (oa) drawObsArt(oa, oe, p, c, r); else if (ob) { const plant = oe === '🌲' || oe === '🌳' || oe === '🌿' || oe === '🌾', sw = plant && !reduced() ? Math.sin(performance.now() / (oe === '🌿' ? 700 : 1100) + c * 1.7 + r * 0.9) * (oe === '🌿' ? 0.03 : 0.018) : 0; if (sw) { ctx.save(); ctx.translate(p.x, p.y + 15 * OBK); ctx.transform(1, 0, sw, 1, 0, 0); ctx.drawImage(ob.cv, -ob.ox * OBK, -ob.oy * OBK - 15 * OBK, ob.w * OBK, ob.h * OBK); ctx.restore(); } else ctx.drawImage(ob.cv, p.x - ob.ox * OBK, p.y - ob.oy * OBK, ob.w * OBK, ob.h * OBK); } else { const oi = typeof Assets !== 'undefined' ? Assets.get(oe === '🌲' ? 'terrain/forest_overlay' : (oe === '🪨' || oe === '⛰️') ? 'terrain/mountain_overlay' : '') : null; if (oi) sprite(oi, p.x, p.y, oe === '🌲' ? 44 : 40); else { ctx.fillStyle = '#fff'; emoji(oe, p.x, p.y, 30); } } }
+      if (B.siege && B.moat.has(k)) { const mf = Assets.get('battle/siege/siege_moat_frame' + (1 + Math.floor(now / 320 + r * 0.5 + c) % 4) + '_' + FORT_NAME[B.siege.fort || 0] + (B.siege.dside === 0 ? '_mirror' : '')); if (mf) { ctx.save(); hexPath(p.x, p.y, HR - 0.5); ctx.clip(); ctx.drawImage(mf, p.x - 40, p.y - 80.7, 80, 120); ctx.restore(); } }
+      if (B.siege && B.moat.has(k) && (!B._board || B._bg) && !siegeImg('moat_frame1', '', 0)) {      // the moat: slow ripples and glints
         ctx.save(); hexPath(p.x, p.y, HR - 2); ctx.clip(); ctx.lineCap = 'round'; ctx.lineWidth = 1.4;
         for (let q = 0; q < 3; q++) { const ph = now / 1400 + q * 0.33 + (c * 0.37 + r * 0.21), f = ph - Math.floor(ph), yy = p.y - 16 + q * 14 + Math.sin(ph * 6) * 2; ctx.strokeStyle = 'rgba(210,240,255,' + (0.4 * Math.sin(f * Math.PI)).toFixed(2) + ')'; ctx.beginPath(); ctx.moveTo(p.x - 16 + f * 8, yy); ctx.quadraticCurveTo(p.x - 6 + f * 8, yy - 3, p.x + 4 + f * 8, yy); ctx.quadraticCurveTo(p.x + 10 + f * 8, yy + 2, p.x + 16, yy); ctx.stroke(); }
         ctx.restore();
       }
-      if (B.siege && B.mines && B.mines.has(k) && B.siege.dside === 0) { const mi = typeof Assets !== 'undefined' ? Assets.get('battle/mine_dormant') : null; if (mi) sprite(mi, p.x, p.y + 6, 34); else { ctx.fillStyle = '#fff'; emoji('💣', p.x, p.y + 2, 18); } }
-      if (B.siege && c === B.cw && !structAt(c, r) && typeof Assets !== 'undefined') { const kk = SIEGE_LAYOUT[r], di = Assets.get(kk === 'gate' ? 'battle/gate_open' : kk === 'tower' ? 'battle/tower_damaged' : 'battle/wall_breached'); if (di) sprite(di, p.x, p.y, kk === 'tower' ? 52 : 70); }
+      if (B.siege && B.mines && B.mines.has(k) && B.siege.dside === 0) { const mn = machImg('mine_dormant_all'); if (mn) { const t = trimOf(mn), w = HW * 0.78, h = t.h * w / t.w; ctx.drawImage(mn, t.x, t.y, t.w, t.h, p.x - w / 2, p.y + 14 - h, w, h); } else { const mi = typeof Assets !== 'undefined' ? Assets.get('battle/mine_dormant') : null; if (mi) sprite(mi, p.x, p.y + 6, 34); else { ctx.fillStyle = '#fff'; emoji('💣', p.x, p.y + 2, 18); } } }
+      if (B.siege && c === B.cw && !structAt(c, r) && typeof Assets !== 'undefined') { const kk = SIEGE_LAYOUT[r], ni = siegeImg(kk, kk === 'wall' ? 'breached' : 'destroyed'); if (ni) siegeTile(ni, p); else { const di = Assets.get(kk === 'gate' ? 'battle/gate_open' : kk === 'tower' ? 'battle/tower_damaged' : 'battle/wall_breached'); if (di) sprite(di, p.x, p.y, kk === 'tower' ? 52 : 70); } }
       if (B.spell === '__mine' && freeMineHex(c, r)) { hexPath(p.x, p.y, HR - 4); ctx.strokeStyle = 'rgba(255,200,80,.8)'; ctx.lineWidth = 2; ctx.stroke(); }
       const st = structAt(c, r);
       if (st) {
@@ -1535,6 +1605,7 @@ const Battle = (() => {
       }
     }
     if (B.siege) drawCatapult(now);
+    drawMachines(now); drawMineBlasts(now);
     if (B.cur && !B.cur.dead) { const p = hexPx(B.cur.c, B.cur.r); hexGlow(p.x, p.y, '255,206,80', 0.2 + 0.07 * Math.sin(now / 300)); }
     if (hov) {
       const p = hexPx(hov.c, hov.r), t = stackAt(hov.c, hov.r);
@@ -1963,6 +2034,8 @@ const Battle = (() => {
     const ids = new Set(); [...(opts.army || []), ...(opts.enemy || [])].forEach(x => { if (x) ids.add(String(x.t)); });
     const list = []; ids.forEach(t => { const bb = t.replace(/_\d$/, ''), u = /_\d$/.test(t) ? '_up' : ''; for (const d of ['left', 'right']) for (const st of ['idle', 'fighting', 'defending']) list.push('poses/' + d + '/' + st + '/' + bb + u); ANIM_STATES.forEach(st => { const q = seqOf(t, st); if (q) list.push(...q); }); });
     [opts.hero, opts.eHero].forEach(h => { if (h && h.pid) list.push('mounted/' + h.pid + '_east', 'mounted/' + h.pid + '_west'); });
+    list.push(...Assets.list('battle/obs/'), ...Assets.list('battle/mach/').filter(s => /_basic$|_all$/.test(s)));
+    if (opts.siege) { const lv = FORT_NAME[Math.max(0, Math.min(3, opts.siege.fort || 0))]; list.push(...Assets.list('battle/siege/').filter(s => s.includes('_' + lv) && (opts.siege.dside === 0) === /_mirror$/.test(s))); }
     await Promise.race([Assets.need(list), new Promise(r => setTimeout(r, 5000))]);
   }
   async function run(opts) {
@@ -1990,7 +2063,7 @@ const Battle = (() => {
       };
       mk(0, opts.army); mk(1, opts.enemy);
       if (opts.siege) setupSiege(opts.siege);
-      const icons = ['🪨', '🌲', '🌳', '🌿', '🪵', '⛰️', '🌳', '🌾', '🏚️', '🌲', '🌿', '🌳', '🍄'];
+      const icons = ['🪨', '🌲', '🌳', '🌿', '🪵', '⛰️', '🌳', '🌾', '🏚️', '🌲', '🌿', '🌳', '🍄', '🪦', '🚧', '💧'];
       let lastIc = '';
       const lo = !opts.siege ? 3 : opts.siege.dside === 1 ? 2 : 8, span = !opts.siege ? 9 : 5, want = opts.siege ? 5 : 11;
       for (let i = 0, tries = 0; i < want && tries < 100; tries++) {

@@ -391,7 +391,7 @@ function reachMap(G, sx, sy, budget, sail, caps) {
   const W = G.W, H = G.H, dist = new Map([[sy * W + sx, 0]]), open = [[0, sx, sy]];
   const cost = (nx, ny) => {
     if (caps && caps.block && caps.block(nx, ny)) return 0;   // a closed border
-    const t = G.tiles[ny][nx], c = TCOST[t];
+    const t = G.tiles[ny][nx], c = t === T.ROAD ? roadCost(G, nx, ny) : TCOST[t];
     let v;
     if (sail) v = t === T.WATER ? 100 - 10 * ((caps && caps.nav) || 0) : 0;
     else if (t === T.WATER) v = lakeAt(G, nx, ny) ? 100 : caps && caps.water ? WATERWALK_COST[caps.water] : 0;
@@ -438,13 +438,15 @@ function lakeAt(G, x, y) {
 const FOREST_COST = [0, 200, 150, 100], MOUNT_COST = [0, 300, 250, 200], WATERWALK_COST = [0, 160, 130, 100];
 // sail: the hero travels by boat (water tiles; a land tile only as the final step to disembark)
 // caps: { forest, mount, water } perk ranks letting the hero cross otherwise blocked terrain
+// road quality: dirt track 50, gravel 40, cobblestone 30 (movement cost of the tile; grass is 100)
+const roadCost = (G, x, y) => [50, 50, 40, 30][(G.roadLv && G.roadLv[x + ',' + y]) || 1] || 50;
 function findPath(G, sx, sy, tx, ty, ignoreObjs, sail, caps) {
   const W = G.W, H = G.H, N = W * H, k = (x, y) => y * W + x;
   if (tx < 0 || ty < 0 || tx >= W || ty >= H) return null;
   const target = k(tx, ty);
   const tcost0 = (nx, ny, nk) => {
     if (caps && caps.block && caps.block(nx, ny)) return 0;   // a closed border
-    const t = G.tiles[ny][nx], c = TCOST[t];
+    const t = G.tiles[ny][nx], c = t === T.ROAD ? roadCost(G, nx, ny) : TCOST[t];
     if (sail) return t === T.WATER ? 100 - 10 * ((caps && caps.nav) || 0) : (c && nk === target ? c : 0);
     if (t === T.WATER) {
       if (lakeAt(G, nx, ny)) return 100;

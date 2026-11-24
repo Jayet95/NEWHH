@@ -566,7 +566,7 @@ const Art = (() => {
     if (typeof Assets === 'undefined') return;
     const cxp = (x + .5 + (y & 1) * .5) * 32, cyp = y * HR * 1.5 + HR;
     if (t === T.ROAD) {                                   // road pieces: a half-road from the centre to every connected neighbour plus a hub
-      const st = Assets.get('roads/dirt_straight'); if (!st || !G) return;
+      const rlv = (G && G.roadLv && G.roadLv[x + ',' + y]) || 1, st = Assets.get('roads/' + ['dirt', 'dirt', 'gravel', 'cobble'][rlv] + '_straight') || Assets.get('roads/dirt_straight'); if (!st || !G) return;
       const nb = hexNb(x, y), rw = 15, L = 19, ih = st.height, iw = st.width;
       for (let i = 0; i < 6; i++) { const p = nb[i]; if (p[0] < 0 || p[1] < 0 || p[0] >= G.W || p[1] >= G.H || G.tiles[p[1]][p[0]] !== T.ROAD) continue; c.save(); c.translate(cxp, cyp); c.rotate(i * Math.PI / 3 + Math.PI / 2); c.drawImage(st, 0, 0, iw, ih / 2, -rw / 2, -L, rw, L); c.restore(); }
       c.save(); c.beginPath(); c.arc(cxp, cyp, rw / 2 + .5, 0, 7); c.clip(); c.drawImage(st, 0, ih * .25, iw, ih * .5, cxp - rw / 2, cyp - rw / 2 - 1, rw, rw + 2); c.restore();

@@ -2783,9 +2783,9 @@
   }
 
   // ---------- Food mode: farms, upkeep and the things a hero can build ----------
-  const SITE_NAME = { farm: 'Farm', mine: 'Mine', road: 'Road', tunnel: 'Tunnel' };
-  const BUILD_DAYS = { farm: 3, mine: 3, road: 1, tunnel: 3 };
-  const ROAD_COST = { gold: 200, wood: 3 }, TUNNEL_COST = { gold: 2000, ore: 20, wood: 10 };
+  const SITE_NAME = { farm: 'Farm', mine: 'Mine', road: 'Road', road2: 'Gravel road', road3: 'Cobblestone road', tunnel: 'Tunnel' };
+  const BUILD_DAYS = { farm: 3, mine: 3, road: 1, road2: 1, road3: 2, tunnel: 3 };
+  const ROAD_COST = { gold: 200, wood: 3 }, ROAD2_COST = { gold: 400, wood: 4, ore: 2 }, ROAD3_COST = { gold: 900, wood: 4, ore: 8 }, TUNNEL_COST = { gold: 2000, ore: 20, wood: 10 };
   const mineCost = (k) => (k === 'wood' || k === 'ore' ? { gold: 1000, wood: 5 } : k === 'gold' ? { gold: 1500, wood: 5, ore: 5 } : { gold: 2500, wood: 5, ore: 5 });
   function foodIncome() {
     let f = 0;
@@ -2805,6 +2805,7 @@
     if (o.build === 'farm') { G.objs.push({ t: 'farm', owner: ow, built: true, x: o.x, y: o.y, guard: [] }); msg = `The farm is finished: +${FOOD.field} 🌾/day.`; }
     else if (o.build === 'mine') { G.objs.push({ t: 'mine', kind: o.kind, owner: ow, built: true, x: o.x, y: o.y, guard: [] }); msg = `The ${o.kind} mine is open.`; }
     else if (o.build === 'road') { if (G.tiles[o.y][o.x] === T.GRASS || G.tiles[o.y][o.x] === T.SAND) { G.tiles[o.y][o.x] = T.ROAD; tilesChanged = true; } msg = 'The road is finished.'; }
+    else if (o.build === 'road2' || o.build === 'road3') { (G.roadLv = G.roadLv || {})[o.x + ',' + o.y] = o.build === 'road2' ? 2 : 3; tilesChanged = true; msg = o.build === 'road2' ? 'The road is gravelled: travel costs less.' : 'The road is paved in cobblestone: the fastest way to travel.'; }
     else if (o.build === 'tunnel') { G.tiles[o.y][o.x] = T.ROAD; (G.tunnels = G.tunnels || []).push({ x: o.x, y: o.y }); tilesChanged = true; msg = 'The tunnel is dug through the mountain!'; }
     reindex(G); if (tilesChanged) buildTerrain(); renderAll();
     if (ow === 0) { toast('🔨 ' + msg); note('🔨 ' + msg, o.x, o.y); mis('build', 1); }
@@ -2823,6 +2824,11 @@
     else if (!o && (tile === T.GRASS || tile === T.SAND)) {
       if (G.food) opts.push({ id: 'farm', icon: '🌾', name: 'Farm', desc: `Grows +${FOOD.field} 🌾/day wherever you build it (${farms}/${FOOD.maxField}).`, cost: FOOD.fieldCost, days: BUILD_DAYS.farm, tx: x, ty: y, block: farms >= FOOD.maxField ? 'Farm limit reached' : '' });
       opts.push({ id: 'road', icon: '🛤️', name: 'Road', desc: 'Makes this tile cheap to cross.', cost: ROAD_COST, days: BUILD_DAYS.road, tx: x, ty: y });
+    }
+    if (!o && tile === T.ROAD) {      // upgrade the road underfoot: dirt track -> gravel -> cobblestone
+      const lv = (G.roadLv && G.roadLv[x + ',' + y]) || 1;
+      if (lv === 1) opts.push({ id: 'road2', icon: '🪨', name: 'Gravel road', desc: 'Packed gravel: this tile costs 40 movement instead of 50.', cost: ROAD2_COST, days: BUILD_DAYS.road2, tx: x, ty: y });
+      else if (lv === 2) opts.push({ id: 'road3', icon: '🧱', name: 'Cobblestone road', desc: 'Paved cobblestones: this tile costs only 30 movement.', cost: ROAD3_COST, days: BUILD_DAYS.road3, tx: x, ty: y });
     }
     const tunnels = (G.tunnels || []).length + G.objs.filter(f => f.t === 'site' && f.build === 'tunnel').length;
     hexNb(x, y).forEach(([nx, ny], i) => {
@@ -3552,5 +3558,5 @@
   if (!/[?&]demo/.test(location.search) && Settings.resume && localStorage.getItem(SAVE)) Assets.ready.then(() => { if (!G && load()) $('title').classList.add('hide'); });
   if (/[?&]demo/.test(location.search)) Assets.ready.then(() => setTimeout(() => { try { newGame('castle', 'Orrin', 'normal', { size: 'medium', seed: 'demo', wrap: true, food: /[?&]food/.test(location.search) }); $('title').classList.add('hide'); demo(); } catch (e) { console.error('demo failed', e); } }, 400));
   window.__G = () => G;
-  window.__dbg = { endTurn, borderBlock, canCross, terrOwner, openDiplomacy, aiDiplomacy, declareWar, atWar, realmPower, demo, openBuildMenu, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, mis, openMissions, misEnsure, getG: () => G, loseTerrain: () => { terrain.width = terrain.width; draw(); }, terrainLost, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
+  window.__dbg = { endTurn, borderBlock, canCross, terrOwner, openDiplomacy, aiDiplomacy, declareWar, atWar, realmPower, demo, openBuildMenu, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, mis, openMissions, misEnsure, getG: () => G, loseTerrain: () => { terrain.width = terrain.width; draw(); }, rebuild: () => { buildTerrain(); renderAll(); }, terrainLost, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
 })();

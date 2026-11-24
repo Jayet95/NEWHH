@@ -134,14 +134,15 @@ const Battle = (() => {
     s.n = Math.ceil(total / c.hp); s.hp = total - (s.n - 1) * c.hp;
     return total - before;
   }
+  const stP = (st) => { const a = hexPx(st.c, st.rows[0]), b = hexPx(st.c, st.rows[st.rows.length - 1]); return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; };
   function hitStruct(st, dmg, label) {
     st.hp -= dmg;
-    const p = hexPx(st.c, st.r);
+    const p = stP(st);
     B.fx.push({ x: p.x, y: p.y - 20, txt: '-' + dmg, col: '#ffd24a', t0: performance.now(), kind: 'struct' });
     st.flash = performance.now(); sfx(st.hp <= 0 ? 'crash' : 'hit');
     fxStruct(st, dmg);
     log(`${label} the ${STRUCT[st.k].n}: ${dmg} dmg (${Math.max(0, st.hp)}/${st.max}).`);
-    if (st.hp <= 0) { B.walls.delete(key(st.c, st.r)); log(`💥 The ${STRUCT[st.k].n} is destroyed!`); fxCollapse(st); }
+    if (st.hp <= 0) { for (const rr of st.rows) B.walls.delete(key(st.c, rr)); log(`💥 The ${STRUCT[st.k].n} is destroyed!`); fxCollapse(st); }
   }
   // kind: 'melee' (default), 'ranged', 'spell', 'strike' (hero strike), 'breath', 'mine' - only changes how the hit looks
   function hit(target, dmg, label, kind) {
@@ -251,13 +252,13 @@ const Battle = (() => {
     if (dn > 0) later(dn, run); else run();
   }
   function fxStruct(st, dmg) {
-    const p = hexPx(st.c, st.r);
+    const p = stP(st);
     burst(p.x, p.y, 8, { kind: 'spark', col: ['#ffe9b0', '#d8c8a0'], v0: 70, v1: 200, l0: 200, l1: 420, s0: 1.2, s1: 2.2, drag: 3 });
     burst(p.x, p.y + 6, 5, { kind: 'smoke', col: PAL.dust, v0: 8, v1: 40, up: 14, l0: 500, l1: 900, s0: 5, s1: 9, grow: 1.1 });
     if (dmg > st.max * 0.12) shake(2.2, 220);
   }
   function fxCollapse(st) {
-    const p = hexPx(st.c, st.r);
+    const p = stP(st);
     burst(p.x, p.y + 4, 16, { kind: 'smoke', col: PAL.dust, v0: 14, v1: 90, up: 22, l0: 700, l1: 1300, s0: 7, s1: 14, grow: 1.5 });
     burst(p.x, p.y, 14, { kind: 'shard', col: PAL.rock, v0: 60, v1: 220, up: 90, g: 380, l0: 500, l1: 900, s0: 2, s1: 4, drag: 0.6 });
     ring(p.x, p.y + 10, 66, '#d8c8a0', { dur: 520 });
@@ -630,9 +631,9 @@ const Battle = (() => {
     B.siege = { dside, fort: sg.fort || 0, minel: sg.minel || 0, fac: sg.fac };
     B.towerMul = fl.tower;
     const cw = dside === 1 ? 9 : 5, mc = dside === 1 ? 8 : 6;
-    ['wall', 'wall', 'tower', 'wall', 'wall', 'gate', 'wall', 'wall', 'tower', 'wall', 'wall'].forEach((k, r) => {
-      const hp = Math.round(STRUCT[k].hp * fl.hp);
-      B.walls.set(key(cw, r), { k, hp, max: hp, c: cw, r });
+    SIEGE_SECTIONS.forEach(([k, rows]) => {      // one structure may cover several hexes (a wall section): they share one health bar and fall together
+      const hp = Math.round(STRUCT[k].hp * (k === 'wall' ? rows.length * 0.85 : 1) * fl.hp), st = { k, hp, max: hp, c: cw, r: rows[0], rows };
+      for (const r of rows) B.walls.set(key(cw, r), st);
     });
     for (let r = 0; r < BH; r++) if (r < 4 || r > 6) B.moat.add(key(mc, r));
     B.cw = cw;
@@ -739,12 +740,12 @@ const Battle = (() => {
   async function siegeRound() {
     const bb = B;
     for (let i = 0; i < 2; i++) {
-      const sts = [...B.walls.values()]; if (!sts.length) break;
+      const sts = [...new Set(B.walls.values())]; if (!sts.length) break;
       const gate = sts.find(w => w.k === 'gate'), st = gate && Math.random() < 0.5 ? gate : sts[Math.floor(Math.random() * sts.length)];
       await catapultShot(st, Math.floor(60 * (B.siege.dside === 1 ? 1 + 0.5 * perk('ballistics') : 1))); if (B !== bb || B.over) return;
     }
     if (B.round > 1) {
-      for (const st of [...B.walls.values()]) if (st.k === 'tower') {
+      for (const st of [...new Set(B.walls.values())]) if (st.k === 'tower') {
         const atk = alive(1 - B.siege.dside).filter(a => !a.dead); if (!atk.length) break;
         await towerVolley(st, atk[Math.floor(Math.random() * atk.length)]); if (B !== bb || B.over) return;
       }
@@ -843,10 +844,10 @@ const Battle = (() => {
     if (best) { await doMelee(s, best.e, best.spot); return; }
     if (B.siege) {
       if (!isAttacker(s)) return;
-      const sts = [...B.walls.values()];
+      const sts = [...new Set(B.walls.values())];
       if (sts.length) {
         if (C[s.t].shoot && s.ammo > 0) { await doStructShoot(s, sts.find(w => w.k === 'gate') || sts[Math.floor(Math.random() * sts.length)]); return; }
-        const opts = sts.map(st => ({ st, spot: spotNear(s, st.c, st.r, B.reach) })).filter(o => o.spot);
+        const opts = sts.map(st => ({ st, spot: st.rows.map(rr => spotNear(s, st.c, rr, B.reach)).filter(Boolean).sort((a, b) => a.d - b.d)[0] })).filter(o => o.spot);
         if (opts.length) { const o = opts.find(x => x.st.k === 'gate') || opts[0]; await doStructMelee(s, o.st, o.spot); return; }
         const gt = sts.find(w => w.k === 'gate');
         if (gt) {
@@ -1112,7 +1113,8 @@ const Battle = (() => {
   function emoji(t, x, y, size) { ctx.font = size + 'px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t, x, y); }
 
   // ---- battlefield pictures from the art pack: textured ground (grass, dirt inside castle walls, water in the moat), walls, gate, towers, mines ----
-  const SIEGE_LAYOUT = ['wall', 'wall', 'tower', 'wall', 'wall', 'gate', 'wall', 'wall', 'tower', 'wall', 'wall'];
+  const SIEGE_LAYOUT = ['tower', 'wall', 'wall', 'wall', 'wall', 'gate', 'wall', 'wall', 'wall', 'wall', 'tower'];
+  const SIEGE_SECTIONS = [['tower', [0]], ['wall', [1, 2]], ['wall', [3, 4]], ['gate', [5]], ['wall', [6, 7]], ['wall', [8, 9]], ['tower', [10]]];
   const texCache = {};
   function flatTex(name, crop) {
     const k = name + crop.join(','); if (texCache[k] !== undefined) return texCache[k];
@@ -1548,11 +1550,20 @@ const Battle = (() => {
       const im = machImg('mine_detonate' + (i + 1) + '_all'); if (!im) return false; const k = 0.5; ctx.drawImage(im, m.x - 128 * k, m.y + 8 - 150 * k, 256 * k, 256 * k); return true;
     });
   }
-  function structSprite(st, p) {
+  function structSprite(st, p, r) {
     if (typeof Assets === 'undefined') return false;
-    { const fr = st.hp / st.max, im = st.k === 'tower' ? siegeImg('tower_round', fr > 0.5 ? 'intact' : 'damaged') : st.k === 'gate' ? siegeImg('gate_closed', fr > 0.5 ? 'intact' : 'damaged')
-        : siegeImg(st.r === 0 ? 'wall_corner_top' : st.r === 10 ? 'wall_corner_bottom' : 'wall_straight', fr > 0.6 ? 'intact' : 'damaged');
-      if (im) { siegeTile(im, p, 0, 0, true); return true; } }
+    {      // the piece breaks up as its health falls: whole above 70%, cracking to 40%, crumbling to 10%, then rubble; the pictures dissolve into each other, with smoke and later flames once it is badly hurt
+      const fr = Math.max(0, st.hp / st.max), part = st.k === 'tower' ? 'tower_round' : st.k === 'gate' ? 'gate_closed' : 'wall_straight';
+      const A = siegeImg(part, 'intact'), Bd = siegeImg(part, 'damaged') || A, Cd = siegeImg(part, 'destroyed') || Bd;
+      if (A) {
+        if (fr >= 0.7) siegeTile(A, p, 0, 0, true);
+        else if (fr >= 0.4) { siegeTile(A, p, 0, 0, true); ctx.save(); ctx.globalAlpha = (0.7 - fr) / 0.3; siegeTile(Bd, p, 0, 0, true); ctx.restore(); }
+        else if (fr >= 0.1) { siegeTile(Bd, p, 0, 0, true); ctx.save(); ctx.globalAlpha = (0.4 - fr) / 0.3; siegeTile(Cd, p, 0, 0, true); ctx.restore(); }
+        else siegeTile(Cd, p, 0, 0, true);
+        if (fr < 0.5 && !reduced()) { const ax = hexPx(B.cw, 0).x + HW / 4, top = st.k === 'tower' ? 34 : 14; if (Math.random() < (fr < 0.25 ? 0.22 : 0.1)) emit({ x: ax + R(-8, 8), y: p.y - top + R(-4, 4), vx: R(-6, 6), vy: R(-30, -14), life: R(600, 1100) / spd(), size: R(3, 5), col: fr < 0.25 ? '#ff9a3a' : '#5a5650', kind: fr < 0.25 ? 'ember' : 'smoke', add: fr < 0.25, grow: 1.4, drag: 1.2 }); }
+        return true;
+      }
+    }
     const frac = st.hp / st.max;
     const img = st.k === 'wall' ? Assets.get(frac > 0.6 ? 'battle/wall_intact' : 'battle/wall_damaged') : st.k === 'gate' ? Assets.get('battle/gate_closed') : Assets.get(frac > 0.5 ? 'battle/tower' : 'battle/tower_damaged');
     if (!img) return false;
@@ -1595,18 +1606,18 @@ const Battle = (() => {
         ctx.restore();
       }
       if (B.siege && B.mines && B.mines.has(k) && B.siege.dside === 0) { const mn = machImg('mine_dormant_all'); if (mn) { const t = trimOf(mn), w = HW * 0.78, h = t.h * w / t.w; ctx.drawImage(mn, t.x, t.y, t.w, t.h, p.x - w / 2, p.y + 14 - h, w, h); } else { const mi = typeof Assets !== 'undefined' ? Assets.get('battle/mine_dormant') : null; if (mi) sprite(mi, p.x, p.y + 6, 34); else { ctx.fillStyle = '#fff'; emoji('💣', p.x, p.y + 2, 18); } } }
-      if (B.siege && c === B.cw && !structAt(c, r) && typeof Assets !== 'undefined') { const kk = SIEGE_LAYOUT[r], ni = siegeImg(kk === 'tower' ? 'tower_round' : kk === 'gate' ? 'gate_closed' : r === 0 ? 'wall_corner_top' : r === 10 ? 'wall_corner_bottom' : 'wall_straight', 'destroyed'); if (ni) siegeTile(ni, p, 0, 0, true); else { const di = Assets.get(kk === 'gate' ? 'battle/gate_open' : kk === 'tower' ? 'battle/tower_damaged' : 'battle/wall_breached'); if (di) sprite(di, p.x, p.y, kk === 'tower' ? 52 : 70); } }
+      if (B.siege && c === B.cw && !structAt(c, r) && typeof Assets !== 'undefined') { const kk = SIEGE_LAYOUT[r], ni = siegeImg(kk === 'tower' ? 'tower_round' : kk === 'gate' ? 'gate_closed' : 'wall_straight', 'destroyed'); if (ni) siegeTile(ni, p, 0, 0, true); else { const di = Assets.get(kk === 'gate' ? 'battle/gate_open' : kk === 'tower' ? 'battle/tower_damaged' : 'battle/wall_breached'); if (di) sprite(di, p.x, p.y, kk === 'tower' ? 52 : 70); } }
       if (B.spell === '__mine' && freeMineHex(c, r)) { hexPath(p.x, p.y, HR - 4); ctx.strokeStyle = 'rgba(255,200,80,.8)'; ctx.lineWidth = 2; ctx.stroke(); }
       const st = structAt(c, r);
       if (st) {
-        if (!structSprite(st, p)) {
+        if (!structSprite(st, p, r)) {
         hexPath(p.x, p.y, HR - 1);
         ctx.fillStyle = now - (st.flash || 0) < 220 ? '#ffcf7a' : '#8b8478'; ctx.fill();
         ctx.strokeStyle = '#2a2520'; ctx.lineWidth = 2; ctx.stroke();
         ctx.fillStyle = '#fff'; emoji(STRUCT[st.k].i, p.x, p.y - 2, st.k === 'wall' ? 24 : 28);
         } else { if (now - (st.flash || 0) < 220) { hexPath(p.x, p.y, HR - 1); ctx.fillStyle = 'rgba(255,210,120,.45)'; ctx.fill(); } siegeDeco(st, p, now); }
-        { const bx = hexPx(B.cw, 0).x + HW / 4 - 16; ctx.fillStyle = '#300'; ctx.fillRect(bx, p.y + 15, 32, 5);
-        ctx.fillStyle = st.hp / st.max > 0.5 ? '#5c5' : st.hp / st.max > 0.25 ? '#ec4' : '#e55'; ctx.fillRect(bx, p.y + 15, 32 * Math.max(0, st.hp) / st.max, 5); }
+        if (r === st.rows[0]) { const bx = hexPx(B.cw, 0).x + HW / 4 - 16, by = stP(st).y + 15; ctx.fillStyle = '#300'; ctx.fillRect(bx, by, 32, 5);
+        ctx.fillStyle = st.hp / st.max > 0.5 ? '#5c5' : st.hp / st.max > 0.25 ? '#ec4' : '#e55'; ctx.fillRect(bx, by, 32 * Math.max(0, st.hp) / st.max, 5); }
       }
     }
     if (B.siege) drawCatapult(now);
@@ -2105,5 +2116,5 @@ const Battle = (() => {
     const nx = !still && n > 1 ? Assets.get(seq[(((i + 1) % n) + n) % n]) : null;
     return { img, next: nx && nx.width === img.width && nx.height === img.height ? nx : null, k: f * f * (3 - 2 * f), br: still ? 0 : Math.sin(now / (520 + 260 * h2) + h1 * 6.28), cx: fit.cx, by: fit.by, bw: fit.bw, bh: fit.bh };
   }
-  return { run, mapIdle };
+  return { run, mapIdle, getB: () => B };
 })();

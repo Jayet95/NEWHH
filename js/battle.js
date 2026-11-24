@@ -2087,8 +2087,11 @@ const Battle = (() => {
     const seq = seqOf(t, 'idle'); if (!seq || typeof Assets === 'undefined') return null;
     if (!mapNeed[t]) { mapNeed[t] = 1; Assets.need(seq); }
     const fit = animFit(t); if (!fit) return null;
-    const img = Assets.get(seq[still ? 0 : (Math.floor(now / ANIM_MS.idle + seed)) % seq.length]); if (!img) return null;
-    return { img, cx: fit.cx, by: fit.by, bw: fit.bw, bh: fit.bh };
+    // every creature keeps its own pace and starting point, and its frames dissolve into each other, so a crowd on the map never moves in step
+    const n = seq.length, h1 = rnd(seed, 1.3), h2 = rnd(seed, 7.7), raw = still ? 0 : now / (idleMs(t) * (0.8 + 0.45 * h2)) + h1 * n * 7, i = Math.floor(raw), f = raw - i;
+    const img = Assets.get(seq[((i % n) + n) % n]); if (!img) return null;
+    const nx = !still && n > 1 ? Assets.get(seq[(((i + 1) % n) + n) % n]) : null;
+    return { img, next: nx && nx.width === img.width && nx.height === img.height ? nx : null, k: f * f * (3 - 2 * f), br: still ? 0 : Math.sin(now / (520 + 260 * h2) + h1 * 6.28), cx: fit.cx, by: fit.by, bw: fit.bw, bh: fit.bh };
   }
   return { run, mapIdle };
 })();

@@ -2397,3 +2397,13 @@ body #modal #mbox[data-scr] .mb { background: none; justify-content: center; pos
 body #modal[data-scr=defeat] #mbox h2, body #modal[data-scr=retreat] #mbox h2 { font-size: 1.5em; }
 body #modal[data-scr=defeat] #mbox, body #modal[data-scr=retreat] #mbox { min-width: min(420px, 90vw); font-size: 15px; }
 body #modal[data-scr=defeat] #mbox h2 { font-size: 2em; letter-spacing: .14em; }
+/* centred and larger */
+body #modal[data-scr] { align-items: center !important; justify-content: center !important; }
+body #modal[data-scr] #mbox { margin: 0 auto !important; min-width: min(460px, 90vw) !important; max-width: min(560px, 94vw) !important; font-size: 17px !important; padding: 14px 20px !important; }
+body #modal[data-scr] #mbox h2 { font-size: 1.9em !important; }
+body #modal[data-scr] #mbox p { font-size: 1em; line-height: 1.4; margin: 6px 0; }
+body #modal[data-scr] #mbox .mb button { font-size: 1em; padding: 8px 22px; }
+body #modal[data-scr=defeat]::after, body #modal[data-scr=retreat]::after { background-position: left 0 bottom 6%, center; background-size: min(36%, 340px) auto, 100% 100%; }
+@media (max-height: 520px) { body #modal[data-scr] #mbox { font-size: 14px !important; min-width: min(400px, 88vw) !important; } }
+body #modal[data-scr] #mbox { min-width: clamp(300px, 44vw, 720px) !important; max-width: min(760px, 94vw) !important; font-size: clamp(15px, 1.7vw, 26px) !important; padding: 1.2em 1.4em !important; }
+body #modal[data-scr=defeat]::after, body #modal[data-scr=retreat]::after { background-position: left 0 bottom 4%, center; background-size: min(40%, 560px) auto, 100% 100%; }

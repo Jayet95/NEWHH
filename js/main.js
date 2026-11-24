@@ -24,7 +24,7 @@
   window.showModal = (html, buttons = ['OK']) => new Promise(res => {
     $('mbox').innerHTML = html + '<div class="mb"></div>';
     // plain notices, defeat and retreat get the painted parchment-in-wood screens (art/ui/screens); busy panels (towns, setup, victory) keep their own layout
-    { const h = String(html), kind = /vic lose|💀 Defeat/.test(h) ? 'defeat' : /🏳️ Retreat/.test(h) ? 'retreat' : (h.length < 900 && !/class=|<table|<canvas|<img|<select|<input/.test(h) && /^s*<h2>/.test(h)) ? 'msg' : '';
+    { const h = String(html), kind = /💀 Defeat/.test(h) && !/class="vic/.test(h) ? 'defeat' : /🏳️ Retreat/.test(h) ? 'retreat' : (h.length < 900 && !/class=|<table|<canvas|<img|<select|<input/.test(h) && /^s*<h2>/.test(h)) ? 'msg' : '';
       if (kind) { $('mbox').dataset.scr = kind; $('modal').dataset.scr = kind; } else { delete $('mbox').dataset.scr; delete $('modal').dataset.scr; } }
     buttons.forEach((b, i) => {
       const el = document.createElement('button'); el.innerHTML = b; if (i === 0) el.className = 'primary';
@@ -2985,7 +2985,8 @@
     if (!myTowns().length) {
       G.noTown++;
       if (G.noTown >= 7) { busy = false; await endGame(false, 'You held no town for a whole week — the realm is lost.'); return; }
-      toast(`⚠ You own no towns! ${7 - G.noTown} days left to retake one.`);
+      if (G.noTown === 1) await showModal('<h2>⚠ No towns left!</h2><p>Your realm holds no town. <b>Retake or capture one within ' + (7 - G.noTown) + ' days</b> or the game is lost. Your hero and army are still free to fight.</p>');
+      else toast(`⚠ You own no towns! ${7 - G.noTown} days left to retake one.`);
     }
     if (checkVictory()) { busy = false; return; }
     banner(newWeek ? `Week ${Math.floor((G.day - 1) % 28 / 7) + 1} begins` : `Day ${(G.day - 1) % 7 + 1}`, parts.join(' '));

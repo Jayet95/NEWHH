@@ -627,7 +627,7 @@ const Battle = (() => {
   }
   function setupSiege(sg) {
     const dside = sg.dside, fl = FORT_LEVELS[Math.max(0, Math.min(3, sg.fort || 0))];
-    B.siege = { dside, fort: sg.fort || 0, minel: sg.minel || 0 };
+    B.siege = { dside, fort: sg.fort || 0, minel: sg.minel || 0, fac: sg.fac };
     B.towerMul = fl.tower;
     const cw = dside === 1 ? 9 : 5, mc = dside === 1 ? 8 : 6;
     ['wall', 'wall', 'tower', 'wall', 'wall', 'gate', 'wall', 'wall', 'tower', 'wall', 'wall'].forEach((k, r) => {
@@ -753,7 +753,7 @@ const Battle = (() => {
   // what fortifications look like: pennants on every tower, torches from a Citadel up, braziers on the walls from a Castle up, golden trim on a Fortress
   function siegeDeco(st, p, now) {
     const lvl = Math.min(3, (B.siege && B.siege.fort) || 0), dcol = B.siege.dside === 0 ? '#3a6fc4' : '#c4473f', fl = Math.sin(now / 230 + st.r * 1.3), fl2 = Math.sin(now / 90 + st.r * 2.1);
-    if (siegeImg('tower', 'intact')) { if (st.k === 'tower' && st.shotAt && now - st.shotAt < 220) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(255,230,160,' + (0.8 * (1 - (now - st.shotAt) / 220)).toFixed(2) + ')'; ctx.beginPath(); ctx.arc(p.x + (B.siege.dside === 1 ? -14 : 14), p.y - 40, 9, 0, 7); ctx.fill(); ctx.restore(); } return; }
+    if (siegeImg('tower_round', 'intact')) { if (st.k === 'tower' && st.shotAt && now - st.shotAt < 220) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(255,230,160,' + (0.8 * (1 - (now - st.shotAt) / 220)).toFixed(2) + ')'; ctx.beginPath(); ctx.arc(p.x + (B.siege.dside === 1 ? -14 : 14), p.y - 40, 9, 0, 7); ctx.fill(); ctx.restore(); } return; }
     ctx.save();
     if (st.k === 'tower') {
       const fx = p.x + 3, fy = p.y - 36;
@@ -1510,8 +1510,12 @@ const Battle = (() => {
     ctx.save(); ctx.translate(p.x, p.y + 19); if (sw) ctx.transform(1, 0, sw, 1, 0, 0); ctx.drawImage(im, t.x, t.y, t.w, t.h, -w / 2, -h, w, h); ctx.restore();
   }
   const FORT_NAME = ['palisade', 'citadel', 'castle', 'fortress'];
-  const siegeImg = (part, state, lvlOpt) => typeof Assets === 'undefined' || !B.siege ? null : Assets.get('battle/siege/siege_' + part + '_' + state + '_' + FORT_NAME[Math.max(0, Math.min(3, lvlOpt === undefined ? (B.siege.fort || 0) : lvlOpt))] + (B.siege.dside === 0 ? '_mirror' : ''));
-  const siegeTile = (img, p) => ctx.drawImage(img, p.x - 40, p.y - 80.7, 80, 120);      // tiles are 240x360 with the hex centred at (120,242) and a hex radius of 90 (our 30 is a third)
+  // castle and fortress walls are painted per faction; palisade and citadel are generic. Pictures face a castle on the right; a castle on the left is the same picture flipped.
+  const FAC_ART = { castle: 'kingdom', rampart: 'forest', tower: 'wizards', inferno: 'hell', necropolis: 'undead', dungeon: 'caves', stronghold: 'wild_clans', fortress: 'swamp', conflux: 'spirits' };
+  const siegeKey = (part, state, lvlOpt) => { const lv = Math.max(0, Math.min(3, lvlOpt === undefined ? (B.siege.fort || 0) : lvlOpt)); return 'battle/siege/siege_' + part + (state ? '_' + state : '') + '_' + FORT_NAME[lv] + (lv >= 2 ? '_' + (FAC_ART[B.siege.fac] || 'kingdom') : ''); };
+  const siegeImg = (part, state, lvlOpt) => typeof Assets === 'undefined' || !B.siege ? null : Assets.get(siegeKey(part, state, lvlOpt));
+  function siegeTile(img, p, w, h) { w = w || 80; h = h || 120; if (B.siege && B.siege.dside === 0) { ctx.save(); ctx.translate(p.x, p.y - 80.7); ctx.scale(-1, 1); ctx.drawImage(img, -w / 2, 0, w, h); ctx.restore(); } else ctx.drawImage(img, p.x - w / 2, p.y - 80.7, w, h); }
+  // tiles are 240x360 with the hex centred at (120,242) and a hex radius of 90 (our 30 is a third)
   const machImg = (n) => typeof Assets === 'undefined' ? null : Assets.get('battle/mach/machine_' + n);
   // draws a machine picture at a fixed scale taken from its resting picture, so animation frames never jump
   function machDraw(img, ref, x, y, maxW, flip) {
@@ -1545,8 +1549,8 @@ const Battle = (() => {
   }
   function structSprite(st, p) {
     if (typeof Assets === 'undefined') return false;
-    { const fr = st.hp / st.max, im = st.k === 'tower' ? siegeImg('tower', fr > 0.5 ? 'intact' : 'damaged') : st.k === 'gate' ? siegeImg('gate', 'closed')
-        : (st.r === 0 || st.r === 10) && fr > 0.6 ? siegeImg(st.r === 0 ? 'corner' : 'endcap', 'intact') : siegeImg('wall', fr > 0.6 ? 'intact' : 'damaged');
+    { const fr = st.hp / st.max, im = st.k === 'tower' ? siegeImg('tower_round', fr > 0.5 ? 'intact' : 'damaged') : st.k === 'gate' ? siegeImg('gate_closed', fr > 0.5 ? 'intact' : 'damaged')
+        : siegeImg(st.r === 0 ? 'wall_corner_top' : st.r === 10 ? 'wall_corner_bottom' : 'wall_straight', fr > 0.6 ? 'intact' : 'damaged');
       if (im) { siegeTile(im, p); return true; } }
     const frac = st.hp / st.max;
     const img = st.k === 'wall' ? Assets.get(frac > 0.6 ? 'battle/wall_intact' : 'battle/wall_damaged') : st.k === 'gate' ? Assets.get('battle/gate_closed') : Assets.get(frac > 0.5 ? 'battle/tower' : 'battle/tower_damaged');
@@ -1577,20 +1581,20 @@ const Battle = (() => {
       if (B.siege && (!B._board || B._bg)) {
         const inside = B.siege.dside === 1 ? c > B.cw : c < B.cw;
         if (inside) { ctx.fillStyle = 'rgba(170,130,80,.30)'; ctx.fill(); }
-        if (B.moat.has(k) && !siegeImg('moat_frame1', '', 0)) { ctx.fillStyle = 'rgba(40,120,200,.65)'; ctx.fill(); }
+        if (B.moat.has(k) && !siegeImg('moat_water_frame1', '')) { ctx.fillStyle = 'rgba(40,120,200,.65)'; ctx.fill(); }
       }
       const walk = input && B.reach.has(k) && !B.spell && B.reach.get(k).d > 0;
       if (walk) { ctx.fillStyle = 'rgba(255, 236, 150, .30)'; ctx.fill(); }
       ctx.strokeStyle = walk ? 'rgba(255, 224, 110, .95)' : B._board ? 'rgba(0,0,0,.16)' : 'rgba(0,0,0,.26)'; ctx.lineWidth = walk ? 2 : 1; ctx.stroke();
       if (B.obs.has(k)) { const oe = B.obs.get(k), oa = obsArt(oe, c, r), ob = oa ? null : obstacleSprite(oe, c, r); if (oa) drawObsArt(oa, oe, p, c, r); else if (ob) { const plant = oe === '🌲' || oe === '🌳' || oe === '🌿' || oe === '🌾', sw = plant && !reduced() ? Math.sin(performance.now() / (oe === '🌿' ? 700 : 1100) + c * 1.7 + r * 0.9) * (oe === '🌿' ? 0.03 : 0.018) : 0; if (sw) { ctx.save(); ctx.translate(p.x, p.y + 15 * OBK); ctx.transform(1, 0, sw, 1, 0, 0); ctx.drawImage(ob.cv, -ob.ox * OBK, -ob.oy * OBK - 15 * OBK, ob.w * OBK, ob.h * OBK); ctx.restore(); } else ctx.drawImage(ob.cv, p.x - ob.ox * OBK, p.y - ob.oy * OBK, ob.w * OBK, ob.h * OBK); } else { const oi = typeof Assets !== 'undefined' ? Assets.get(oe === '🌲' ? 'terrain/forest_overlay' : (oe === '🪨' || oe === '⛰️') ? 'terrain/mountain_overlay' : '') : null; if (oi) sprite(oi, p.x, p.y, oe === '🌲' ? 44 : 40); else { ctx.fillStyle = '#fff'; emoji(oe, p.x, p.y, 30); } } }
-      if (B.siege && B.moat.has(k)) { const mf = Assets.get('battle/siege/siege_moat_frame' + (1 + Math.floor(now / 320 + r * 0.5 + c) % 4) + '_' + FORT_NAME[B.siege.fort || 0] + (B.siege.dside === 0 ? '_mirror' : '')); if (mf) { ctx.save(); hexPath(p.x, p.y, HR - 0.5); ctx.clip(); ctx.drawImage(mf, p.x - 40, p.y - 80.7, 80, 120); ctx.restore(); } }
-      if (B.siege && B.moat.has(k) && (!B._board || B._bg) && !siegeImg('moat_frame1', '', 0)) {      // the moat: slow ripples and glints
+      if (B.siege && B.moat.has(k)) { const mf = siegeImg('moat_water_frame' + (1 + Math.floor(now / 320 + r * 0.5 + c) % 4), ''); if (mf) { ctx.save(); hexPath(p.x, p.y, HR - 0.5); ctx.clip(); siegeTile(mf, p); ctx.restore(); } }
+      if (B.siege && B.moat.has(k) && (!B._board || B._bg) && !siegeImg('moat_water_frame1', '')) {      // the moat: slow ripples and glints
         ctx.save(); hexPath(p.x, p.y, HR - 2); ctx.clip(); ctx.lineCap = 'round'; ctx.lineWidth = 1.4;
         for (let q = 0; q < 3; q++) { const ph = now / 1400 + q * 0.33 + (c * 0.37 + r * 0.21), f = ph - Math.floor(ph), yy = p.y - 16 + q * 14 + Math.sin(ph * 6) * 2; ctx.strokeStyle = 'rgba(210,240,255,' + (0.4 * Math.sin(f * Math.PI)).toFixed(2) + ')'; ctx.beginPath(); ctx.moveTo(p.x - 16 + f * 8, yy); ctx.quadraticCurveTo(p.x - 6 + f * 8, yy - 3, p.x + 4 + f * 8, yy); ctx.quadraticCurveTo(p.x + 10 + f * 8, yy + 2, p.x + 16, yy); ctx.stroke(); }
         ctx.restore();
       }
       if (B.siege && B.mines && B.mines.has(k) && B.siege.dside === 0) { const mn = machImg('mine_dormant_all'); if (mn) { const t = trimOf(mn), w = HW * 0.78, h = t.h * w / t.w; ctx.drawImage(mn, t.x, t.y, t.w, t.h, p.x - w / 2, p.y + 14 - h, w, h); } else { const mi = typeof Assets !== 'undefined' ? Assets.get('battle/mine_dormant') : null; if (mi) sprite(mi, p.x, p.y + 6, 34); else { ctx.fillStyle = '#fff'; emoji('💣', p.x, p.y + 2, 18); } } }
-      if (B.siege && c === B.cw && !structAt(c, r) && typeof Assets !== 'undefined') { const kk = SIEGE_LAYOUT[r], ni = siegeImg(kk, kk === 'wall' ? 'breached' : 'destroyed'); if (ni) siegeTile(ni, p); else { const di = Assets.get(kk === 'gate' ? 'battle/gate_open' : kk === 'tower' ? 'battle/tower_damaged' : 'battle/wall_breached'); if (di) sprite(di, p.x, p.y, kk === 'tower' ? 52 : 70); } }
+      if (B.siege && c === B.cw && !structAt(c, r) && typeof Assets !== 'undefined') { const kk = SIEGE_LAYOUT[r], ni = siegeImg(kk === 'tower' ? 'tower_round' : kk === 'gate' ? 'gate_closed' : r === 0 ? 'wall_corner_top' : r === 10 ? 'wall_corner_bottom' : 'wall_straight', 'destroyed'); if (ni) siegeTile(ni, p); else { const di = Assets.get(kk === 'gate' ? 'battle/gate_open' : kk === 'tower' ? 'battle/tower_damaged' : 'battle/wall_breached'); if (di) sprite(di, p.x, p.y, kk === 'tower' ? 52 : 70); } }
       if (B.spell === '__mine' && freeMineHex(c, r)) { hexPath(p.x, p.y, HR - 4); ctx.strokeStyle = 'rgba(255,200,80,.8)'; ctx.lineWidth = 2; ctx.stroke(); }
       const st = structAt(c, r);
       if (st) {
@@ -2042,7 +2046,7 @@ const Battle = (() => {
     const list = []; ids.forEach(t => { const bb = t.replace(/_\d$/, ''), u = /_\d$/.test(t) ? '_up' : ''; for (const d of ['left', 'right']) for (const st of ['idle', 'fighting', 'defending']) list.push('poses/' + d + '/' + st + '/' + bb + u); ANIM_STATES.forEach(st => { const q = seqOf(t, st); if (q) list.push(...q); }); });
     [opts.hero, opts.eHero].forEach(h => { if (h && h.pid) list.push('mounted/' + h.pid + '_east', 'mounted/' + h.pid + '_west'); });
     list.push(...Assets.list('battle/obs/'), ...Assets.list('battle/mach/').filter(s => /_basic$|_all$/.test(s)));
-    if (opts.siege) { const lv = FORT_NAME[Math.max(0, Math.min(3, opts.siege.fort || 0))]; list.push(...Assets.list('battle/siege/').filter(s => s.includes('_' + lv) && (opts.siege.dside === 0) === /_mirror$/.test(s))); }
+    if (opts.siege) { const L = Math.max(0, Math.min(3, opts.siege.fort || 0)), sfx = FORT_NAME[L] + (L >= 2 ? '_' + (FAC_ART[opts.siege.fac] || 'kingdom') : ''); list.push(...Assets.list('battle/siege/').filter(s => s.endsWith('_' + sfx))); }
     await Promise.race([Assets.need(list), new Promise(r => setTimeout(r, 5000))]);
   }
   async function run(opts) {

@@ -2229,7 +2229,7 @@
     openExchange(`🏯 ${f.name}`, note, f.garrison, 'Garrison', hero.army, hero.name, undefined, extra);
   }
   // siege parameters for a structure: wall strength (fortifications) and mines (minefield); dside = who defends (1 = the opposing side of the player)
-  const siegeOf = (o, dside) => ({ dside, fort: (o && o.fort) || 0, minel: (o && o.minel) || 0, mines: o && o.minel ? MINE_LEVELS[o.minel].stock : 0 });
+  const siegeOf = (o, dside) => ({ dside, fac: (o && o.fac) || G.faction, fort: (o && o.fort) || 0, minel: (o && o.minel) || 0, mines: o && o.minel ? MINE_LEVELS[o.minel].stock : 0 });
   // a rival hero attacks a player-owned fort or town: the garrison defends in a real siege battle, an empty one falls at once
   async function defendStructure(o, ah) {
     const gar = o.garrison;

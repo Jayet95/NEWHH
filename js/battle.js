@@ -1684,7 +1684,7 @@ const Battle = (() => {
         if (s === B.cur && !B.over) { ctx.shadowColor = s.side === 0 ? 'rgba(255,214,90,.95)' : 'rgba(255,120,90,.95)'; ctx.shadowBlur = 16 + (reduced() ? 0 : 5 * Math.sin(now / 260)); }
         const a0 = ctx.globalAlpha, dis = nxImg && !reduced();      // the old picture stays solid for half the fade, then dissolves, so the last of it never lingers and snaps away
         if (dis) {      // the shadow / selection glow is cast once, from a copy drawn off-canvas, so it never fades or pulses while the pictures dissolve
-          if (ctx.shadowBlur > 0) { const Tm = ctx.getTransform(), D = 4000; ctx.shadowOffsetX = -D * Tm.a; if (fit) ctx.drawImage(pose, -fit.cx * kk + D, -fit.by * kk, pw, ph); else ctx.drawImage(pose, -pw / 2 + D, -ph, pw, ph); ctx.shadowOffsetX = 0; }
+          if (ctx.shadowBlur > 0) { const Tm = ctx.getTransform(), D = 4000, soy = ctx.shadowOffsetY; ctx.shadowOffsetX = -D * Tm.a; ctx.shadowOffsetY = soy - D * Tm.b; if (fit) ctx.drawImage(pose, -fit.cx * kk + D, -fit.by * kk, pw, ph); else ctx.drawImage(pose, -pw / 2 + D, -ph, pw, ph); ctx.shadowOffsetX = 0; ctx.shadowOffsetY = soy; }
           ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.globalAlpha = a0 * Math.min(1, 2 * (1 - nxK));
         }
         if (fit) ctx.drawImage(pose, -fit.cx * kk, -fit.by * kk, pw, ph); else ctx.drawImage(pose, -pw / 2, -ph, pw, ph);

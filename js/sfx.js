@@ -91,15 +91,15 @@ const Sfx = (() => {
   // D dorian: the notes of a lute tune
   const D = { d3: 146.8, a3: 220, d4: 293.7, e4: 329.6, f4: 349.2, g4: 392, a4: 440, b4: 493.9, c5: 523.3, d5: 587.3, e5: 659.3, f5: 698.5, g5: 784, a5: 880, d6: 1174.7 };
   const run = (notes, gap, vol, d = 1.1) => notes.forEach((f, i) => pluck(f, vol, i * gap, d));
-  let foot = 0, hp = 0;
+  let foot = 0, hp = 0, hc = 0, hlast = 0;
   const footstep = () => { foot ^= 1; noise(0.07, 0.06, foot ? 220 : 280, 1.1, 'lowpass'); tone(foot ? 120 : 140, 0.06, 'sine', 0.035, -35); };
   // a handful of coins hitting each other: short, dull, uneven clinks (not one clean tone)
   const coins = (n, delay = 0) => { for (let i = 0; i < n; i++) { const t = delay + i * (0.035 + Math.random() * 0.045), f = 1700 + Math.random() * 1700; ring(f, [[1, 1, 1], [1.51, 0.6, 0.6], [2.37, 0.4, 0.4]], 0.016 + Math.random() * 0.012, 0.16 + Math.random() * 0.1, t); noise(0.02, 0.025, 5200, 1.5, 'highpass', t); } };
   const clang = () => { const f = 900 + Math.random() * 500; ring(f, METAL, 0.045, 0.5); noise(0.05, 0.06, 4500, 1.2, 'highpass'); };
   const S = {
     click: () => wood(0.07),
-    // a horse on the march: one soft hoofbeat per step on turf, a dull low thump with a short muffled crunch (no metal), alternating a higher and a lower beat
-    hoof: () => { hp ^= 1; const lo = hp ? 1 : 0.85, f = 125 * lo * (0.95 + Math.random() * 0.1); tone(f, 0.11, 'sine', 0.12, -f * 0.55); noise(0.09, 0.07, 420 * lo, 0.7, 'lowpass'); noise(0.04, 0.035, 1100, 0.9, 'bandpass', 0.005); },
+    // a horse at a gallop: the beats of a march come as da-da-DUM, rest, da-da-DUM - the three-beat canter rhythm; each beat is a dull turf thump (no metal). The pattern restarts when the hero sets off again.
+    hoof: () => { const now = performance.now(); if (now - hlast > 450) hc = 0; hlast = now; const k = hc++ % 4; if (k === 3) return; const f = [105, 140, 120][k] * (0.97 + Math.random() * 0.06), g = [0.85, 0.75, 1.15][k]; tone(f, 0.12, 'sine', 0.12 * g, -f * 0.55); noise(0.09, 0.07 * g, 480, 0.7, 'lowpass'); noise(0.035, 0.03 * g, 1100, 0.9, 'bandpass', 0.004); },
     splash: () => { noise(0.22, 0.07, 700, 0.9, 'bandpass', 0, 900); noise(0.15, 0.04, 2200, 1, 'highpass', 0.05); },
     tick: () => wood(0.03, 330),
     tap: () => wood(0.04, 300),

@@ -99,7 +99,8 @@ const Sfx = (() => {
   const S = {
     click: () => wood(0.07),
     // a horse at a gallop: the beats of a march come as da-da-DUM, rest, da-da-DUM - the three-beat canter rhythm; each beat is a dull turf thump (no metal). The pattern restarts when the hero sets off again.
-    hoof: () => { const now = performance.now(); if (now - hlast > 450) hc = 0; hlast = now; const k = hc++ % 4; if (k === 3) return; const f = [105, 140, 120][k] * (0.97 + Math.random() * 0.06), g = [0.85, 0.75, 1.15][k]; tone(f, 0.12, 'sine', 0.12 * g, -f * 0.55); noise(0.09, 0.07 * g, 480, 0.7, 'lowpass'); noise(0.035, 0.03 * g, 1100, 0.9, 'bandpass', 0.004); },
+    hoof: () => { const now = performance.now(); if (now - hlast > 450) hc = 0; hlast = now; const k = hc++ % 4; const scuff = (d, v) => noise(0.08, v, 1700 + Math.random() * 500, 0.8, 'bandpass', d, -900);   // a hoof dragging through grass and dirt between the beats
+      if (k === 3) { scuff(0.02, 0.03); return; } const f = [105, 140, 120][k] * (0.97 + Math.random() * 0.06), g = [0.85, 0.75, 1.15][k]; tone(f, 0.12, 'sine', 0.12 * g, -f * 0.55); noise(0.09, 0.07 * g, 480, 0.7, 'lowpass'); noise(0.035, 0.03 * g, 1100, 0.9, 'bandpass', 0.004); scuff(0.07, 0.035 * g); },
     splash: () => { noise(0.22, 0.07, 700, 0.9, 'bandpass', 0, 900); noise(0.15, 0.04, 2200, 1, 'highpass', 0.05); },
     tick: () => wood(0.03, 330),
     tap: () => wood(0.04, 300),

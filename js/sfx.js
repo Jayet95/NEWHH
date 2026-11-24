@@ -98,8 +98,8 @@ const Sfx = (() => {
   const clang = () => { const f = 900 + Math.random() * 500; ring(f, METAL, 0.045, 0.5); noise(0.05, 0.06, 4500, 1.2, 'highpass'); };
   const S = {
     click: () => wood(0.07),
-    // a horse on the march: one hoofbeat per step, alternating a higher clip and a lower clop - a hollow knock with a faint iron ring of the shoe
-    hoof: () => { hp ^= 1; const lo = hp ? 1 : 0.84, f = 200 * lo * (0.96 + Math.random() * 0.08); tone(f, 0.08, 'sine', 0.07, -f * 0.5); noise(0.05, 0.06, 850 + hp * 300, 1.3, 'bandpass'); noise(0.012, 0.05, 3600, 2, 'highpass'); ring(2900 * lo, [[1, 1, 1], [1.7, 0.5, 0.6]], 0.012, 0.13, 0.004); },
+    // a horse on the march: one soft hoofbeat per step on turf, a dull low thump with a short muffled crunch (no metal), alternating a higher and a lower beat
+    hoof: () => { hp ^= 1; const lo = hp ? 1 : 0.85, f = 125 * lo * (0.95 + Math.random() * 0.1); tone(f, 0.11, 'sine', 0.12, -f * 0.55); noise(0.09, 0.07, 420 * lo, 0.7, 'lowpass'); noise(0.04, 0.035, 1100, 0.9, 'bandpass', 0.005); },
     splash: () => { noise(0.22, 0.07, 700, 0.9, 'bandpass', 0, 900); noise(0.15, 0.04, 2200, 1, 'highpass', 0.05); },
     tick: () => wood(0.03, 330),
     tap: () => wood(0.04, 300),

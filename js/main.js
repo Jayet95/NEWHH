@@ -3007,7 +3007,7 @@
     G.over = true; if (win) Ach.event('win', { diff: G.diff, size: G.size, day: G.day }); if (win) { if (!(typeof Sfx !== 'undefined' && Sfx.victory && Sfx.victory())) sfx('fanfare'); } else sfx('lose'); if (win && typeof Celebrate !== 'undefined') Celebrate.game();
     try { localStorage.removeItem(SAVE); } catch (e) { /* ignore */ }
     if (win) { await victoryScreen(); $('title').classList.remove('hide'); refreshTitle(); return; }
-    await showModal(win ? `<h2>🏆 Victory!</h2><p>Every rival has lost its towns: you rule the realm on day ${G.day} (${DF().name}). Well fought!</p>` : window.vicBanner('Defeat', why || 'Your hero has fallen.', 'lose'), ['Main menu']);
+    await showModal(win ? `<h2>🏆 Victory!</h2><p>Every rival has lost its towns: you rule the realm on day ${G.day} (${DF().name}). Well fought!</p>` : `<h2>💀 Defeat</h2><p>${why || 'Your hero has fallen.'}</p><p>The realm fell on <b>day ${G.day}</b>.</p>`, ['Main menu']);
     $('title').classList.remove('hide'); refreshTitle();
   }
 

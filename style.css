@@ -2395,3 +2395,5 @@ body #modal #mbox[data-scr] h2 { color: #4a2a0c; text-shadow: 0 1px 0 rgba(255, 
 body #modal #mbox[data-scr] p, body #modal #mbox[data-scr] b { color: #2c1a0a; text-shadow: none; }
 body #modal #mbox[data-scr] .mb { background: none; justify-content: center; position: static; margin-top: 10px; }
 body #modal[data-scr=defeat] #mbox h2, body #modal[data-scr=retreat] #mbox h2 { font-size: 1.5em; }
+body #modal[data-scr=defeat] #mbox, body #modal[data-scr=retreat] #mbox { min-width: min(420px, 90vw); font-size: 15px; }
+body #modal[data-scr=defeat] #mbox h2 { font-size: 2em; letter-spacing: .14em; }

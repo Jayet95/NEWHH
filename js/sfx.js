@@ -91,13 +91,16 @@ const Sfx = (() => {
   // D dorian: the notes of a lute tune
   const D = { d3: 146.8, a3: 220, d4: 293.7, e4: 329.6, f4: 349.2, g4: 392, a4: 440, b4: 493.9, c5: 523.3, d5: 587.3, e5: 659.3, f5: 698.5, g5: 784, a5: 880, d6: 1174.7 };
   const run = (notes, gap, vol, d = 1.1) => notes.forEach((f, i) => pluck(f, vol, i * gap, d));
-  let foot = 0;
+  let foot = 0, hp = 0;
   const footstep = () => { foot ^= 1; noise(0.07, 0.06, foot ? 220 : 280, 1.1, 'lowpass'); tone(foot ? 120 : 140, 0.06, 'sine', 0.035, -35); };
   // a handful of coins hitting each other: short, dull, uneven clinks (not one clean tone)
   const coins = (n, delay = 0) => { for (let i = 0; i < n; i++) { const t = delay + i * (0.035 + Math.random() * 0.045), f = 1700 + Math.random() * 1700; ring(f, [[1, 1, 1], [1.51, 0.6, 0.6], [2.37, 0.4, 0.4]], 0.016 + Math.random() * 0.012, 0.16 + Math.random() * 0.1, t); noise(0.02, 0.025, 5200, 1.5, 'highpass', t); } };
   const clang = () => { const f = 900 + Math.random() * 500; ring(f, METAL, 0.045, 0.5); noise(0.05, 0.06, 4500, 1.2, 'highpass'); };
   const S = {
     click: () => wood(0.07),
+    // a horse on the march: one hoofbeat per step, alternating a higher clip and a lower clop - a hollow knock with a faint iron ring of the shoe
+    hoof: () => { hp ^= 1; const lo = hp ? 1 : 0.84, f = 200 * lo * (0.96 + Math.random() * 0.08); tone(f, 0.08, 'sine', 0.07, -f * 0.5); noise(0.05, 0.06, 850 + hp * 300, 1.3, 'bandpass'); noise(0.012, 0.05, 3600, 2, 'highpass'); ring(2900 * lo, [[1, 1, 1], [1.7, 0.5, 0.6]], 0.012, 0.13, 0.004); },
+    splash: () => { noise(0.22, 0.07, 700, 0.9, 'bandpass', 0, 900); noise(0.15, 0.04, 2200, 1, 'highpass', 0.05); },
     tick: () => wood(0.03, 330),
     tap: () => wood(0.04, 300),
     step: footstep,

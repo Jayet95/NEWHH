@@ -1161,7 +1161,7 @@
         const bt = G.boats.find(b => b.x === s.x && b.y === s.y);
         if (bt) { h.boat = bt.id; Ach.event('sail'); toast(`${h.name} sets sail!`); }
       }
-      h.dir = dirOf(h.x, h.y, s.x, s.y); h.x = s.x; h.y = s.y; (G.flags = G.flags || {}).moved = true; centerOn(h.x, h.y); renderAll(); sfx('step');
+      h.dir = dirOf(h.x, h.y, s.x, s.y); h.x = s.x; h.y = s.y; (G.flags = G.flags || {}).moved = true; centerOn(h.x, h.y); renderAll(); sfx(h.boat != null ? 'splash' : 'hoof');
       await sleep(Math.round(90 + s.cost * 0.6));      // a step takes longer on rough ground and the hero no longer races across the map
       const last = i === path.length - 1, o = objAt(G, s.x, s.y);
       const eh = aiHeroAt(s.x, s.y);

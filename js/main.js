@@ -1178,7 +1178,7 @@
     }
   }
   function collect(o) {
-    sfx('coin');
+    sfx(o.t === 'chest' ? 'chest' : o.t === 'pile' && o.kind !== 'gold' ? 'pickup' : 'coin');
     if (o.t === 'pile') { G.res[o.kind] += o.amt; toast(`Collected ${o.amt} ${RES_ICON[o.kind]} ${o.kind}.`); }
     else { G.res.gold += o.gold; Ach.event('chest'); mis('chests', 1); mis('gold', o.gold); toast(`The chest holds ${o.gold} 🪙 gold!`); }
     G.objs.splice(G.objs.indexOf(o), 1); reindex(G);

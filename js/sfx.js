@@ -93,6 +93,8 @@ const Sfx = (() => {
   const run = (notes, gap, vol, d = 1.1) => notes.forEach((f, i) => pluck(f, vol, i * gap, d));
   let foot = 0;
   const footstep = () => { foot ^= 1; noise(0.07, 0.06, foot ? 220 : 280, 1.1, 'lowpass'); tone(foot ? 120 : 140, 0.06, 'sine', 0.035, -35); };
+  // a handful of coins hitting each other: short, dull, uneven clinks (not one clean tone)
+  const coins = (n, delay = 0) => { for (let i = 0; i < n; i++) { const t = delay + i * (0.035 + Math.random() * 0.045), f = 1700 + Math.random() * 1700; ring(f, [[1, 1, 1], [1.51, 0.6, 0.6], [2.37, 0.4, 0.4]], 0.016 + Math.random() * 0.012, 0.16 + Math.random() * 0.1, t); noise(0.02, 0.025, 5200, 1.5, 'highpass', t); } };
   const clang = () => { const f = 900 + Math.random() * 500; ring(f, METAL, 0.045, 0.5); noise(0.05, 0.06, 4500, 1.2, 'highpass'); };
   const S = {
     click: () => wood(0.07),
@@ -105,7 +107,8 @@ const Sfx = (() => {
     spell: () => { run([D.d5, D.f5, D.a5, D.d6], 0.06, 0.07, 0.9); bell(1568, 0.025, 1.4, 0.1); noise(0.45, 0.025, 2600, 2.5, 'bandpass', 0, 2200); },
     crash: () => { drum(55, 0.14); noise(0.5, 0.09, 700, 0.7, 'lowpass', 0, -500); noise(0.3, 0.05, 2500, 0.8, 'bandpass', 0.05, -1500); },
     death: () => { drum(60, 0.1); tone(130, 0.5, 'sine', 0.05, -70, 0.05); noise(0.5, 0.05, 600, 0.8, 'lowpass', 0.02, -380); pluck(D.d3, 0.08, 0.1, 1.2); },
-    coin: () => { ring(2500, METAL, 0.026, 0.28); ring(3300, METAL, 0.02, 0.25, 0.07); },
+    coin: () => coins(4),
+    pickup: () => { noise(0.14, 0.07, 1600, 1, 'bandpass', 0, -700); wood(0.07, 190, 0.06); pluck(D.a4, 0.05, 0.1, 0.6); },
     build: () => { wood(0.09, 200); wood(0.09, 190, 0.18); ring(1250, METAL, 0.04, 0.55, 0.36); wood(0.08, 210, 0.36); },
     level: () => { run([D.d4, D.f4, D.a4, D.d5, D.f5, D.a5], 0.075, 0.09, 1.2); bell(D.d6, 0.035, 1.8, 0.45); },
     fanfare: () => { horn(D.d4, 0.35, 0.06); horn(D.a4, 0.35, 0.06, 0.38); horn(D.d5, 0.8, 0.07, 0.76); drum(90, 0.1, 0); drum(90, 0.1, 0.38); drum(70, 0.12, 0.76); bell(D.d6, 0.03, 2, 0.8); },
@@ -117,7 +120,7 @@ const Sfx = (() => {
     swing: () => noise(0.18, 0.1, 900, 0.9, 'bandpass', 0, 1700),
     thud: () => { drum(70, 0.09); wood(0.05, 140); },
     clang,
-    chest: () => { wood(0.08, 170); noise(0.12, 0.05, 700, 1, 'bandpass', 0.05); ring(2200, METAL, 0.025, 0.3, 0.18); ring(2900, METAL, 0.02, 0.3, 0.26); run([D.d5, D.a5], 0.09, 0.06, 0.8); },
+    chest: () => { noise(0.28, 0.07, 500, 3, 'bandpass', 0, 700); wood(0.1, 130, 0.26); drum(70, 0.07, 0.27); coins(9, 0.34); run([D.d5, D.a5, D.d6], 0.11, 0.05, 1.1); bell(D.d6, 0.02, 1.6, 0.5); },
     magic: () => { run([D.a4, D.d5, D.e5, D.a5, D.d6], 0.07, 0.07, 1); bell(2349, 0.02, 1.6, 0.2); noise(0.5, 0.02, 3200, 2, 'bandpass', 0, 1500); },
     capture: () => { horn(D.d4, 0.25, 0.055); horn(D.a4, 0.55, 0.06, 0.26); drum(80, 0.1); drum(80, 0.1, 0.26); },
     deny: () => { wood(0.08, 120); tone(95, 0.22, 'sine', 0.05, -30, 0.02); pluck(D.d3, 0.07, 0.1, 0.5); },

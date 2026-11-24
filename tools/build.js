@@ -19,6 +19,7 @@ if (fs.existsSync(path.join(root, 'icons'))) fs.readdirSync(path.join(root, 'ico
 require('./make_manifest')(root);
 if (fs.existsSync(path.join(root, 'audio'))) fs.cpSync(path.join(root, 'audio'), path.join(dist, 'audio'), { recursive: true });
 if (fs.existsSync(path.join(root, 'fonts'))) fs.cpSync(path.join(root, 'fonts'), path.join(dist, 'fonts'), { recursive: true });
+if (fs.existsSync(path.join(root, 'brand'))) fs.cpSync(path.join(root, 'brand'), path.join(dist, 'brand'), { recursive: true });   // studio logo + its short intro video
 if (fs.existsSync(path.join(root, 'themes'))) fs.cpSync(path.join(root, 'themes'), path.join(dist, 'themes'), { recursive: true });
 if (fs.existsSync(path.join(root, 'art'))) fs.cpSync(path.join(root, 'art'), path.join(dist, 'art'), { recursive: true });
 if (fs.existsSync(path.join(root, 'art'))) require('./pack_art')(root, path.join(dist, 'art', 'packs'));   // a few big files instead of thousands of requests

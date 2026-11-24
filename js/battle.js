@@ -1093,8 +1093,110 @@ const Battle = (() => {
   }
   function obsSmooth(g, P) { g.beginPath(); g.moveTo(P[0][0], P[0][1]); for (let i = 1; i < P.length - 1; i++) { const m = [(P[i][0] + P[i + 1][0]) / 2, (P[i][1] + P[i + 1][1]) / 2]; g.quadraticCurveTo(P[i][0], P[i][1], m[0], m[1]); } g.lineTo(P[P.length - 1][0], P[P.length - 1][1]); g.closePath(); }
   function obsShadow(g, x, y, rx, ry) { g.save(); g.translate(x, y); g.scale(1, ry / rx); const rg = g.createRadialGradient(0, 0, 2, 0, 0, rx); rg.addColorStop(0, 'rgba(0,0,0,.5)'); rg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = rg; g.beginPath(); g.arc(0, 0, rx, 0, 7); g.fill(); g.restore(); }
+
+  // ---- new obstacle art: pines, oaks, bushes, faceted boulders, ruined walls, stumps and hay, all painted from the map textures with light from the top left ----
+  const OB_LIT = (g, x0, y0, w, h, lo, hi) => { const lg = g.createLinearGradient(x0, y0, x0 + w, y0 + h * 0.6); lg.addColorStop(0, hi); lg.addColorStop(0.5, 'rgba(0,0,0,0)'); lg.addColorStop(1, lo); g.fillStyle = lg; g.fillRect(x0, y0, w, h); };
+  function obPine(g, x, by, h, seed, fp) {
+    g.fillStyle = '#4a2f18'; g.beginPath(); g.moveTo(x - 3, by); g.lineTo(x - 2, by - 10); g.lineTo(x + 2, by - 10); g.lineTo(x + 3, by); g.closePath(); g.fill();
+    const tiers = 4;
+    for (let i = 0; i < tiers; i++) {
+      const bot = by - 6 - i * h * 0.19, top = bot - h * 0.36 + i * 1.5, w = h * 0.3 * (1 - i * 0.2), sc = 3 + rnd(seed + i, 2.3) * 2;
+      const path = () => { g.beginPath(); g.moveTo(x, top); g.quadraticCurveTo(x + w * 0.7, bot - h * 0.12, x + w, bot); for (let k = 1; k <= 3; k++) g.quadraticCurveTo(x + w - (k - 0.5) * w * 2 / 3, bot + sc, x + w - k * w * 2 / 3, bot - 1); g.quadraticCurveTo(x - w * 0.7, bot - h * 0.12, x, top); g.closePath(); };
+      path(); g.save(); g.clip(); if (fp) { g.fillStyle = fp; g.fillRect(x - w - 2, top, w * 2 + 4, bot - top + 6); } else { g.fillStyle = '#2f6a2a'; g.fillRect(x - w - 2, top, w * 2 + 4, bot - top + 6); }
+      g.fillStyle = 'rgba(70,130,50,.28)'; g.fillRect(x - w - 2, top, w * 2 + 4, bot - top + 6);
+      OB_LIT(g, x - w, top, w * 2, bot - top, 'rgba(0,16,6,.55)', 'rgba(220,255,150,.42)');
+      const sg = g.createLinearGradient(0, bot - 7, 0, bot + 4); sg.addColorStop(0, 'rgba(0,0,0,0)'); sg.addColorStop(1, 'rgba(0,10,4,.5)'); g.fillStyle = sg; g.fillRect(x - w - 2, bot - 7, w * 2 + 4, 12);
+      g.restore(); path(); g.lineWidth = 1.1; g.lineJoin = 'round'; g.strokeStyle = 'rgba(4,24,10,.75)'; g.stroke();
+    }
+  }
+  function obOak(g, x, by, sc, seed, fp) {
+    // trunk with flared roots
+    const tg = g.createLinearGradient(x - 6, 0, x + 6, 0); tg.addColorStop(0, '#8a5a30'); tg.addColorStop(0.5, '#5e3a1c'); tg.addColorStop(1, '#33200f');
+    g.fillStyle = tg; g.beginPath(); g.moveTo(x - 9 * sc, by + 1); g.quadraticCurveTo(x - 3 * sc, by - 4 * sc, x - 3.2 * sc, by - 16 * sc); g.lineTo(x + 3.2 * sc, by - 16 * sc); g.quadraticCurveTo(x + 3 * sc, by - 4 * sc, x + 9 * sc, by + 1); g.closePath(); g.fill(); g.lineWidth = 1; g.strokeStyle = 'rgba(20,10,4,.8)'; g.stroke();
+    const blobs = [[-11, -27, 11, 9], [11, -27, 11, 9], [0, -22, 13, 10], [-8, -36, 11, 9], [9, -35, 10, 8], [0, -43, 10, 8]];
+    const shade = ['rgba(0,18,6,.5)', 'rgba(0,18,6,.32)', 'rgba(0,0,0,0)'];
+    blobs.forEach(([dx, dy, rx, ry], i) => {
+      const bx = x + dx * sc, byy = by + dy * sc, brx = rx * sc, bry = ry * sc;
+      obsBlob(g, bx, byy, brx, bry, seed * 5 + i * 7); g.save(); g.clip();
+      if (fp) { g.fillStyle = fp; g.fillRect(bx - brx - 3, byy - bry - 3, brx * 2 + 6, bry * 2 + 6); }
+      g.fillStyle = 'rgba(110,180,60,.30)'; g.fillRect(bx - brx - 3, byy - bry - 3, brx * 2 + 6, bry * 2 + 6);
+      OB_LIT(g, bx - brx, byy - bry, brx * 2, bry * 2, shade[Math.min(2, Math.floor(i / 2))] === 'rgba(0,0,0,0)' ? 'rgba(0,16,6,.4)' : shade[Math.floor(i / 2)], 'rgba(235,255,150,.5)');
+      g.fillStyle = 'rgba(255,255,190,.22)'; for (let q = 0; q < 6; q++) { g.beginPath(); g.ellipse(bx - brx * 0.4 + rnd(seed + q + i, 1.3) * brx * 0.9, byy - bry * 0.5 + rnd(seed + q + i, 2.3) * bry * 0.6, 2.4, 1.5, 0.5, 0, 7); g.fill(); }
+      g.restore(); obsBlob(g, bx, byy, brx, bry, seed * 5 + i * 7); g.lineWidth = 1.2; g.strokeStyle = 'rgba(6,28,10,.75)'; g.stroke();
+    });
+  }
+  function obBush(g, x, by, sc, seed, fp, flowers) {
+    [[-8, -5, 9, 7], [8, -5, 9, 7], [0, -9, 10, 8]].forEach(([dx, dy, rx, ry], i) => {
+      const bx = x + dx * sc, byy = by + dy * sc, brx = rx * sc, bry = ry * sc; obsBlob(g, bx, byy, brx, bry, seed + i * 9, 11); g.save(); g.clip();
+      if (fp) { g.fillStyle = fp; g.fillRect(bx - brx - 2, byy - bry - 2, brx * 2 + 4, bry * 2 + 4); } g.fillStyle = 'rgba(120,190,60,.28)'; g.fillRect(bx - brx - 2, byy - bry - 2, brx * 2 + 4, bry * 2 + 4);
+      OB_LIT(g, bx - brx, byy - bry, brx * 2, bry * 2, 'rgba(0,16,6,.5)', 'rgba(235,255,150,.45)'); g.restore();
+      obsBlob(g, bx, byy, brx, bry, seed + i * 9, 11); g.lineWidth = 1.1; g.strokeStyle = 'rgba(6,28,10,.75)'; g.stroke();
+    });
+    const cols = flowers ? ['#fff3b0', '#ffffff', '#ffb0c8'] : ['#d8362a', '#b02a20']; for (let i = 0; i < 9; i++) { g.fillStyle = cols[i % cols.length]; g.beginPath(); g.arc(x + (rnd(seed + i, 3.1) - 0.5) * 30 * sc, by - 4 * sc - rnd(seed + i, 4.1) * 11 * sc, 1.5 * sc, 0, 7); g.fill(); }
+  }
+  function obBoulder(g, x, y, rw, rh, seed, rp) {
+    const n = 9, P = []; for (let i = 0; i < n; i++) { const a = Math.PI + (i / (n - 1)) * Math.PI, w = 0.86 + 0.2 * rnd(seed + i, 7.7); P.push([x + Math.cos(a) * rw * w, y + Math.sin(a) * rh * w * 1.5 * (i % 2 ? 0.95 : 1.05) * 0.8]); }
+    const poly = () => { g.beginPath(); g.moveTo(x - rw, y + 1); P.forEach(q => g.lineTo(q[0], q[1])); g.lineTo(x + rw, y + 1); g.closePath(); };
+    poly(); g.save(); g.clip();
+    if (rp) { g.fillStyle = rp; g.fillRect(x - rw - 2, y - rh * 1.6, rw * 2 + 4, rh * 1.9); } else { g.fillStyle = '#8a8478'; g.fillRect(x - rw - 2, y - rh * 1.6, rw * 2 + 4, rh * 1.9); }
+    g.fillStyle = 'rgba(190,180,160,.22)'; g.fillRect(x - rw - 2, y - rh * 1.6, rw * 2 + 4, rh * 1.9);
+    // planes: lit top, mid left, shaded right
+    g.fillStyle = 'rgba(255,255,255,.26)'; g.beginPath(); g.moveTo(x - rw, y - rh * 0.3); g.lineTo(P[2][0], P[2][1]); g.lineTo(P[4][0], P[4][1]); g.lineTo(P[5][0], P[5][1]); g.lineTo(x, y - rh * 0.45); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(12,8,30,.34)'; g.beginPath(); g.moveTo(x + rw * 0.15, y - rh * 0.45); g.lineTo(P[5][0], P[5][1]); g.lineTo(P[7][0], P[7][1]); g.lineTo(x + rw, y + 1); g.lineTo(x + rw * 0.3, y + 1); g.closePath(); g.fill();
+    OB_LIT(g, x - rw, y - rh * 1.6, rw * 2, rh * 1.9, 'rgba(6,4,20,.5)', 'rgba(255,255,255,.1)');
+    g.strokeStyle = 'rgba(20,14,10,.55)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x - rw * 0.2, y - rh * 0.5); g.lineTo(x - rw * 0.05, y - rh * 0.05); g.lineTo(x - rw * 0.25, y + 1); g.moveTo(x + rw * 0.35, y - rh * 0.2); g.lineTo(x + rw * 0.5, y + 1); g.stroke();
+    g.fillStyle = 'rgba(112,156,60,.85)'; obsBlob(g, x - rw * 0.35, y - rh * 0.85, rw * 0.42, rh * 0.16, seed + 3, 8); g.fill(); obsBlob(g, x + rw * 0.2, y - rh * 0.75, rw * 0.26, rh * 0.1, seed + 5, 8); g.fill();
+    g.restore(); poly(); g.lineJoin = 'round'; g.lineWidth = 1.4; g.strokeStyle = 'rgba(24,18,14,.8)'; g.stroke();
+  }
+  function obTufts(g, x, y, w, seed) { g.strokeStyle = 'rgba(70,120,40,.9)'; g.lineWidth = 1.3; g.lineCap = 'round'; for (let i = 0; i < 6; i++) { const tx = x + (rnd(seed + i, 5.1) - 0.5) * w; g.beginPath(); g.moveTo(tx, y); g.lineTo(tx - 2, y - 5); g.moveTo(tx, y); g.lineTo(tx + 2, y - 4); g.stroke(); } }
+  function obRuin(g, x, by, seed, rp) {
+    const cols = 4, bw = 14, rowsH = [34, 24, 40, 18];
+    for (let i = 0; i < cols; i++) {
+      const bx = x - 28 + i * bw, h = rowsH[(i + seed) % 4];
+      for (let rI = 0; rI * 7 < h; rI++) {
+        const yy = by - (rI + 1) * 7, off = rI % 2 ? 4 : 0;
+        g.beginPath(); if (g.roundRect) g.roundRect(bx - off, yy, bw - 1, 6.5, 1.2); else g.rect(bx - off, yy, bw - 1, 6.5); g.save(); g.clip();
+        g.fillStyle = rp || '#8a8478'; g.fillRect(bx - 6, yy, bw + 8, 7); g.fillStyle = 'rgba(210,200,180,' + (0.12 + rnd(seed + i * 7 + rI, 1.9) * 0.2) + ')'; g.fillRect(bx - 6, yy, bw + 8, 7);
+        OB_LIT(g, bx - 4, yy, bw, 7, 'rgba(6,4,20,.5)', 'rgba(255,255,255,.22)'); g.restore(); g.lineWidth = 0.9; g.strokeStyle = 'rgba(28,22,16,.75)'; g.beginPath(); if (g.roundRect) g.roundRect(bx - off, yy, bw - 1, 6.5, 1.2); else g.rect(bx - off, yy, bw - 1, 6.5); g.stroke();
+      }
+    }
+    g.fillStyle = 'rgba(86,130,50,.8)'; for (let i = 0; i < 5; i++) { obsBlob(g, x - 24 + i * 12 + rnd(seed + i, 1.1) * 4, by - 20 - rnd(seed + i, 2.2) * 14, 5, 3, seed + i, 8); g.fill(); }
+    obTufts(g, x, by + 1, 62, seed);
+  }
+  function obStump(g, x, by, seed) {
+    const bg = g.createLinearGradient(x - 10, 0, x + 10, 0); bg.addColorStop(0, '#a87442'); bg.addColorStop(0.5, '#74502a'); bg.addColorStop(1, '#3a2612');
+    g.fillStyle = bg; g.beginPath(); g.moveTo(x - 13, by + 1); g.quadraticCurveTo(x - 8, by - 4, x - 9, by - 14); g.lineTo(x + 9, by - 14); g.quadraticCurveTo(x + 8, by - 4, x + 13, by + 1); g.closePath(); g.fill(); g.lineWidth = 1.1; g.strokeStyle = 'rgba(20,10,4,.85)'; g.stroke();
+    const tg = g.createRadialGradient(x - 2, by - 17, 1, x, by - 15, 11); tg.addColorStop(0, '#ecd29a'); tg.addColorStop(1, '#b8884e'); g.fillStyle = tg; g.beginPath(); g.ellipse(x, by - 14, 9, 4.4, 0, 0, 7); g.fill(); g.stroke();
+    g.strokeStyle = 'rgba(110,70,30,.6)'; g.lineWidth = 0.7; for (const k of [0.65, 0.35]) { g.beginPath(); g.ellipse(x, by - 14, 9 * k, 4.4 * k, 0, 0, 7); g.stroke(); }
+    for (const [mx, my, sc] of [[x + 13, by - 1, 1], [x + 18, by + 2, 0.7]]) { g.fillStyle = '#efe4c8'; g.fillRect(mx - 1, my - 3, 2, 4); g.fillStyle = '#d8362a'; g.beginPath(); g.ellipse(mx, my - 4, 4 * sc, 2.6 * sc, 0, Math.PI, 0); g.fill(); g.fillStyle = '#fff'; g.fillRect(mx - 1, my - 5.5, 1, 1); }
+    obTufts(g, x - 14, by + 2, 14, seed);
+  }
+  function obHay(g, x, by, seed) {
+    g.fillStyle = '#c8a24a'; g.beginPath(); g.ellipse(x, by - 8, 15, 11, 0, 0, 7); g.fill(); g.lineWidth = 1.2; g.strokeStyle = 'rgba(70,44,10,.85)'; g.stroke();
+    const sg = g.createLinearGradient(x - 15, by - 18, x + 15, by + 3); sg.addColorStop(0, 'rgba(255,240,170,.5)'); sg.addColorStop(0.55, 'rgba(0,0,0,0)'); sg.addColorStop(1, 'rgba(60,30,0,.5)'); g.fillStyle = sg; g.fill();
+    g.strokeStyle = 'rgba(120,84,20,.55)'; g.lineWidth = 0.8; for (let i = 0; i < 9; i++) { const a = rnd(seed + i, 3.9) * 6.28, r1 = rnd(seed + i, 4.9) * 9; g.beginPath(); g.moveTo(x + Math.cos(a) * r1 * 0.6, by - 8 + Math.sin(a) * r1 * 0.5); g.lineTo(x + Math.cos(a) * (r1 + 5) * 0.8, by - 8 + Math.sin(a) * (r1 + 5) * 0.65); g.stroke(); }
+    g.strokeStyle = '#7a4a22'; g.lineWidth = 2; g.beginPath(); g.ellipse(x, by - 8, 15, 11, 0, 0.4, 2.7); g.stroke();
+    g.strokeStyle = 'rgba(226,190,90,.9)'; g.lineWidth = 1; for (let i = 0; i < 6; i++) { const sx = x + (rnd(seed + i, 6.1) - 0.5) * 44; g.beginPath(); g.moveTo(sx, by + 2); g.lineTo(sx + (rnd(seed + i, 7.1) - 0.5) * 6, by - 2); g.stroke(); }
+  }
   function buildObstacle(oe, seed) {
     const S = Math.max(2, DPR), W = 96, H = 96, cx = 48, cy = 62, cv = document.createElement('canvas'); cv.width = W * S; cv.height = H * S; const g = cv.getContext('2d'); g.scale(S, S);
+    const base = cy + 15, fp = () => obsTex(g, 'tex_forest', 96, -rnd(seed, 3.3) * 260, -rnd(seed, 4.4) * 260), rp = () => obsTex(g, 'tex_mountain', 120, -rnd(seed, 5.5) * 300, -rnd(seed, 6.6) * 300);
+    const out = { cv, ox: cx, oy: cy, w: W, h: H };
+    if (oe === '🌲') { const f = fp(); if (!f) return null; obsShadow(g, cx + 2, base, 33, 10); obPine(g, cx + 13, base - 4, 38, seed + 2, f); obPine(g, cx - 14, base - 2, 44, seed, f); obPine(g, cx + 1, base + 2, 52, seed + 5, f); return out; }
+    if (oe === '🌳') { const f = fp(); if (!f) return null; obsShadow(g, cx, base, 30, 9); obOak(g, cx, base, 0.95, seed, f); return out; }
+    if (oe === '🌿') { const f = fp(); if (!f) return null; obsShadow(g, cx, base, 28, 8); obBush(g, cx - 6, base - 2, 1.05, seed, f, seed % 2 === 0); obBush(g, cx + 14, base + 1, 0.7, seed + 4, f, seed % 2 === 0); return out; }
+    if (oe === '🪨' || oe === '⛰️') {
+      const r = rp(); if (!r) return null; obsShadow(g, cx + 2, base, 36, 10); const big = oe === '⛰️';
+      obBoulder(g, cx - 14, base - 1, big ? 22 : 17, big ? 20 : 15, seed, r); obBoulder(g, cx + 14, base + 1, big ? 19 : 12, big ? 17 : 11, seed + 3, r); if (!big) obBoulder(g, cx + 1, base + 4, 10, 8, seed + 6, r); else obBoulder(g, cx + 3, base + 3, 14, 11, seed + 6, r);
+      obTufts(g, cx - 6, base + 4, 56, seed); return out;
+    }
+    if (oe === '🏚️') { const r = rp(); if (!r) return null; obsShadow(g, cx, base, 34, 9); obRuin(g, cx, base, seed, r); return out; }
+    if (oe === '🍄') { obsShadow(g, cx, base, 24, 7); obStump(g, cx, base, seed); return out; }
+    if (oe === '🌾') { obsShadow(g, cx, base, 24, 7); obHay(g, cx - 6, base, seed); obHay(g, cx + 14, base + 2, seed + 4); return out; }
+    {
+    // (the older versions below are only reached by a key the new art does not know)
+    }
+    const cx0 = 0; if (cx0) {
     if (oe === '🌲') {
       const fp = obsTex(g, 'tex_forest', 96, -rnd(seed, 3.3) * 260, -rnd(seed, 4.4) * 260); if (!fp) return null;
       obsShadow(g, cx + 2, cy + 15, 31, 11);
@@ -1135,8 +1237,10 @@ const Battle = (() => {
       g.strokeStyle = 'rgba(60,110,40,.85)'; g.lineWidth = 1.2; g.lineCap = 'round'; for (const [tx, ty] of [[-28, 14], [-25, 15], [26, 15], [29, 14]]) { g.beginPath(); g.moveTo(cx + tx, cy + ty); g.lineTo(cx + tx + (tx < 0 ? -2 : 2), cy + ty - 5); g.stroke(); }
       return { cv, ox: cx, oy: cy, w: W, h: H };
     }
+    }
     return null;
   }
+  const OBK = 1.32;      // obstacles are drawn a third larger than they are painted: they fill their hex and read clearly on a phone
   function obstacleSprite(oe, c, r) {
     const cache = B._obsSpr || (B._obsSpr = new Map()), k = oe + c + ',' + r; if (cache.has(k)) return cache.get(k);
     const spr = buildObstacle(oe, c * 17 + r * 31 + 3); if (spr) cache.set(k, spr); return spr;
@@ -1341,7 +1445,7 @@ const Battle = (() => {
       const walk = input && B.reach.has(k) && !B.spell && B.reach.get(k).d > 0;
       if (walk) { ctx.fillStyle = 'rgba(255, 236, 150, .30)'; ctx.fill(); }
       ctx.strokeStyle = walk ? 'rgba(255, 224, 110, .95)' : B._board ? 'rgba(0,0,0,.16)' : 'rgba(0,0,0,.26)'; ctx.lineWidth = walk ? 2 : 1; ctx.stroke();
-      if (B.obs.has(k)) { const oe = B.obs.get(k), ob = obstacleSprite(oe, c, r); if (ob) ctx.drawImage(ob.cv, p.x - ob.ox, p.y - ob.oy, ob.w, ob.h); else { const oi = typeof Assets !== 'undefined' ? Assets.get(oe === '🌲' ? 'terrain/forest_overlay' : (oe === '🪨' || oe === '⛰️') ? 'terrain/mountain_overlay' : '') : null; if (oi) sprite(oi, p.x, p.y, oe === '🌲' ? 44 : 40); else { ctx.fillStyle = '#fff'; emoji(oe, p.x, p.y, 30); } } }
+      if (B.obs.has(k)) { const oe = B.obs.get(k), ob = obstacleSprite(oe, c, r); if (ob) { const plant = oe === '🌲' || oe === '🌳' || oe === '🌿' || oe === '🌾', sw = plant && !reduced() ? Math.sin(performance.now() / (oe === '🌿' ? 700 : 1100) + c * 1.7 + r * 0.9) * (oe === '🌿' ? 0.03 : 0.018) : 0; if (sw) { ctx.save(); ctx.translate(p.x, p.y + 15 * OBK); ctx.transform(1, 0, sw, 1, 0, 0); ctx.drawImage(ob.cv, -ob.ox * OBK, -ob.oy * OBK - 15 * OBK, ob.w * OBK, ob.h * OBK); ctx.restore(); } else ctx.drawImage(ob.cv, p.x - ob.ox * OBK, p.y - ob.oy * OBK, ob.w * OBK, ob.h * OBK); } else { const oi = typeof Assets !== 'undefined' ? Assets.get(oe === '🌲' ? 'terrain/forest_overlay' : (oe === '🪨' || oe === '⛰️') ? 'terrain/mountain_overlay' : '') : null; if (oi) sprite(oi, p.x, p.y, oe === '🌲' ? 44 : 40); else { ctx.fillStyle = '#fff'; emoji(oe, p.x, p.y, 30); } } }
       if (B.siege && B.moat.has(k) && (!B._board || B._bg)) { ctx.fillStyle = 'rgba(255,255,255,.5)'; emoji('≈', p.x, p.y, 20); }
       if (B.siege && B.mines && B.mines.has(k) && B.siege.dside === 0) { const mi = typeof Assets !== 'undefined' ? Assets.get('battle/mine_dormant') : null; if (mi) sprite(mi, p.x, p.y + 6, 34); else { ctx.fillStyle = '#fff'; emoji('💣', p.x, p.y + 2, 18); } }
       if (B.siege && c === B.cw && !structAt(c, r) && typeof Assets !== 'undefined') { const kk = SIEGE_LAYOUT[r], di = Assets.get(kk === 'gate' ? 'battle/gate_open' : kk === 'tower' ? 'battle/tower_damaged' : 'battle/wall_breached'); if (di) sprite(di, p.x, p.y, kk === 'tower' ? 52 : 70); }
@@ -1807,12 +1911,13 @@ const Battle = (() => {
       };
       mk(0, opts.army); mk(1, opts.enemy);
       if (opts.siege) setupSiege(opts.siege);
-      const icons = ['🪨', '🌲', '🪵'];
+      const icons = ['🪨', '🌲', '🌳', '🌿', '🪵', '⛰️', '🌳', '🌾', '🏚️', '🌲', '🌿', '🌳', '🍄'];
+      let lastIc = '';
       const lo = !opts.siege ? 3 : opts.siege.dside === 1 ? 2 : 8, span = !opts.siege ? 9 : 5, want = opts.siege ? 5 : 11;
       for (let i = 0, tries = 0; i < want && tries < 100; tries++) {
         const c = lo + Math.floor(Math.random() * span), r = Math.floor(Math.random() * BH);
         if (B.obs.has(key(c, r)) || stackAt(c, r)) continue;
-        B.obs.set(key(c, r), icons[i % 3]); i++;
+        let ic; do ic = icons[Math.floor(Math.random() * icons.length)]; while (ic === lastIc); lastIc = ic; B.obs.set(key(c, r), ic); i++;
       }
       placeMines();
       $('blog').innerHTML = ''; $('btitle').textContent = opts.title || 'Battle';

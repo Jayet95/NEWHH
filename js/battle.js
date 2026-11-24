@@ -1456,7 +1456,12 @@ const Battle = (() => {
             else if (style === 'rear') { const rr = k < 0.35 ? Math.sin(k / 0.35 * Math.PI / 2) : Math.max(0, 1 - (k - 0.35) / 0.65); sy = 1 + 0.12 * rr; sx = 1 - 0.05 * rr; y -= rr * 6; rot = e * 0.12 * sg; }   // big ones rear up and slam
             else if (style === 'stomp') { sx = 1 + 0.07 * e; sy = 1 - 0.07 * e; y += e * 2; rot = e * 0.1 * sg; }               // heavy ones squash into the blow
           }
-        } else { const pr = k < 0.35 ? k / 0.35 : 1 - (k - 0.35) / 0.65; x -= ux * pr * 5 * f; y -= uy * pr * 5 * f; rot = -pr * 0.16 * sg * f; if (!own) { sx = 1 + 0.03 * pr; sy = 1 - 0.03 * pr; } }
+        } else if (own) { const pr = k < 0.35 ? k / 0.35 : 1 - (k - 0.35) / 0.65; x -= ux * pr * 5 * f; y -= uy * pr * 5 * f; rot = -pr * 0.16 * sg * f; }
+        else {      // draw back slowly, then release with a kick and settle
+          const smx = (t) => t * t * (3 - 2 * t);
+          let e; if (k < 0.45) e = -smx(k / 0.45); else if (k < 0.58) e = -1 + 1.55 * smx((k - 0.45) / 0.13); else e = 0.55 * (1 - smx((k - 0.58) / 0.42));
+          x += ux * e * 6; y += uy * e * 6; rot = e * 0.2 * sg; sx = 1 - 0.035 * Math.max(0, -e) + 0.03 * Math.max(0, e); sy = 1 + 0.03 * Math.max(0, -e) - 0.02 * Math.max(0, e);
+        }
       }
     }
     if (s.walkUntil && now < s.walkUntil && !a && !seqOf(s.t, 'walk')) {      // real walk frames carry their own motion; the stepping bob is only for the idle-frame stand-in
@@ -1470,13 +1475,31 @@ const Battle = (() => {
   const IMP = { twin: ['#e8ffd0', '#7ddc5a'], glow: ['#e8ffd0', '#7ddc5a'], bolt: ['#fff6d0', '#ffb04a'], javelin: ['#fff6d0', '#d8c28a'], zap: ['#ffffff', '#8cc8ff'], holy: ['#ffffff', '#ffe27a'], death: ['#bfffd0', '#4aff9a'], venom: ['#d8ff90', '#6ad02a'] };
   const IMPC = { twin: '140,230,100', glow: '140,230,100', bolt: '255,176,74', javelin: '230,205,140', zap: '160,210,255', holy: '255,226,122', death: '90,255,160', venom: '120,220,50' };
   const rnd = (i, t) => { const v = Math.sin(i * 12.9898 + t * 78.233) * 43758.5453; return v - Math.floor(v); };
+  function impactExtra(p, now) {
+    const arc = { arrow: 26, twin: 26, glow: 26, javelin: 30, bolt: 14 }[p.style];
+    if (arc !== undefined) (B.stuck = B.stuck || []).push({ x: p.bx, y: p.by + 4, ang: Math.atan2(p.by - p.ay + arc * Math.PI, p.bx - p.ax), t0: now, dur: 1100, style: p.style, col: p.col });
+    const ringOf = { fire: ['#ff9a3a', 30, true], venom: ['#8fe04a', 22, true], holy: ['#ffe27a', 30, false], death: ['#4aff9a', 26, true], zap: ['#8cc8ff', 24, false], orb: ['#c070ff', 26, true], gaze: ['#ff5aa8', 26, true], twin: ['#8be05a', 18, false], glow: ['#8be05a', 18, false] }[p.style];
+    if (ringOf) ring(p.bx, p.by + 8, ringOf[1], ringOf[0], { w: 3, dur: 420, fill: ringOf[2] });
+    if (p.style === 'rock' || p.style === 'ball') {
+      ring(p.bx, p.by + 10, 30, p.style === 'rock' ? '#a89878' : '#8a8a90', { w: 4, dur: 460, flat: 0.45 });
+      burst(p.bx, p.by + 6, 7, { kind: 'shard', col: p.style === 'rock' ? PAL.rock : ['#6a6a72', '#4a4a52'], v0: 60, v1: 190, up: 80, g: 520, drag: 1.2, l0: 380, l1: 720, s0: 1.4, s1: 2.6, add: false });
+    }
+    if (p.style === 'fire') burst(p.bx, p.by, 10, { kind: 'ember', col: PAL.fire, v0: 30, v1: 120, up: 50, g: -40, l0: 400, l1: 800, s0: 2, s1: 4 });
+  }
   function drawProjectiles(now) {
+    B.stuck = (B.stuck || []).filter(st => {
+      const k = (now - st.t0) / st.dur; if (k >= 1) return false; if (k < 0) return true;
+      ctx.save(); ctx.globalAlpha = k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3; ctx.translate(st.x, st.y); ctx.rotate(st.ang + Math.sin(k * 40) * (1 - k) * 0.12 * (k < 0.25 ? 1 : 0));
+      ctx.strokeStyle = '#140a04'; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.moveTo(-14, 0); ctx.lineTo(-3, 0); ctx.stroke(); ctx.strokeStyle = '#e8dcc0'; ctx.lineWidth = 1.6; ctx.stroke();
+      ctx.fillStyle = st.col || '#e0443a'; ctx.beginPath(); ctx.moveTo(-14, 0); ctx.lineTo(-18, -3); ctx.lineTo(-11, 0); ctx.lineTo(-18, 3); ctx.closePath(); ctx.fill(); ctx.restore(); return true;      // the shaft stays in the target for a moment
+    });
     B.proj = (B.proj || []).filter(p => {
       const k = (now - p.t0) / p.dur;
       if (k < 0) return true;
       if (k >= 1) {
         (B.slashes = B.slashes || []).push({ x: p.bx, y: p.by + 6, t0: now, dur: 280, style: 'spark', col: p.col, shoot: p.style });
         burst(p.bx, p.by + 6, p.style === 'fire' ? 12 : 7, { kind: p.style === 'ball' || p.style === 'rock' ? 'smoke' : 'spark', col: IMP[p.style] || (p.style === 'fire' ? PAL.fire : p.style === 'orb' ? PAL.dark : p.style === 'ball' || p.style === 'rock' ? PAL.dust : ['#fff6d0', '#ffd98a']), v0: 40, v1: 170, l0: 200, l1: 420, s0: p.style === 'ball' || p.style === 'rock' ? 5 : 1.2, s1: p.style === 'ball' || p.style === 'rock' ? 8 : 2.2, drag: 3, grow: 1 });
+        impactExtra(p, now);
         return false;
       }
       const arc = { arrow: 26, twin: 26, glow: 26, javelin: 30, bolt: 14, rock: 38, venom: 20, gaze: 0, zap: 0 }[p.style] ?? 12;
@@ -1526,13 +1549,22 @@ const Battle = (() => {
         for (let i = 4; i >= 0; i--) { const kk = Math.max(0, k - i * 0.04), tx = p.ax + (p.bx - p.ax) * kk, ty = p.ay + (p.by - p.ay) * kk - arc * Math.sin(Math.PI * kk); ctx.globalAlpha = 0.5 - i * 0.09; ctx.fillStyle = p.style === 'fire' ? '#ff8a2a' : col; ctx.beginPath(); ctx.arc(tx, ty, 7 - i, 0, 7); ctx.fill(); }
         ctx.globalAlpha = 1; const g = ctx.createRadialGradient(x, y, 1, x, y, 10); g.addColorStop(0, '#fff'); g.addColorStop(0.4, p.style === 'fire' ? '#ffb040' : (p.col || '#c070ff')); g.addColorStop(1, 'rgba(255,120,40,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 10, 0, 7); ctx.fill();
       } else if (p.style === 'ball') {
+        if (k < 0.06) burst(p.ax, p.ay, 2, { kind: 'smoke', col: ['#8a8680'], v0: 10, v1: 40, l0: 300, l1: 520, s0: 3, s1: 5, drag: 2.5, grow: 1.4, add: false });
         if (Math.random() < 0.7) emit({ x, y, vx: R(-12, 12), vy: R(-12, 6), life: R(250, 450) / spd(), size: R(2.5, 4), col: '#6a6560', kind: 'smoke', add: false, grow: 1.2, drag: 2 });
         ctx.fillStyle = '#2a2a30'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, 5, 0, 7); ctx.fill(); ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.beginPath(); ctx.arc(x - 1.5, y - 1.5, 1.5, 0, 7); ctx.fill();
       } else if (p.style === 'rock') {
+        { const gx = p.ax + (p.bx - p.ax) * k, gy = p.ay + (p.by - p.ay) * k + 14, h = Math.sin(Math.PI * k); ctx.save(); ctx.globalAlpha = 0.34 - 0.18 * h; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(gx, gy, 9 - 3 * h, 3.4 - 1.2 * h, 0, 0, 7); ctx.fill(); ctx.restore(); }
         if (Math.random() < 0.5) emit({ x, y, vx: R(-14, 14), vy: R(-6, 12), life: R(250, 450) / spd(), size: R(2, 3.5), col: '#a89878', kind: 'smoke', add: false, grow: 1, drag: 2 });
         ctx.translate(x, y); ctx.rotate(k * 9); ctx.fillStyle = '#8a8478'; ctx.strokeStyle = '#1c1710'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-7, -2); ctx.lineTo(-2, -8); ctx.lineTo(7, -4); ctx.lineTo(6, 6); ctx.lineTo(-4, 7); ctx.closePath(); ctx.fill(); ctx.stroke();
       } else {
-        const w = 3 + 4 * Math.sin(k * Math.PI); ctx.strokeStyle = 'rgba(255,60,120,.35)'; ctx.lineWidth = w + 5; ctx.beginPath(); ctx.moveTo(p.ax, p.ay); ctx.lineTo(x, y); ctx.stroke(); ctx.strokeStyle = '#fff0f8'; ctx.lineWidth = w; ctx.stroke();
+        const w = 2 + 3.5 * Math.sin(k * Math.PI), dxg = x - p.ax, dyg = y - p.ay, lg = Math.hypot(dxg, dyg) || 1, nxg = -dyg / lg, nyg = dxg / lg;
+        ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+        for (const [ph, col, wd] of [[0, 'rgba(255,70,150,.55)', w + 4], [2.1, 'rgba(255,170,230,.5)', w + 1], [4.2, 'rgba(255,240,250,.9)', Math.max(1, w - 1)]]) {
+          ctx.strokeStyle = col; ctx.lineWidth = wd; ctx.beginPath();
+          for (let i = 0; i <= 14; i++) { const t = i / 14, wob = Math.sin(t * 9 - now / 70 + ph) * 5 * Math.sin(Math.PI * t); const px = p.ax + dxg * t + nxg * wob, py = p.ay + dyg * t + nyg * wob; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+          ctx.stroke();
+        }
+        glow(x, y, 16, '#ff5aa8', 0.8); if (Math.random() < 0.7) emit({ x, y, vx: R(-30, 30), vy: R(-30, 30), life: R(220, 400) / spd(), size: R(1.4, 2.6), col: '#ffc0e8', kind: 'sparkle', drag: 2 });
       }
       ctx.restore();
       return true;

@@ -2407,3 +2407,24 @@ body #modal[data-scr=defeat]::after, body #modal[data-scr=retreat]::after { back
 @media (max-height: 520px) { body #modal[data-scr] #mbox { font-size: 14px !important; min-width: min(400px, 88vw) !important; } }
 body #modal[data-scr] #mbox { min-width: clamp(300px, 44vw, 720px) !important; max-width: min(760px, 94vw) !important; font-size: clamp(15px, 1.7vw, 26px) !important; padding: 1.2em 1.4em !important; }
 body #modal[data-scr=defeat]::after, body #modal[data-scr=retreat]::after { background-position: left 0 bottom 4%, center; background-size: min(40%, 560px) auto, 100% 100%; }
+
+/* ---- Realm Lost: the game-over screen ---- */
+#realmlost { position: fixed; inset: 0; z-index: 90; background: #0b0605; opacity: 0; transition: opacity .6s ease; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+#realmlost.on { opacity: 1; }
+#realmlost .rl-bg { position: absolute; inset: -3%; background: url(art/ui/realm-lost/bg_realm_lost.webp) center / cover no-repeat; animation: rlZoom 40s ease-in-out infinite alternate; }
+#realmlost .rl-smoke { position: absolute; inset: 0; background-repeat: no-repeat; background-size: auto 70%; opacity: .5; mix-blend-mode: screen; pointer-events: none; }
+#realmlost .rl-smoke.s1 { background-image: url(art/ui/realm-lost/layer_smoke_1.webp); background-position: 18% 100%; animation: rlSmoke 14s linear infinite; }
+#realmlost .rl-smoke.s2 { background-image: url(art/ui/realm-lost/layer_smoke_2.webp); background-position: 82% 100%; animation: rlSmoke 19s linear infinite -6s; }
+#realmlost .rl-embers { position: absolute; inset: 0; pointer-events: none; background: url(art/ui/realm-lost/layer_embers_1.webp) 0 0 / 50% auto repeat-y, url(art/ui/realm-lost/layer_embers_2.webp) 30% 0 / 40% auto repeat-y, url(art/ui/realm-lost/layer_embers_3.webp) 70% 0 / 45% auto repeat-y; mix-blend-mode: screen; animation: rlEmbers 9s linear infinite; }
+#realmlost .rl-vig { position: absolute; inset: 0; pointer-events: none; background: url(art/ui/realm-lost/vignette.webp) center / 100% 100% no-repeat; }
+#realmlost .rl-panel { position: relative; z-index: 2; text-align: center; color: #e9d9bd; border: 24px solid transparent; border-image: url(art/ui/realm-lost/realm_lost_frame_3x.webp) 72 / 24px stretch; background: url(art/ui/realm-lost/realm_lost_burnt_paper.webp) center / cover padding-box; padding: 1.2em 1.6em; min-width: clamp(300px, 40vw, 620px); max-width: 92vw; font-size: clamp(15px, 1.7vw, 24px); box-shadow: 0 18px 60px rgba(0, 0, 0, .8); }
+#realmlost .rl-emblem { width: clamp(56px, 8vw, 110px); margin-top: -2.4em; filter: drop-shadow(0 4px 8px rgba(0,0,0,.8)); }
+#realmlost h2 { margin: .1em 0 .4em; font-variant: small-caps; letter-spacing: .18em; font-size: 2em; color: #ff9a5a; text-shadow: 0 0 12px rgba(255, 90, 30, .6), 0 2px 0 #000; }
+#realmlost p { margin: .4em 0; line-height: 1.4; }
+#realmlost .rl-day b { color: #ffd27a; }
+#realmlost button { margin-top: .8em; font-size: 1em; padding: .5em 1.6em; }
+@media (orientation: portrait) { #realmlost .rl-bg { background-image: url(art/ui/realm-lost/bg_realm_lost_portrait.webp); } #realmlost .rl-vig { background-image: url(art/ui/realm-lost/vignette_portrait.webp); } }
+@keyframes rlZoom { from { transform: scale(1) translate(0, 0); } to { transform: scale(1.08) translate(-1%, -1%); } }
+@keyframes rlSmoke { from { transform: translateY(0); opacity: .5; } to { transform: translateY(-12%); opacity: 0; } }
+@keyframes rlEmbers { from { background-position: 0 0, 30% 0, 70% 0; } to { background-position: 0 -120vh, 30% -160vh, 70% -140vh; } }
+@media (prefers-reduced-motion: reduce) { #realmlost .rl-bg, #realmlost .rl-smoke, #realmlost .rl-embers { animation: none; } }

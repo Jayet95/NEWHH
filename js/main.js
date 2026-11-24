@@ -3025,11 +3025,22 @@
     busy = false; centerOn(G.hero.x, G.hero.y); renderAll();
     autosave();
   }
+  // the game-over screen: a fallen castle at dusk, drifting smoke and embers, a burnt-paper panel in an iron frame (art/ui/realm-lost)
+  function realmLost(why, day) {
+    return new Promise((res) => {
+      const el = document.createElement('div'); el.id = 'realmlost';
+      el.innerHTML = '<div class="rl-bg"></div><div class="rl-smoke s1"></div><div class="rl-smoke s2"></div><div class="rl-embers"></div><div class="rl-vig"></div>' +
+        '<div class="rl-panel"><img class="rl-emblem" src="art/ui/realm-lost/realm_lost_emblem.webp" alt=""><h2>Realm Lost</h2><p>' + why + '</p><p class="rl-day">The realm fell on <b>day ' + day + '</b>.</p><button class="primary">Main menu</button></div>';
+      document.body.appendChild(el);
+      requestAnimationFrame(() => el.classList.add('on'));
+      el.querySelector('button').onclick = () => { el.classList.remove('on'); setTimeout(() => { el.remove(); res(); }, 400); };
+    });
+  }
   async function endGame(win, why) {
     G.over = true; if (win) Ach.event('win', { diff: G.diff, size: G.size, day: G.day }); if (win) { if (!(typeof Sfx !== 'undefined' && Sfx.victory && Sfx.victory())) sfx('fanfare'); } else sfx('lose'); if (win && typeof Celebrate !== 'undefined') Celebrate.game();
     try { localStorage.removeItem(SAVE); } catch (e) { /* ignore */ }
     if (win) { await victoryScreen(); $('title').classList.remove('hide'); refreshTitle(); return; }
-    await showModal(win ? `<h2>🏆 Victory!</h2><p>Every rival has lost its towns: you rule the realm on day ${G.day} (${DF().name}). Well fought!</p>` : `<h2>💀 Defeat</h2><p>${why || 'Your hero has fallen.'}</p><p>The realm fell on <b>day ${G.day}</b>.</p>`, ['Main menu']);
+    if (win) await showModal(`<h2>🏆 Victory!</h2><p>Every rival has lost its towns: you rule the realm on day ${G.day} (${DF().name}). Well fought!</p>`, ['Main menu']); else await realmLost(why || 'Your hero has fallen.', G.day);
     $('title').classList.remove('hide'); refreshTitle();
   }
 
@@ -3574,5 +3585,5 @@
   if (!/[?&]demo/.test(location.search) && Settings.resume && localStorage.getItem(SAVE)) Assets.ready.then(() => { if (!G && load()) $('title').classList.add('hide'); });
   if (/[?&]demo/.test(location.search)) Assets.ready.then(() => setTimeout(() => { try { newGame('castle', 'Orrin', 'normal', { size: 'medium', seed: 'demo', wrap: true, food: /[?&]food/.test(location.search) }); $('title').classList.add('hide'); demo(); } catch (e) { console.error('demo failed', e); } }, 400));
   window.__G = () => G;
-  window.__dbg = { endTurn, borderBlock, canCross, terrOwner, openDiplomacy, aiDiplomacy, declareWar, atWar, realmPower, demo, openBuildMenu, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, mis, openMissions, misEnsure, getG: () => G, loseTerrain: () => { terrain.width = terrain.width; draw(); }, rebuild: () => { buildTerrain(); renderAll(); }, terrainLost, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
+  window.__dbg = { endTurn, borderBlock, canCross, terrOwner, openDiplomacy, aiDiplomacy, declareWar, atWar, realmPower, demo, openBuildMenu, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, mis, openMissions, misEnsure, getG: () => G, loseTerrain: () => { terrain.width = terrain.width; draw(); }, rebuild: () => { buildTerrain(); renderAll(); }, realmLost, terrainLost, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
 })();

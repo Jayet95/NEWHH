@@ -383,6 +383,18 @@ function zoneOwner(G, z) {
 function reindex(G) {
   G.omap = new Map();
   for (const o of G.objs) G.omap.set(o.y * G.W + o.x, o);
+  // a mine covers three hexes: its entrance plus two neighbouring yard hexes that nobody can walk through (o.fp); every click on the yard leads to the mine
+  for (const o of G.objs) if (o.t === 'mine') { if (o.fp === undefined) o.fp = mineFootprint(G, o); for (const p of o.fp) G.omap.set(p[1] * G.W + p[0], o); }
+}
+function mineFootprint(G, o) {
+  const ok = (p) => p[0] >= 0 && p[1] >= 0 && p[0] < G.W && p[1] < G.H && (G.tiles[p[1]][p[0]] === T.GRASS || G.tiles[p[1]][p[0]] === T.SAND) && !G.omap.has(p[1] * G.W + p[0]) && !(G.heroes && G.heroes.some(h => h.x === p[0] && h.y === p[1]));
+  const nb = hexNb(o.x, o.y), s = (o.x * 7 + o.y * 13) % 6;
+  for (let k = 0; k < 6; k++) {
+    const a = nb[(s + k) % 6], b = nb[(s + k + 1) % 6]; if (!ok(a) || !ok(b)) continue;
+    const open = nb.filter(p => p !== a && p !== b && p[0] >= 0 && p[1] >= 0 && p[0] < G.W && p[1] < G.H && G.tiles[p[1]][p[0]] !== T.WATER && G.tiles[p[1]][p[0]] !== T.MOUNT && !G.omap.has(p[1] * G.W + p[0]));
+    if (open.length >= 2) return [[a[0], a[1]], [b[0], b[1]]];      // the mine keeps at least two ways in
+  }
+  return [];
 }
 function objAt(G, x, y) { return G.omap.get(y * G.W + x); }
 

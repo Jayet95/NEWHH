@@ -404,6 +404,20 @@
   }
   const threatLine = (x, y) => { const t = threatAt(x, y); return t ? `<br>⚔ <b style="color:${t.col}">${t.label}</b> <span class="small">— your army is ${t.ratio >= 10 ? '10+' : t.ratio.toFixed(1)}× ${t.ratio >= 1 ? 'stronger' : 'as strong'}; expect to lose ≈${Math.round(t.loss * 100)}% of it</span>` : ''; };
   // waving flag in the owner's colour (allies get a white fringe)
+  // a mine's yard: the two extra hexes it covers, trodden earth with a heap of what the mine yields (logs for a lumber camp, ore and rock otherwise)
+  const MINE_COL = { wood: '#8a5a2a', ore: '#8a8a98', gold: '#ffd24a', mercury: '#d0d0e0', sulfur: '#e8d84a', crystal: '#6ae0ff', gems: '#c05aff' };
+  function drawMineYard(o, px, py) {
+    o.fp.forEach((p, i) => {
+      const qx = px + hcx(p[0], p[1]) - hcx(o.x, o.y), qy = py + hcy(p[1]) - hcy(o.y), rr = TS * 0.46;
+      const g = cx.createRadialGradient(qx, qy, 2, qx, qy, rr); g.addColorStop(0, 'rgba(92,66,40,.9)'); g.addColorStop(0.7, 'rgba(110,80,48,.55)'); g.addColorStop(1, 'rgba(110,80,48,0)');
+      cx.fillStyle = g; cx.beginPath(); cx.ellipse(qx, qy + 2, rr, rr * 0.8, 0, 0, 7); cx.fill();
+      if (o.kind === 'wood') {
+        for (let k = 0; k < 3; k++) { const lx = qx - 9 + k * 7 + (i ? 3 : -3), ly = qy + 3 - (k === 1 ? 5 : 0); cx.fillStyle = '#6a4220'; cx.fillRect(lx - 6, ly - 3, 13, 6); cx.fillStyle = '#c8955a'; cx.beginPath(); cx.ellipse(lx + 7, ly, 2, 3, 0, 0, 7); cx.fill(); cx.strokeStyle = 'rgba(20,10,4,.7)'; cx.lineWidth = 0.8; cx.strokeRect(lx - 6, ly - 3, 13, 6); }
+      } else {
+        for (let k = 0; k < 3; k++) { const rx = qx - 8 + k * 8 + (i ? 2 : -2), ry = qy + 3 - (k === 1 ? 5 : 0); cx.fillStyle = '#7a766c'; cx.beginPath(); cx.moveTo(rx - 6, ry + 3); cx.lineTo(rx - 3, ry - 4); cx.lineTo(rx + 3, ry - 5); cx.lineTo(rx + 7, ry + 3); cx.closePath(); cx.fill(); cx.strokeStyle = 'rgba(20,16,12,.7)'; cx.lineWidth = 0.8; cx.stroke(); cx.fillStyle = MINE_COL[o.kind] || '#fff'; cx.fillRect(rx - 1, ry - 2, 2.5, 2.5); }
+      }
+    });
+  }
   function drawFlag(px, py, col, rel, sc = 1) {
     const pal = PALETTE.find(q => q[1] === col), fim = pal ? Assets.get('flags/' + pal[0].toLowerCase()) : null;
     if (fim) { const fh = 26 * sc, fw = fim.width * fh / fim.height; cx.drawImage(fim, px - fw * 0.22, py + 7 * sc - fh, fw, fh); return; }
@@ -673,6 +687,7 @@
           if (typeof Assets !== 'undefined' && Assets.has(ms) && !monNeed.has(ms)) { monNeed.add(ms); Assets.need([ms, 'poses/left/idle/' + mb]).then(() => draw()); }
         }
       }
+      if (o.t === 'mine' && o.fp && o.fp.length) drawMineYard(o, px, py);
       const badge = o.t === 'town' ? townBadge(o) : null;
       if (badge) {   // a round picture of the town's own castle, ringed in its owner's colour
         cx.beginPath(); cx.ellipse(px, py + 17, 24, 7, 0, 0, 7); cx.fillStyle = 'rgba(0,0,0,.3)'; cx.fill();
@@ -680,9 +695,10 @@
       }
       const spr = o.t === 'monster' || badge ? null : Art.obj(o, o.fac);
       if (spr) {
-        const sz = o.t === 'town' ? 50 : o.t === 'fort' || o.t === 'lair' ? 46 : o.t === 'dwelling' ? 44 : o.t === 'pile' ? 30 : 38;
-        cx.beginPath(); cx.ellipse(px, py + sz * 0.3, sz * 0.38, sz * 0.12, 0, 0, 7); cx.fillStyle = 'rgba(0,0,0,.26)'; cx.fill();   // soft ground shadow
-        cx.drawImage(spr, px - sz / 2, py - sz / 2 - (o.t === 'town' ? 5 : 2), sz, sz);
+        const big = o.t === 'mine' && o.fp && o.fp.length, sz = o.t === 'town' ? 50 : o.t === 'fort' || o.t === 'lair' ? 46 : o.t === 'dwelling' ? 44 : o.t === 'pile' ? 30 : big ? 52 : 38;
+        const sdx = big ? o.fp.reduce((a, p) => a + hcx(p[0], p[1]) - hcx(o.x, o.y), 0) / o.fp.length * 0.45 : 0, sdy = big ? o.fp.reduce((a, p) => a + hcy(p[1]) - hcy(o.y), 0) / o.fp.length * 0.45 : 0;
+        cx.beginPath(); cx.ellipse(px + sdx, py + sdy + sz * 0.3, sz * 0.38, sz * 0.12, 0, 0, 7); cx.fillStyle = 'rgba(0,0,0,.26)'; cx.fill();   // soft ground shadow
+        cx.drawImage(spr, px + sdx - sz / 2, py + sdy - sz / 2 - (o.t === 'town' ? 5 : 2), sz, sz);
       }
       else if (o.t !== 'monster') { if (typeof GI !== 'undefined') GI.text(cx, objIcon(o), px, py + 1, 28, { fill: '#fff' }); else { cx.font = `26px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(objIcon(o), px, py + 1); } }
       if (o.t === 'fort') {
@@ -1104,7 +1120,7 @@
     if (suppress) return;
     if (!G || busy || G.over) return;
     let t = tileFromEvent(ev); if (!t) return;
-    { const to = objAt(G, t.x, t.y); if (to && to.t === 'town' && (to.x !== t.x || to.y !== t.y)) t = { x: to.x, y: to.y }; }   // any of the town's four tiles leads to its gate
+    { const to = objAt(G, t.x, t.y); if (to && (to.t === 'town' || to.t === 'mine') && (to.x !== t.x || to.y !== t.y)) t = { x: to.x, y: to.y }; }   // any of the town's four tiles leads to its gate
     const here = heroesAt(t.x, t.y);
     if (here.length) {
       if (!here.includes(G.hero)) { setActive(G.heroes.indexOf(here[0])); G.path = null; renderAll(); return; }

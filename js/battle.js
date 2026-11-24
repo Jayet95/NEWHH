@@ -1329,6 +1329,13 @@ const Battle = (() => {
     const n = seq.length, i = state === 'walk' ? Math.floor((now - (s.walkT0 || 0)) / (s.walkMs || ANIM_MS.walk)) % n : state === 'idle' ? Math.floor((now - (s.idleT0 || 0)) / ANIM_MS.idle + (s.idleT0 ? 0 : s.c * 3 + s.r * 5)) % n : Math.min(n - 1, Math.max(0, Math.floor((now - t0) / dur * n)));
     return Assets.get(seq[i]) || null;
   }
+  // idle and walk frames are cross-faded: the next picture fades in over the whole length of the current one, so the creature flows from pose to pose instead of flipping between a few photos
+  function frameBlend(s, state, now) {
+    const seq = state === 'walk' ? (seqOf(s.t, 'walk') || seqOf(s.t, 'idle')) : seqOf(s.t, 'idle'); if (!seq || seq.length < 2) return null;
+    const n = seq.length, raw = state === 'walk' ? (now - (s.walkT0 || 0)) / (s.walkMs || ANIM_MS.walk) : (now - (s.idleT0 || 0)) / ANIM_MS.idle + (s.idleT0 ? 0 : s.c * 3 + s.r * 5);
+    const i = Math.floor(raw), f = raw - i, nx = Assets.get(seq[(i + 1) % n]); if (!nx) return null;
+    return { next: nx, k: f * f * (3 - 2 * f) };
+  }
   // Animation frames of one creature may have any canvas size as long as they are all the same: the figure's feet (bottom centre of the
   // first idle frame's visible pixels) are the anchor and one scale fits the creature to the field, so nothing jumps between frames.
   const fitCache = {};
@@ -1523,6 +1530,7 @@ const Battle = (() => {
       const fxv = faceStep(s, now);
       const fr = fighting ? frameOf(s, 'attack', now, s.anim.t0, s.anim.dur) : defending ? frameOf(s, 'defend', now, s.hurt, animDur(s.t, 'defend') || 320) : walking ? frameOf(s, 'walk', now) : frameOf(s, 'idle', now), fsx = fr ? fxv : fxv * (s.side === 0 ? 1 : -1);
       const pose = fr || poseOf(s, pst), pf = profOf(s.t); s._fimg = fr || null;
+      let nxImg = null, nxK = 0; if (fr && (pst === 'idle' || pst === 'walking')) { const bl = frameBlend(s, pst === 'walking' ? 'walk' : 'idle', now); if (bl && bl.next.width === fr.width && bl.next.height === fr.height) { nxImg = bl.next; nxK = bl.k; } }
       // idle breathing: a tiny squash and stretch about the feet (own speed per creature, out of step between stacks); flyers also flap
       const bph = now / (pf.fly ? 330 : pf.spd) + pf.ph + s.c * 1.7 + s.r * 0.9, breathing = !fighting && !defending && !reduced();
       const ba = pf.amp * (fr ? 0.6 : 1); let bry = breathing ? 1 + ba * Math.sin(bph) : 1, brx = breathing ? 1 - ba * 0.55 * Math.sin(bph) : 1;   // a creature with its own frames only gets a gentle extra breath
@@ -1537,7 +1545,9 @@ const Battle = (() => {
         if (flash && fa < 170 && !reduced() && 'filter' in ctx) ctx.filter = 'brightness(' + (1 + 1.15 * (1 - fa / 170)).toFixed(2) + ')';      // a quick white-hot flash on impact
         if (s._xf && fit) { const xk = (now - s._xf.t0) / 90; if (xk < 1) { ctx.save(); ctx.globalAlpha *= 1 - xk; ctx.drawImage(s._xf.img, -fit.cx * kk, -fit.by * kk, s._xf.img.width * kk, s._xf.img.height * kk); ctx.restore(); } else s._xf = null; }
         if (s === B.cur && !B.over) { ctx.shadowColor = s.side === 0 ? 'rgba(255,214,90,.95)' : 'rgba(255,120,90,.95)'; ctx.shadowBlur = 16 + (reduced() ? 0 : 5 * Math.sin(now / 260)); }
-        if (fit) ctx.drawImage(pose, -fit.cx * kk, -fit.by * kk, pw, ph); else ctx.drawImage(pose, -pw / 2, -ph, pw, ph); ctx.restore();
+        if (fit) ctx.drawImage(pose, -fit.cx * kk, -fit.by * kk, pw, ph); else ctx.drawImage(pose, -pw / 2, -ph, pw, ph);
+        if (nxImg && !reduced()) { ctx.shadowBlur = 0; ctx.globalAlpha *= nxK; if (fit) ctx.drawImage(nxImg, -fit.cx * kk, -fit.by * kk, pw, ph); else ctx.drawImage(nxImg, -pw / 2, -ph, pw, ph); }
+        ctx.restore();
         if (s === B.cur && !B.over) turnMarker(p.x, fy - (fit ? (fit.by - fit.ty) * kk : ph) - 12, s.side === 0, now);
       } else {
       ctx.beginPath(); ctx.arc(p.x, p.y + 4, HR * 0.72, 0, 7);

@@ -153,7 +153,7 @@ const Battle = (() => {
     if (target.side === 1) B.xp += killed * C[target.t].hp;
     const p = hexPx(target.c, target.r);
     B.fx.push({ x: p.x, y: p.y - 20, txt: '-' + dmg, col: '#ff6a5a', t0: now + dl, kind, big: dmg >= pool * 0.3, sub: killed > 0 ? '☠ ' + killed : '' });
-    if (target.dead) later(dl * spd() + 80, () => burst(p.x, p.y + 16, 9, { kind: 'smoke', col: PAL.dust, v0: 14, v1: 70, l0: 380, l1: 760, s0: 3, s1: 6, drag: 2.4, grow: 1.4 }));
+    if (target.dead) later(dl * spd() + 80, () => deathFx(target, p));
     fxHit(target, dmg, pool, kind, dn);
     log(`${label} ${C[target.t].n}: ${dmg} dmg, ${killed} killed.`);
     return killed;
@@ -556,11 +556,12 @@ const Battle = (() => {
   };
   async function strike(s, t) {
     const a = hexPx(s.c, s.r), p = hexPx(t.c, t.r), now = performance.now();
-    const ad = animDur(s.t, 'attack'), hitAt = ad ? (2.5 - atkSkip(s.t)) * ANIM_MS.attack : 152 / spd();    // with its own frames the blow lands on the impact frame
-    s.anim = { kind: 'lunge', t0: now, dur: ad || 380 / spd(), dx: p.x - a.x, dy: p.y - a.y }; sfx('swing'); csfx(s.t, 'attack'); faceTo(s, p.x, (ad || 380) + 400);
+    const pfa = profOf(s.t), atkMs = pfa.atk || 380, ad = animDur(s.t, 'attack'), hitAt = ad ? (2.5 - atkSkip(s.t)) * ANIM_MS.attack : 0.4 * atkMs / spd();    // with its own frames the blow lands on the impact frame
+    s.anim = { kind: 'lunge', t0: now, dur: ad || atkMs / spd(), dx: p.x - a.x, dy: p.y - a.y }; sfx('swing'); csfx(s.t, 'attack'); faceTo(s, p.x, (ad || atkMs) + 400);
+    if (pfa.slam) later(ad ? (2.5 - atkSkip(s.t)) * ANIM_MS.attack : 0.4 * atkMs, () => { ring(p.x, p.y + 12, 34, '#b9a98a', { w: 4, dur: 420, flat: 0.4 }); burst(p.x, p.y + 12, 7, { kind: 'smoke', col: PAL.dust, v0: 20, v1: 90, l0: 320, l1: 640, s0: 3, s1: 5.5, drag: 2.4, grow: 1.3 }); });      // heavy blows shake the ground
     { const dd = Math.hypot(p.x - a.x, p.y - a.y) || 1; t.knock = { ux: (p.x - a.x) / dd, uy: (p.y - a.y) / dd, amp: 8 }; }      // the target is pushed back along the blow
     push((a.x + p.x) / 2, (a.y + p.y) / 2, 0.026, 560);
-    (B.slashes = B.slashes || []).push({ x: p.x, y: p.y, t0: now + (ad ? (2 - atkSkip(s.t)) * ANIM_MS.attack : 150) / spd(), dur: 340 / spd(), style: styleOf(s).melee, mc: styleOf(s).mc, ang: Math.atan2(p.y - a.y, p.x - a.x) });
+    (B.slashes = B.slashes || []).push({ x: p.x, y: p.y, t0: now + (ad ? (2 - atkSkip(s.t)) * ANIM_MS.attack : 0.38 * atkMs) / spd(), dur: 340 / spd(), style: styleOf(s).melee, mc: styleOf(s).mc, ang: Math.atan2(p.y - a.y, p.x - a.x) });
     await sleep(hitAt);
   }
   // quick = the second arrow of a double shot: a shorter draw and flight, so the pair reads as one quick volley
@@ -1237,11 +1238,72 @@ const Battle = (() => {
     return (fitCache[key] = { k: Math.min(66 / (y1 - y0 + 1), 72 / (x1 - x0 + 1)), cx: (x0 + x1) / 2, by: y1 + 1, ty: y0, bw: x1 - x0 + 1, bh: y1 - y0 + 1 });
   }
   const PROF = {};
+
+  // ---------- how each creature moves and fights ----------
+  // atk = length of an attack in ms, wu = wind-up depth (how far it draws back first), lm = lunge length, kn = how far a blow pushes it,
+  // walk = the way it travels, die = how it goes down, slam = heavy blows kick up a dust ring, dc = colours of its death sparkles
+  const ARCH = {
+    imp:      { style: 'lunge', atk: 300, wu: 0.42, lm: 1.25, kn: 1.8, walk: 'hop', die: 'fall' },
+    foot:     { style: 'lunge', atk: 380, wu: 0.30, lm: 1.0, kn: 1.0, walk: 'march', die: 'fall' },
+    knight:   { style: 'lunge', atk: 410, wu: 0.36, lm: 1.1, kn: 0.8, walk: 'march', die: 'fall' },
+    rider:    { style: 'lunge', atk: 360, wu: 0.40, lm: 1.5, kn: 0.8, walk: 'bound', die: 'fall' },
+    beast:    { style: 'lunge', atk: 330, wu: 0.45, lm: 1.5, kn: 1.1, walk: 'bound', die: 'fall' },
+    brute:    { style: 'rear', atk: 480, wu: 0.55, lm: 0.9, kn: 0.5, walk: 'stomp', die: 'fall', slam: 1 },
+    colossus: { style: 'stomp', atk: 540, wu: 0.45, lm: 0.8, kn: 0.25, walk: 'stomp', die: 'shatter', slam: 1 },
+    giant:    { style: 'stomp', atk: 520, wu: 0.5, lm: 0.85, kn: 0.3, walk: 'stomp', die: 'fall', slam: 1 },
+    raptor:   { style: 'swoop', atk: 380, wu: 0.3, lm: 1.2, kn: 1.0, walk: 'glide', die: 'plunge' },
+    dragon:   { style: 'rear', atk: 520, wu: 0.5, lm: 1.0, kn: 0.3, walk: 'glide', die: 'plunge', slam: 1 },
+    serpent:  { style: 'lunge', atk: 380, wu: 0.5, lm: 1.3, kn: 0.7, walk: 'slither', die: 'flop' },
+    caster:   { style: 'lunge', atk: 400, wu: 0.25, lm: 0.9, kn: 1.0, walk: 'march', die: 'fall' },
+    undead:   { style: 'lunge', atk: 400, wu: 0.3, lm: 1.0, kn: 1.2, walk: 'sway', die: 'collapse', dc: ['#e8e0c8', '#c8c0a0'] },
+    ghost:    { style: 'swoop', atk: 380, wu: 0.3, lm: 1.0, kn: 1.4, walk: 'glide', die: 'dissolve', dc: ['#ffffff', '#cfe6ff'] },
+    fiend:    { style: 'rear', atk: 430, wu: 0.45, lm: 1.0, kn: 0.7, walk: 'march', die: 'burn' },
+    flame:    { style: 'swoop', atk: 380, wu: 0.3, lm: 1.1, kn: 1.0, walk: 'glide', die: 'burn' },
+    plant:    { style: 'stomp', atk: 520, wu: 0.5, lm: 0.8, kn: 0.4, walk: 'stomp', die: 'collapse', dc: ['#8ad05a', '#5aa83a', '#b8e07a'] },
+    angel:    { style: 'swoop', atk: 400, wu: 0.3, lm: 1.1, kn: 0.7, walk: 'glide', die: 'dissolve', dc: ['#ffffff', '#fff1a8', '#ffd24a'] },
+  };
+  const ARCH_OF = {
+    goblin: 'imp', wolf: 'rider', orc: 'foot', ogre: 'brute', troll: 'brute', golem: 'colossus', naga: 'serpent', dragon: 'dragon', shark: 'serpent', kraken: ['serpent', { atk: 520, kn: 0.3 }],
+    castle1: 'foot', castle2: 'caster', castle3: 'raptor', castle4: 'knight', castle5: 'caster', castle6: 'rider', castle7: 'angel',
+    rampart1: 'rider', rampart2: ['foot', { kn: 0.6 }], rampart3: 'caster', rampart4: 'raptor', rampart5: 'plant', rampart6: 'beast', rampart7: 'dragon',
+    tower1: 'imp', tower2: ['raptor', { die: 'shatter', dc: ['#a49a88', '#7a7262'] }], tower3: 'colossus', tower4: 'caster', tower5: ['ghost', { dc: ['#ffe9a0', '#9fe6ff'] }], tower6: 'serpent', tower7: 'giant',
+    inferno1: ['imp', { die: 'burn' }], inferno2: ['caster', { die: 'burn' }], inferno3: ['beast', { die: 'burn' }], inferno4: 'fiend', inferno5: 'fiend', inferno6: 'flame', inferno7: ['fiend', { style: 'swoop', walk: 'glide' }],
+    necropolis1: 'undead', necropolis2: ['undead', { atk: 450, kn: 0.8 }], necropolis3: ['ghost', { dc: ['#bfffd0', '#7ad88a'] }], necropolis4: ['raptor', { die: 'dissolve', dc: ['#ff8a9a', '#c0304a'] }], necropolis5: ['caster', { die: 'collapse', dc: ['#e8e0c8', '#c8c0a0'] }], necropolis6: ['knight', { die: 'collapse', dc: ['#9a8ab8', '#6a5a88'] }], necropolis7: ['dragon', { die: 'collapse', dc: ['#e8e0c8', '#c8c0a0'] }],
+    dungeon1: 'imp', dungeon2: 'raptor', dungeon3: ['caster', { walk: 'glide', die: 'dissolve', dc: ['#ffb0e8', '#ffffff'] }], dungeon4: ['serpent', { atk: 400 }], dungeon5: 'brute', dungeon6: ['dragon', { atk: 440, lm: 1.2 }], dungeon7: 'dragon',
+    stronghold1: 'imp', stronghold2: 'rider', stronghold3: 'foot', stronghold4: 'brute', stronghold5: ['raptor', { atk: 450, kn: 0.5 }], stronghold6: 'brute', stronghold7: 'giant',
+    fortress1: 'foot', fortress2: ['foot', { lm: 1.2 }], fortress3: 'raptor', fortress4: 'serpent', fortress5: 'brute', fortress6: ['raptor', { style: 'rear', atk: 440 }], fortress7: ['serpent', { atk: 520, kn: 0.3 }],
+    conflux1: ['ghost', { atk: 300, dc: ['#ffffff', '#ffb8f0', '#c8ffb8'] }], conflux2: 'ghost', conflux3: ['ghost', { walk: 'slither', dc: ['#bfefff', '#7fd4ff'] }], conflux4: 'flame', conflux5: 'colossus', conflux6: ['ghost', { dc: ['#ff9ae8', '#ffffff'] }], conflux7: ['flame', { atk: 440 }],
+    faerie: ['ghost', { atk: 320, dc: ['#ffffff', '#ffb8f0', '#c8ffb8'] }], rustd: 'dragon', crystald: ['dragon', { die: 'shatter', dc: ['#c8f0ff', '#ffffff'] }], azured: ['dragon', { die: 'dissolve', dc: ['#9fd0ff', '#ffffff'] }],
+  };
+  // how each way of going down looks: offsets, spin, squash and fade over its fall (e = eased 0..1, k = raw 0..1, dir = which way it topples)
+  const DEATH = {
+    fall:     (e, k, dir) => ({ dy: e * 6, rot: dir * e * 0.85, sx: 1 + e * 0.1, sy: 1 - e * 0.5, a: Math.max(0, 1 - Math.pow(k, 1.5)) }),
+    collapse: (e, k, dir) => ({ dy: e * 10, rot: dir * e * 0.12, sx: 1 + e * 0.25, sy: 1 - e * 0.82, a: Math.max(0, 1 - k * k) }),
+    dissolve: (e, k) => ({ dy: -e * 16, rot: 0, sx: 1 + e * 0.12, sy: 1 + e * 0.1, a: Math.pow(Math.max(0, 1 - k), 1.4) }),
+    burn:     (e, k, dir) => ({ dy: e * 4, rot: dir * e * 0.3, sx: 1 - e * 0.2, sy: 1 - e * 0.6, a: Math.max(0, 1 - Math.pow(k, 0.8)) }),
+    shatter:  (e, k, dir) => ({ dy: e * 2, rot: dir * e * 0.05, sx: 1 + e * 0.15, sy: 1 - e * 0.3, a: Math.max(0, 1 - k * 2.2) }),
+    plunge:   (e, k, dir) => ({ dy: 34 * k * k, rot: dir * e * 1.6, sx: 1, sy: 1 - e * 0.2, a: Math.max(0, 1 - k * k) }),
+    flop:     (e, k, dir) => ({ dy: e * 8, rot: dir * e * 1.4, sx: 1 + e * 0.1, sy: 1 - e * 0.5, a: Math.max(0, 1 - Math.pow(k, 1.5)) }),
+  };
+  // what flies off a creature as it dies
+  function deathFx(t, p) {
+    const pf = profOf(t.t), x = p.x, y = p.y + 16;
+    switch (pf.die) {
+      case 'collapse': burst(x, y - 6, 12, { kind: 'shard', col: pf.dc, v0: 30, v1: 120, up: 70, g: 520, drag: 1.2, l0: 420, l1: 800, s0: 1.4, s1: 2.8, add: false }); burst(x, y, 5, { kind: 'smoke', col: PAL.dust, v0: 10, v1: 50, l0: 300, l1: 600, s0: 3, s1: 5, drag: 2.4, grow: 1.2 }); break;
+      case 'dissolve': burst(x, y - 14, 16, { kind: 'sparkle', col: pf.dc || PAL.gold, v0: 8, v1: 50, up: 50, g: -70, drag: 1.6, l0: 600, l1: 1100, s0: 2, s1: 3.4 }); break;
+      case 'burn': burst(x, y - 8, 14, { kind: 'ember', col: PAL.fire, v0: 20, v1: 90, up: 60, g: -50, drag: 1.4, l0: 500, l1: 1000, s0: 2, s1: 4 }); burst(x, y - 4, 6, { kind: 'smoke', col: ['#3a3430'], v0: 8, v1: 40, up: 20, g: -30, l0: 500, l1: 900, s0: 3, s1: 6, drag: 2, grow: 1.6, add: false }); break;
+      case 'shatter': burst(x, y - 8, 16, { kind: 'shard', col: pf.dc || PAL.rock, v0: 60, v1: 200, up: 90, g: 560, drag: 1.1, l0: 420, l1: 820, s0: 1.8, s1: 3.2, add: false }); burst(x, y, 8, { kind: 'smoke', col: PAL.dust, v0: 14, v1: 70, l0: 380, l1: 760, s0: 3, s1: 6, drag: 2.4, grow: 1.4 }); break;
+      case 'plunge': burst(x, y + 6, 9, { kind: 'smoke', col: PAL.dust, v0: 14, v1: 80, l0: 380, l1: 720, s0: 3, s1: 5.5, drag: 2.4, grow: 1.3 }); burst(x, y - 20, 6, { kind: 'shard', col: ['#f4efe4', '#d8d0c0'], v0: 20, v1: 70, up: 20, g: 90, drag: 1.4, l0: 500, l1: 900, s0: 1.2, s1: 2, add: false }); break;
+      default: burst(x, y, 9, { kind: 'smoke', col: PAL.dust, v0: 14, v1: 70, l0: 380, l1: 760, s0: 3, s1: 6, drag: 2.4, grow: 1.4 });
+    }
+  }
   function profOf(t) {
     const id = String(t).replace(/_\d$/, ''); if (PROF[id]) return PROF[id];
     let h = 2166136261; for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
     const r = (n) => ((h >>> (n * 5)) & 31) / 31, c = C[t] || {};
-    return (PROF[id] = { fly: !!c.fly, shoot: !!c.shoot, spd: 480 + r(1) * 220, amp: 0.014 + r(2) * 0.014, lunge: 20 + r(3) * 10, ph: r(4) * 6.28, style: c.fly ? 'swoop' : c.shoot ? 'recoil' : r(0) > 0.62 ? 'rear' : r(0) > 0.3 ? 'lunge' : 'stomp' });
+    const base = { fly: !!c.fly, shoot: !!c.shoot, spd: 480 + r(1) * 220, amp: 0.014 + r(2) * 0.014, lunge: 20 + r(3) * 10, ph: r(4) * 6.28, style: c.fly ? 'swoop' : c.shoot ? 'recoil' : r(0) > 0.62 ? 'rear' : r(0) > 0.3 ? 'lunge' : 'stomp' };
+    const ao = ARCH_OF[id], an = Array.isArray(ao) ? ao[0] : ao, ar = Object.assign({}, ARCH[an || 'foot'], Array.isArray(ao) ? ao[1] : null);
+    return (PROF[id] = Object.assign(base, ar, { lunge: base.lunge * ar.lm, arch: an || 'foot' }));
   }
   function structSprite(st, p) {
     if (typeof Assets === 'undefined') return false;
@@ -1333,13 +1395,14 @@ const Battle = (() => {
     // a fallen stack slumps, shrinks and fades (a stack killed by a delayed spell stays whole until the effect lands)
     for (const s of B.stacks) if (s.dead && s.deadAt && now - s.deadAt < Math.max(700, animDur(s.t, 'death') + 40) && s.px !== undefined) {
       const k = Math.max(0, (now - s.deadAt) / 700), dfr = frameOf(s, 'death', now, s.deadAt, animDur(s.t, 'death') || 600), e = k * k * (3 - 2 * k), dir = s.side === 1 ? -1 : 1, pose = dfr || poseOf(s, 'defending');
-      ctx.save(); ctx.globalAlpha = dfr ? Math.min(1, Math.max(0, (1 - k) * 4)) : Math.max(0, 1 - Math.pow(k, 1.5));
+      const dkp = (DEATH[profOf(s.t).die] || DEATH.fall)(e, k, dir);
+      ctx.save(); ctx.globalAlpha = dfr ? Math.min(1, Math.max(0, (1 - k) * 4)) : dkp.a;
       if (dfr) {
         const wd = isWide(s), fit = animFit(s.t), kk = fit ? fit.k * (wd ? 1.25 : 1) : Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.25 : 1), pw = pose.width * kk, ph = pose.height * kk;
         ctx.translate(s.px + (wd ? (s.side === 0 ? -1 : 1) * HW * 0.5 : 0), s.py + 22); ctx.scale(s.fx !== undefined ? s.fx : defFace(s), 1); if (fit) ctx.drawImage(pose, -fit.cx * kk, -fit.by * kk, pw, ph); else ctx.drawImage(pose, -pw / 2, -ph, pw, ph);
       } else if (pose) {
         const wd = isWide(s), kk = Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.25 : 1), pw = pose.width * kk, ph = pose.height * kk;
-        ctx.translate(s.px + (wd ? (s.side === 0 ? -1 : 1) * HW * 0.5 : 0), s.py + 22 + e * 6); ctx.rotate(dir * e * 0.85); ctx.scale(1 + e * 0.1, 1 - e * 0.5); if (s.fx !== undefined && s.fx !== defFace(s)) ctx.scale(-1, 1); ctx.drawImage(pose, -pw / 2, -ph, pw, ph);
+        ctx.translate(s.px + (wd ? (s.side === 0 ? -1 : 1) * HW * 0.5 : 0), s.py + 22 + dkp.dy); ctx.rotate(dkp.rot); ctx.scale(dkp.sx, dkp.sy); if (s.fx !== undefined && s.fx !== defFace(s)) ctx.scale(-1, 1); ctx.drawImage(pose, -pw / 2, -ph, pw, ph);
       } else {
         const sz = HR * 1.28; ctx.translate(s.px, s.py + 3 + e * 14); ctx.rotate(dir * e * 0.85); ctx.scale(1 + e * 0.1, 1 - e * 0.45); ctx.drawImage(Art.portraitCanvas(s.t, PS()), -sz / 2, -sz / 2, sz, sz);
       }
@@ -1445,11 +1508,11 @@ const Battle = (() => {
           // frames of their own keep the old, gentler curve; the code-made motion gets a real wind-up (draw back), a fast strike, a short hold on impact and a soft settle
           let e;
           if (own) { const pr = k < 0.4 ? k / 0.4 : 1 - (k - 0.4) / 0.6; e = sm(pr); }
-          else if (k < 0.22) e = -0.3 * Math.sin(k / 0.22 * Math.PI / 2);
-          else if (k < 0.4) { const t = (k - 0.22) / 0.18; e = -0.3 + 1.3 * t * t; }
+          else if (k < 0.22) e = -(pf.wu || 0.3) * Math.sin(k / 0.22 * Math.PI / 2);
+          else if (k < 0.4) { const t = (k - 0.22) / 0.18, w0 = pf.wu || 0.3; e = -w0 + (1 + w0) * t * t; }
           else if (k < 0.52) e = 1 + 0.04 * Math.sin((k - 0.4) / 0.12 * Math.PI);
           else { const t = (k - 0.52) / 0.48; e = 1 - sm(t) * 1.03 + 0.03 * Math.sin(t * Math.PI); }
-          const m = Math.min(pf.lunge * (own ? 1 : 1.3), d * 0.6);
+          const m = Math.min(pf.lunge * (own ? 0.8 : 1.3), d * 0.6);
           x += ux * e * m * f; y += uy * e * m * f; rot = e * 0.28 * sg * f;
           if (!own) {
             if (style === 'swoop') { y -= Math.sin(k * Math.PI) * 16; rot = e * 0.4 * sg; }                                   // flyers dive in along an arc
@@ -1465,9 +1528,16 @@ const Battle = (() => {
       }
     }
     if (s.walkUntil && now < s.walkUntil && !a && !seqOf(s.t, 'walk')) {      // real walk frames carry their own motion; the stepping bob is only for the idle-frame stand-in
-      const st = Math.sin(now / 95); y -= Math.abs(st) * (fly ? 1.5 : 3); rot += st * 0.035; }
+      const wk = pf.walk || 'march';
+      if (wk === 'hop') { const st = Math.sin(now / 70); y -= Math.abs(st) * 6; rot += st * 0.05; }
+      else if (wk === 'bound') { const st = Math.sin(now / 80); y -= Math.abs(st) * 4.5; rot += st * 0.025; sx *= 1 + 0.03 * Math.sin(now / 80 + 1); }
+      else if (wk === 'stomp') { const st = Math.sin(now / 140); y -= Math.max(0, st) * 3; sy *= 1 - 0.045 * Math.max(0, -st); sx *= 1 + 0.03 * Math.max(0, -st); rot += st * 0.025; }
+      else if (wk === 'slither') { x += Math.sin(now / 110) * 2.4; y -= Math.abs(Math.sin(now / 150)) * 0.8; rot += Math.sin(now / 110) * 0.05; }
+      else if (wk === 'glide') { y += Math.sin(now / 200) * 1.8 - 2; rot += Math.sin(now / 260) * 0.03; }
+      else if (wk === 'sway') { const st = Math.sin(now / 130); rot += st * 0.06; y -= Math.abs(st) * 1.4; }
+      else { const st = Math.sin(now / 95); y -= Math.abs(st) * (fly ? 1.5 : 3); rot += st * 0.035; } }
     if (s.hurt) { const k = (now - s.hurt) / 320; if (k >= 0 && k < 1) {
-      if (s.knock) { const kb = k < 0.22 ? Math.sin(k / 0.22 * Math.PI / 2) : 1 - (() => { const t = (k - 0.22) / 0.78; return t * t * (3 - 2 * t); })(); x += s.knock.ux * kb * s.knock.amp; y += s.knock.uy * kb * s.knock.amp * 0.6; x += Math.sin(k * 34) * (1 - k) * 1.6; }
+      if (s.knock) { const kb = k < 0.22 ? Math.sin(k / 0.22 * Math.PI / 2) : 1 - (() => { const t = (k - 0.22) / 0.78; return t * t * (3 - 2 * t); })(); x += s.knock.ux * kb * s.knock.amp * (pf.kn || 1); y += s.knock.uy * kb * s.knock.amp * 0.6 * (pf.kn || 1); x += Math.sin(k * 34) * (1 - k) * 1.6; }
       else x += Math.sin(k * 40) * (1 - k) * 4; if (!seqOf(s.t, 'defend')) { sy *= 1 - 0.06 * Math.sin(k * Math.PI); sx *= 1 + 0.04 * Math.sin(k * Math.PI); } } }
     return { x, y, rot, sx, sy };
   }

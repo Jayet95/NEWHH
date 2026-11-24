@@ -4,7 +4,7 @@
 // packs/index.json: { packs: [{ f, n, core }], files: { "<stem>": [pack, offset, length, "webp|png|..."] } }
 // The game falls back to the single files when the packs are not there (for example the python dev server).
 const fs = require('fs'), path = require('path');
-const LATER = /^(poses|mounted|anim|buildings|heroes)\/|^battle\/(obs|mach|siege)\/|^ui\/(screens|castle_select|hero_select|adventure|town_)/;
+const LATER = /^(poses|mounted|anim|buildings|heroes)\/|^battle\/(obs|mach|siege|proj)\/|^ui\/(screens|castle_select|hero_select|adventure|town_)/;
 function pack(root, outDir) {
   const art = path.join(root, 'art'), list = JSON.parse(fs.readFileSync(path.join(art, 'manifest.json'), 'utf8')).files;
   outDir = outDir || path.join(art, 'packs'); fs.rmSync(outDir, { recursive: true, force: true }); fs.mkdirSync(outDir, { recursive: true });
@@ -13,7 +13,7 @@ function pack(root, outDir) {
   add('core', true, list.filter(f => !LATER.test(stem(f))));
   const idleSet = new Set(list.filter(f => /^anim\/[^/]+\/idle_1\./.test(f) || /^poses\/left\/idle\//.test(f)));   // the battle art used for creature pictures everywhere: one small pack
   add('idle', true, [...idleSet]);   // part of the loader: every picture of a creature is its battle art from the first screen
-  add('battleart', false, list.filter(f => /^battle\/(obs|mach|siege)\//.test(f)));   // painted obstacles, war machines and castle walls: fetched when a battle starts
+  add('battleart', false, list.filter(f => /^battle\/(obs|mach|siege|proj)\//.test(f)));   // painted obstacles, war machines and castle walls: fetched when a battle starts
   add('buildings', false, list.filter(f => /^buildings\//.test(f)));
   // each castle's new town paintings, garrison panels and buttons form their own pack, so opening a town downloads only that castle's art
   const townFac = (f) => { const m = /^ui\/town_(?:w|wl|t|tl)_([a-z]+)$/.exec(stem(f)) || /^ui\/town_(?:gar|btn)_([a-z]+)_(?:with|without|war|bld)$/.exec(stem(f)); return m && m[1]; };

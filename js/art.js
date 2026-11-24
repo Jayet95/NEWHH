@@ -586,5 +586,6 @@ const Art = (() => {
   }
   // after custom art finishes loading: forget everything painted so far and rebuild the icon strings
   function reload() { for (const o of [resCache, resUrl, spriteCache, portCache, heroCache, urlCache, patCache]) for (const k in o) delete o[k]; for (const k of Object.keys(RES_ICON)) RES_ICON[k] = resImg(k); }
-  return { reload, tile, tileOverlay, drawRivers, hexPath, hexPt, HR, cursor, rarity, portraitCanvas, heroCanvas, pic, heroPic, obj, boat: boatC, resImg, resCanvas, RES_EMOJI, fmtCostTxt, facHue };
+  const dropPatterns = () => { for (const k in patCache) delete patCache[k]; };   // a phone can discard canvas memory while the app is in the background
+  return { dropPatterns, reload, tile, tileOverlay, drawRivers, hexPath, hexPt, HR, cursor, rarity, portraitCanvas, heroCanvas, pic, heroPic, obj, boat: boatC, resImg, resCanvas, RES_EMOJI, fmtCostTxt, facHue };
 })();

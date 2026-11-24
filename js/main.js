@@ -284,6 +284,19 @@
       const cxp = (tn.x + .5 + (tn.y & 1) * .5) * TS, cyp = tn.y * RH + HR; c.save(); c.fillStyle = '#0c0804'; c.beginPath(); c.moveTo(cxp - 10, cyp + 10); c.lineTo(cxp - 10, cyp - 2); c.quadraticCurveTo(cxp, cyp - 16, cxp + 10, cyp - 2); c.lineTo(cxp + 10, cyp + 10); c.closePath(); c.fill(); c.strokeStyle = '#9a8a68'; c.lineWidth = 2.4; c.stroke(); c.restore();
     }
   }
+  // coming back to the app on a phone: the browser may have thrown away the big terrain canvas (the map shows only blue/blank), so check it and repaint
+  function terrainLost() {
+    if (!terrain) return false;
+    try {
+      const g = terrain.getContext('2d'); let lost = terrain.width < 2;
+      for (const [fx, fy] of [[.3, .3], [.5, .5], [.7, .7], [.2, .8], [.8, .2]]) { const d = g.getImageData(Math.floor(terrain.width * fx), Math.floor(terrain.height * fy), 1, 1).data; if (d[3] === 0) lost = true; }
+      return lost;
+    } catch (e) { return true; }
+  }
+  function revive() { if (!G || document.hidden) return; try { if (terrainLost()) { Art.dropPatterns(); buildTerrain(); fogDirty = true; renderAll(); } else draw(); } catch (e) { /* ignore */ } }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { revive(); setTimeout(revive, 400); } });
+  window.addEventListener('pageshow', () => { revive(); setTimeout(revive, 400); });
+  window.addEventListener('focus', () => setTimeout(revive, 200));
   // ---------- fog of war ----------
   let vis = null, fogDirty = true, miniFog = null;
   const fogOn = () => G.fog !== false;
@@ -3535,5 +3548,5 @@
   if (!/[?&]demo/.test(location.search) && Settings.resume && localStorage.getItem(SAVE)) Assets.ready.then(() => { if (!G && load()) $('title').classList.add('hide'); });
   if (/[?&]demo/.test(location.search)) Assets.ready.then(() => setTimeout(() => { try { newGame('castle', 'Orrin', 'normal', { size: 'medium', seed: 'demo', wrap: true, food: /[?&]food/.test(location.search) }); $('title').classList.add('hide'); demo(); } catch (e) { console.error('demo failed', e); } }, 400));
   window.__G = () => G;
-  window.__dbg = { endTurn, borderBlock, canCross, terrOwner, openDiplomacy, aiDiplomacy, declareWar, atWar, realmPower, demo, openBuildMenu, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, mis, openMissions, misEnsure, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
+  window.__dbg = { endTurn, borderBlock, canCross, terrOwner, openDiplomacy, aiDiplomacy, declareWar, atWar, realmPower, demo, openBuildMenu, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, mis, openMissions, misEnsure, loseTerrain: () => { terrain.width = terrain.width; draw(); }, terrainLost, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
 })();

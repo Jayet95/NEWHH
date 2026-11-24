@@ -384,7 +384,22 @@ function reindex(G) {
   G.omap = new Map();
   for (const o of G.objs) G.omap.set(o.y * G.W + o.x, o);
   // a mine covers three hexes: its entrance plus two neighbouring yard hexes that nobody can walk through (o.fp); every click on the yard leads to the mine
-  for (const o of G.objs) if (o.t === 'mine') { if (o.fp === undefined) o.fp = mineFootprint(G, o); for (const p of o.fp) G.omap.set(p[1] * G.W + p[0], o); }
+  for (const o of G.objs) if (has3hex(o)) { if (o.fp === undefined || (o.fp.length && o.rot === undefined)) assignFootprint(G, o); for (const p of o.fp) G.omap.set(p[1] * G.W + p[0], o); }
+}
+// buildings that cover three hexes (the painted world art, art/world): the entrance hex plus two yard hexes in one of six rotations (axial offsets from the entrance)
+const WROT3 = [[[0, -1], [1, -1]], [[1, -1], [1, 0]], [[1, 0], [0, 1]], [[0, 1], [-1, 1]], [[-1, 1], [-1, 0]], [[-1, 0], [0, -1]]];
+const has3hex = (o) => o.t === 'mine' || o.t === 'fort' || o.t === 'lair' || o.t === 'farm' || (o.t === 'dwelling' && !!o.fac);
+const axOff = (x, y, dq, dr) => { const q = x - (y - (y & 1)) / 2 + dq, r = y + dr; return [q + (r - (r & 1)) / 2, r]; };
+function assignFootprint(G, o) {
+  const ok = (p) => p[0] >= 0 && p[1] >= 0 && p[0] < G.W && p[1] < G.H && (G.tiles[p[1]][p[0]] === T.GRASS || G.tiles[p[1]][p[0]] === T.SAND) && !G.omap.has(p[1] * G.W + p[0]) && !(G.heroes && G.heroes.some(h => h.x === p[0] && h.y === p[1]));
+  const nb = hexNb(o.x, o.y), s0 = (o.x * 7 + o.y * 13) % 6;
+  for (let k = 0; k < 6; k++) {
+    const r = (s0 + k) % 6, tiles = WROT3[r].map(([dq, dr]) => axOff(o.x, o.y, dq, dr));
+    if (!tiles.every(ok)) continue;
+    const open = nb.filter(p => !tiles.some(t => t[0] === p[0] && t[1] === p[1]) && p[0] >= 0 && p[1] >= 0 && p[0] < G.W && p[1] < G.H && G.tiles[p[1]][p[0]] !== T.WATER && G.tiles[p[1]][p[0]] !== T.MOUNT && !G.omap.has(p[1] * G.W + p[0]));
+    if (open.length >= 2) { o.fp = tiles; o.rot = r; return; }      // the building keeps at least two ways in
+  }
+  o.fp = []; o.rot = undefined;
 }
 function mineFootprint(G, o) {
   const ok = (p) => p[0] >= 0 && p[1] >= 0 && p[0] < G.W && p[1] < G.H && (G.tiles[p[1]][p[0]] === T.GRASS || G.tiles[p[1]][p[0]] === T.SAND) && !G.omap.has(p[1] * G.W + p[0]) && !(G.heroes && G.heroes.some(h => h.x === p[0] && h.y === p[1]));

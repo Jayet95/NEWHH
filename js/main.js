@@ -404,6 +404,31 @@
   }
   const threatLine = (x, y) => { const t = threatAt(x, y); return t ? `<br>⚔ <b style="color:${t.col}">${t.label}</b> <span class="small">— your army is ${t.ratio >= 10 ? '10+' : t.ratio.toFixed(1)}× ${t.ratio >= 1 ? 'stronger' : 'as strong'}; expect to lose ≈${Math.round(t.loss * 100)}% of it</span>` : ''; };
   // waving flag in the owner's colour (allies get a white fringe)
+  // painted world objects (art/world): every picture fits the hexes it covers; a three-hex building is painted in six rotations to match the yard chosen for it (o.rot)
+  const FAC_ART = { castle: 'kingdom', rampart: 'forest', tower: 'wizards', inferno: 'hell', necropolis: 'undead', dungeon: 'caves', stronghold: 'wild_clans', fortress: 'swamp', conflux: 'spirits' };
+  const WORLD_E3 = [[105, 156.57], [57, 156.57], [57, 73.43], [105, 73.43], [153, 73.43], [153, 156.57]], WORLD_F = 0.7, worldNeed = new Set();
+  const gateCol = (c) => (c === 'gold' ? 'orange' : c || 'blue');
+  function worldKey(o) {
+    switch (o.t) {
+      case 'mine': return o.kind === 'wood' ? 'lumber_camp' : 'mine_' + o.kind;
+      case 'dwelling': return o.fac && o.tier ? 'dwelling_t' + o.tier + '_' + (FAC_ART[o.fac] || 'kingdom') : null;
+      case 'fort': return 'fort'; case 'lair': return 'dragon_lair'; case 'farm': return 'farm';
+      case 'shrine': return 'shrine'; case 'tower': return 'watchtower'; case 'seer': return 'seer_hut'; case 'prison': return 'prison'; case 'merchant': return 'merchant';
+      case 'obelisk': return 'obelisk_' + ['blue', 'red', 'green', 'orange', 'purple', 'teal'][(o.x * 3 + o.y) % 6];
+      case 'questgate': return 'quest_gate_' + gateCol(o.col); case 'keytent': return 'key_tent_' + gateCol(o.col); case 'gate': return 'border_gate_' + gateCol(o.col);
+      case 'deposit': return 'deposit_' + o.kind; case 'pile': return 'pile_' + o.kind; case 'chest': return 'chest'; case 'wreck': return 'wreck';
+      default: return null;
+    }
+  }
+  function drawWorldObj(o, px, py) {
+    if (typeof Assets === 'undefined') return false;
+    const key = worldKey(o); if (!key) return false;
+    const three = has3hex(o); if (three && (!o.fp || !o.fp.length || o.rot === undefined)) return false;
+    const name = 'world/' + key + '_' + (three ? o.rot : 0), im = Assets.get(name);
+    if (!im) { if (Assets.has(name) && !worldNeed.has(name)) { worldNeed.add(name); Assets.need([name]).then(() => draw()); } return false; }
+    const e = three ? WORLD_E3[o.rot] : [52, 60], sc = HR / 55.4256, k = sc / WORLD_F;
+    cx.drawImage(im, px - e[0] * sc, py - e[1] * sc, im.width * k, im.height * k); return true;
+  }
   // a mine's yard: the two extra hexes it covers, trodden earth with a heap of what the mine yields (logs for a lumber camp, ore and rock otherwise)
   const MINE_COL = { wood: '#8a5a2a', ore: '#8a8a98', gold: '#ffd24a', mercury: '#d0d0e0', sulfur: '#e8d84a', crystal: '#6ae0ff', gems: '#c05aff' };
   function drawMineYard(o, px, py) {
@@ -687,20 +712,21 @@
           if (typeof Assets !== 'undefined' && Assets.has(ms) && !monNeed.has(ms)) { monNeed.add(ms); Assets.need([ms, 'poses/left/idle/' + mb]).then(() => draw()); }
         }
       }
-      if (o.t === 'mine' && o.fp && o.fp.length) drawMineYard(o, px, py);
+      const wDrawn = drawWorldObj(o, px, py);
+      if (!wDrawn && o.t === 'mine' && o.fp && o.fp.length) drawMineYard(o, px, py);
       const badge = o.t === 'town' ? townBadge(o) : null;
       if (badge) {   // a round picture of the town's own castle, ringed in its owner's colour
         cx.beginPath(); cx.ellipse(px, py + 17, 24, 7, 0, 0, 7); cx.fillStyle = 'rgba(0,0,0,.3)'; cx.fill();
         cx.drawImage(badge, px - 30, py - 33, 60, 60);
       }
-      const spr = o.t === 'monster' || badge ? null : Art.obj(o, o.fac);
+      const spr = o.t === 'monster' || badge || wDrawn ? null : Art.obj(o, o.fac);
       if (spr) {
         const big = o.t === 'mine' && o.fp && o.fp.length, sz = o.t === 'town' ? 50 : o.t === 'fort' || o.t === 'lair' ? 46 : o.t === 'dwelling' ? 44 : o.t === 'pile' ? 30 : big ? 52 : 38;
         const sdx = big ? o.fp.reduce((a, p) => a + hcx(p[0], p[1]) - hcx(o.x, o.y), 0) / o.fp.length * 0.45 : 0, sdy = big ? o.fp.reduce((a, p) => a + hcy(p[1]) - hcy(o.y), 0) / o.fp.length * 0.45 : 0;
         cx.beginPath(); cx.ellipse(px + sdx, py + sdy + sz * 0.3, sz * 0.38, sz * 0.12, 0, 0, 7); cx.fillStyle = 'rgba(0,0,0,.26)'; cx.fill();   // soft ground shadow
         cx.drawImage(spr, px + sdx - sz / 2, py + sdy - sz / 2 - (o.t === 'town' ? 5 : 2), sz, sz);
       }
-      else if (o.t !== 'monster') { if (typeof GI !== 'undefined') GI.text(cx, objIcon(o), px, py + 1, 28, { fill: '#fff' }); else { cx.font = `26px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(objIcon(o), px, py + 1); } }
+      else if (o.t !== 'monster' && !wDrawn) { if (typeof GI !== 'undefined') GI.text(cx, objIcon(o), px, py + 1, 28, { fill: '#fff' }); else { cx.font = `26px ${FONT}`; cx.fillStyle = '#fff'; cx.fillText(objIcon(o), px, py + 1); } }
       if (o.t === 'fort') {
         drawFlag(px + 13, py - 8, ownCol(o.owner), relOf(o.owner), 1.1);
         const gn = o.garrison.reduce((s, a) => s + (a ? a.n : 0), 0);
@@ -1120,7 +1146,7 @@
     if (suppress) return;
     if (!G || busy || G.over) return;
     let t = tileFromEvent(ev); if (!t) return;
-    { const to = objAt(G, t.x, t.y); if (to && (to.t === 'town' || to.t === 'mine') && (to.x !== t.x || to.y !== t.y)) t = { x: to.x, y: to.y }; }   // any of the town's four tiles leads to its gate
+    { const to = objAt(G, t.x, t.y); if (to && (to.t === 'town' || (to.fp && to.fp.length)) && (to.x !== t.x || to.y !== t.y)) t = { x: to.x, y: to.y }; }   // any of the town's four tiles leads to its gate
     const here = heroesAt(t.x, t.y);
     if (here.length) {
       if (!here.includes(G.hero)) { setActive(G.heroes.indexOf(here[0])); G.path = null; renderAll(); return; }

@@ -556,7 +556,7 @@ const Battle = (() => {
   };
   async function strike(s, t) {
     const a = hexPx(s.c, s.r), p = hexPx(t.c, t.r), now = performance.now();
-    const pfa = profOf(s.t), atkMs = pfa.atk || 380, ad = animDur(s.t, 'attack'), hitAt = ad ? (2.5 - atkSkip(s.t)) * ANIM_MS.attack : 0.4 * atkMs / spd();    // with its own frames the blow lands on the impact frame
+    const pfa = profOf(s.t), atkMs = pfa.atk || 380, ad = animDur(s.t, 'attack'), hitAt = ad ? (2.5 - atkSkip(s.t)) * ANIM_MS.attack : 0.4 * atkMs;      // (sleep() divides by the animation speed itself)    // with its own frames the blow lands on the impact frame
     s.anim = { kind: 'lunge', t0: now, dur: ad || atkMs / spd(), dx: p.x - a.x, dy: p.y - a.y }; sfx('swing'); csfx(s.t, 'attack'); faceTo(s, p.x, (ad || atkMs) + 400);
     if (pfa.slam) later(ad ? (2.5 - atkSkip(s.t)) * ANIM_MS.attack : 0.4 * atkMs, () => { ring(p.x, p.y + 12, 34, '#b9a98a', { w: 4, dur: 420, flat: 0.4 }); burst(p.x, p.y + 12, 7, { kind: 'smoke', col: PAL.dust, v0: 20, v1: 90, l0: 320, l1: 640, s0: 3, s1: 5.5, drag: 2.4, grow: 1.3 }); });      // heavy blows shake the ground
     { const dd = Math.hypot(p.x - a.x, p.y - a.y) || 1; t.knock = { ux: (p.x - a.x) / dd, uy: (p.y - a.y) / dd, amp: 8 }; }      // the target is pushed back along the blow
@@ -689,7 +689,81 @@ const Battle = (() => {
     return false;
   }
 
-  function newRound() {
+
+  // ---- siege: the attackers' catapult and the defenders' arrow towers act in the open instead of damaging the walls out of sight ----
+  const catPos = () => { const side = 1 - B.siege.dside, p = hexPx(side === 0 ? 0 : BW - 1, BH - 1); return { x: p.x + (side === 0 ? -4 : 4), y: p.y + 4, dir: side === 0 ? 1 : -1 }; };
+  function drawCatapult(now) {
+    const cp = catPos(), t = B.catT0 ? now - B.catT0 : 99999, rel = 260 / spd(), back = 1300 / spd(), sm = (u) => u * u * (3 - 2 * u);
+    // arm angle: cocked back, a fast throw forward, then winched slowly back
+    let a = -2.55; if (t < rel) a = -2.55 + 2.4 * sm(t / rel); else if (t < rel + 200) a = -0.15; else if (t < rel + 200 + back) a = -0.15 - 2.4 * sm((t - rel - 200) / back);
+    const loaded = !(t >= rel && t < rel + 200 + back * 0.85);
+    ctx.save(); ctx.translate(cp.x, cp.y); ctx.scale(cp.dir, 1);
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(0, 10, 28, 6, 0, 0, 7); ctx.fill();
+    // wheels and frame
+    for (const wx of [-15, 15]) { ctx.fillStyle = '#4a2f18'; ctx.strokeStyle = '#1c1008'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(wx, 4, 8, 0, 7); ctx.fill(); ctx.stroke(); ctx.strokeStyle = '#8a5a30'; ctx.lineWidth = 1.2; for (let i = 0; i < 4; i++) { const an = i * Math.PI / 4; ctx.beginPath(); ctx.moveTo(wx - Math.cos(an) * 7, 4 - Math.sin(an) * 7); ctx.lineTo(wx + Math.cos(an) * 7, 4 + Math.sin(an) * 7); ctx.stroke(); } }
+    ctx.fillStyle = '#7a4e26'; ctx.strokeStyle = '#1c1008'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(-22, 0); ctx.lineTo(24, 0); ctx.lineTo(18, -9); ctx.lineTo(-16, -9); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-6, -9); ctx.lineTo(0, -22); ctx.lineTo(6, -9); ctx.closePath(); ctx.fillStyle = '#5e3a1c'; ctx.fill(); ctx.stroke();
+    // arm with its bucket
+    ctx.save(); ctx.translate(0, -20); ctx.rotate(a); ctx.strokeStyle = '#1c1008'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(32, 0); ctx.stroke(); ctx.strokeStyle = '#a87442'; ctx.lineWidth = 3.6; ctx.stroke();
+    ctx.fillStyle = '#5e3a1c'; ctx.strokeStyle = '#1c1008'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.arc(32, 0, 6, 0, 7); ctx.fill(); ctx.stroke();
+    if (loaded) { ctx.fillStyle = '#8a8478'; ctx.beginPath(); ctx.arc(32, -3, 5, 0, 7); ctx.fill(); ctx.strokeStyle = '#1c1710'; ctx.lineWidth = 1; ctx.stroke(); }
+    ctx.restore(); ctx.restore();
+  }
+  async function catapultShot(st, dmg) {
+    const bb = B, p = hexPx(st.c, st.r), cp = catPos();
+    B.catT0 = performance.now(); sfx('swing');
+    await sleep(260); if (B !== bb || B.over) return;
+    const lx = cp.x + cp.dir * 18, ly = cp.y - 44, dist = Math.hypot(p.x - lx, p.y - ly), fl = Math.max(520, Math.min(900, dist * 1.05)) / spd();
+    burst(lx, ly + 6, 5, { kind: 'smoke', col: PAL.dust, v0: 10, v1: 50, l0: 250, l1: 500, s0: 3, s1: 5, drag: 2.4, grow: 1.3 });
+    (B.proj = B.proj || []).push({ ax: lx, ay: ly, bx: p.x, by: p.y - 6, t0: performance.now(), dur: fl, style: 'rock', arc: 96, col: null });
+    await sleep(fl * spd() + 30); if (B !== bb || B.over) return;
+    hitStruct(st, dmg, '🎯 Catapult hits');
+    await sleep(280);
+  }
+  async function towerVolley(st, tg) {
+    const bb = B, a = hexPx(st.c, st.r), p = hexPx(tg.c, tg.r), lvl = Math.min(3, (B.siege && B.siege.fort) || 0), n = 1 + lvl, dur = Math.max(260, Math.min(520, Math.hypot(p.x - a.x, p.y - a.y))) / spd();
+    st.shotAt = performance.now(); sfx('shoot');
+    for (let i = 0; i < n; i++) (B.proj = B.proj || []).push({ ax: a.x, ay: a.y - 30, bx: p.x + (Math.random() - 0.5) * 12, by: p.y - 6 + (Math.random() - 0.5) * 8, t0: performance.now() + i * 95 / spd(), dur, style: 'arrow', col: '#c8a24a' });
+    await sleep(95 * (n - 1) + dur * spd() + 20); if (B !== bb || B.over || tg.dead) return;
+    hit(tg, Math.round((25 + Math.floor(Math.random() * 20)) * (B.towerMul || 1)), '🗼 Arrow Tower hits', 'ranged');
+    await sleep(200);
+  }
+  async function siegeRound() {
+    const bb = B;
+    for (let i = 0; i < 2; i++) {
+      const sts = [...B.walls.values()]; if (!sts.length) break;
+      const gate = sts.find(w => w.k === 'gate'), st = gate && Math.random() < 0.5 ? gate : sts[Math.floor(Math.random() * sts.length)];
+      await catapultShot(st, Math.floor(60 * (B.siege.dside === 1 ? 1 + 0.5 * perk('ballistics') : 1))); if (B !== bb || B.over) return;
+    }
+    if (B.round > 1) {
+      for (const st of [...B.walls.values()]) if (st.k === 'tower') {
+        const atk = alive(1 - B.siege.dside).filter(a => !a.dead); if (!atk.length) break;
+        await towerVolley(st, atk[Math.floor(Math.random() * atk.length)]); if (B !== bb || B.over) return;
+      }
+    }
+  }
+  // what fortifications look like: pennants on every tower, torches from a Citadel up, braziers on the walls from a Castle up, golden trim on a Fortress
+  function siegeDeco(st, p, now) {
+    const lvl = Math.min(3, (B.siege && B.siege.fort) || 0), dcol = B.siege.dside === 0 ? '#3a6fc4' : '#c4473f', fl = Math.sin(now / 230 + st.r * 1.3), fl2 = Math.sin(now / 90 + st.r * 2.1);
+    ctx.save();
+    if (st.k === 'tower') {
+      const fx = p.x + 3, fy = p.y - 36;
+      ctx.strokeStyle = '#2a1604'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(fx, fy + 12); ctx.lineTo(fx, fy - 7); ctx.stroke();
+      const pen = (ox) => { ctx.fillStyle = dcol; ctx.beginPath(); ctx.moveTo(fx + ox, fy - 7); ctx.quadraticCurveTo(fx + ox + 8 + fl * 2, fy - 6 + fl, fx + ox + 15 + fl * 3, fy - 3 + fl * 1.5); ctx.quadraticCurveTo(fx + ox + 8 + fl * 2, fy - 2 + fl, fx + ox, fy + 2); ctx.closePath(); ctx.fill(); ctx.lineWidth = 0.8; ctx.strokeStyle = 'rgba(20,10,4,.8)'; ctx.stroke(); };
+      pen(0); if (lvl >= 3) { ctx.beginPath(); ctx.moveTo(fx - 8, fy + 14); ctx.lineTo(fx - 8, fy - 2); ctx.strokeStyle = '#2a1604'; ctx.lineWidth = 1.4; ctx.stroke(); ctx.save(); ctx.translate(-8, 4); pen(0); ctx.restore(); }
+      if (lvl >= 1) for (const tx of [-17, 19]) { ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(p.x + tx, p.y - 14, 1, p.x + tx, p.y - 14, 12 + fl2); g.addColorStop(0, 'rgba(255,220,120,.85)'); g.addColorStop(1, 'rgba(255,120,30,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x + tx, p.y - 14, 12 + fl2, 0, 7); ctx.fill(); ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = '#4a2f18'; ctx.fillRect(p.x + tx - 1, p.y - 11, 2, 6); }
+      if (st.shotAt && now - st.shotAt < 220) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(255,230,160,' + (0.8 * (1 - (now - st.shotAt) / 220)).toFixed(2) + ')'; ctx.beginPath(); ctx.arc(p.x + (B.siege.dside === 1 ? -14 : 14), p.y - 30, 9, 0, 7); ctx.fill(); }
+    } else if (lvl >= 2 && st.k !== 'gate' && st.r % 2 === 0) {      // braziers along the wall
+      ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(p.x, p.y - 18, 1, p.x, p.y - 18, 14 + fl2 * 1.5); g.addColorStop(0, 'rgba(255,210,110,.8)'); g.addColorStop(1, 'rgba(255,110,30,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y - 18, 14 + fl2 * 1.5, 0, 7); ctx.fill();
+    }
+    if (lvl >= 3 && st.k === 'gate') { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.45 + 0.15 * fl; const g = ctx.createRadialGradient(p.x, p.y - 4, 4, p.x, p.y - 4, 44); g.addColorStop(0, 'rgba(255,214,100,.75)'); g.addColorStop(1, 'rgba(255,214,100,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y - 4, 44, 0, 7); ctx.fill(); }
+    ctx.restore();
+    // a hurt tower smokes and then burns; a cracked wall sifts dust
+    const fr = st.hp / st.max;
+    if (st.k === 'tower' && fr < 0.5 && Math.random() < (fr < 0.25 ? 0.5 : 0.22)) emit({ x: p.x + (Math.random() - 0.5) * 18, y: p.y - 30, vx: (Math.random() - 0.5) * 12, vy: -22, life: 700 / spd(), size: 4, col: fr < 0.25 ? '#ff8a2a' : '#4a4540', kind: fr < 0.25 ? 'ember' : 'smoke', add: fr < 0.25, grow: 1.6, drag: 0.6 });
+    else if (st.k === 'wall' && fr < 0.6 && Math.random() < 0.05) emit({ x: p.x + (Math.random() - 0.5) * 30, y: p.y - 6, vx: 0, vy: 10, life: 500 / spd(), size: 2.4, col: '#b9a98a', kind: 'smoke', add: false, grow: 1, drag: 1 });
+  }
+  async function newRound() {
     B.round++;
     if (B.round > 60) { log('Stalemate — the attackers withdraw.'); finish(false, false); return; }
     for (const s of alive()) { s.ret = true; s.waited = false; }
@@ -699,21 +773,7 @@ const Battle = (() => {
     B.queue = alive().sort((a, c) => speedOf(c) - speedOf(a) || a.side - c.side);
     B.waitQ = []; B.strikeUsed = false; B.mineUsed = false; B.balUsed = false; B.tentUsed = false;
     log(`— Round ${B.round} —`);
-    if (B.siege) {
-      for (let i = 0; i < 2; i++) {
-        const sts = [...B.walls.values()]; if (!sts.length) break;
-        const gate = sts.find(w => w.k === 'gate');
-        const cat = Math.floor(60 * (B.siege.dside === 1 ? 1 + 0.5 * perk('ballistics') : 1));
-        hitStruct(gate && Math.random() < 0.5 ? gate : sts[Math.floor(Math.random() * sts.length)], cat, '🎯 Catapult hits');
-      }
-      if (B.round > 1) {
-        const atk = alive(1 - B.siege.dside);
-        for (const st of [...B.walls.values()]) if (st.k === 'tower' && atk.length) {
-          const tg = atk.filter(a => !a.dead)[Math.floor(Math.random() * atk.length)];
-          if (tg) hit(tg, Math.round((25 + Math.floor(Math.random() * 20)) * (B.towerMul || 1)), '🗼 Arrow Tower hits', 'ranged');
-        }
-      }
-    }
+    if (B.siege) await siegeRound();
   }
   async function nextTurn() {
     if (B.over) return;
@@ -722,7 +782,7 @@ const Battle = (() => {
     while (!s) {
       if (!B.queue.length) {
         if (B.waitQ.length) { B.queue = B.waitQ.sort((a, b) => speedOf(a) - speedOf(b)); B.waitQ = []; }
-        else { newRound(); B.castUsed = false; if (checkEnd()) return; }
+        else { await newRound(); if (!B || B.over) return; B.castUsed = false; if (checkEnd()) return; }
       }
       const c = B.queue.shift();
       if (!c || c.dead) continue;
@@ -1297,6 +1357,7 @@ const Battle = (() => {
     const da = px(A), di = px(I); let d = 0; for (let k = 0; k < da.length; k++) d += Math.abs(da[k] - di[k]);
     return (skipCache[key] = d / da.length < 2.5 && a.length >= 4 ? 1 : 0);
   }
+  const idleMs = (t) => (C[t] && C[t].fly ? 115 : ANIM_MS.idle);      // wings beat far faster than a creature breathes
   const atkFrames = (t) => { const q = seqOf(t, 'attack'); return q ? q.slice(atkSkip(t)) : null; };
   const animDur = (t, state) => { const q = state === 'attack' ? atkFrames(t) : seqOf(t, state); return q && q.length ? q.length * ANIM_MS[state] / spd() : 0; };
   // ---- facing: a creature turns toward what it attacks and the way it walks (a quick flip), then turns back to face the enemy side ----
@@ -1326,13 +1387,13 @@ const Battle = (() => {
   // the frame to show now, or null when this creature has no frames for the state (or they have not loaded)
   function frameOf(s, state, now, t0, dur) {
     const seq = state === 'attack' ? atkFrames(s.t) : state === 'walk' ? (seqOf(s.t, 'walk') || seqOf(s.t, 'idle')) : seqOf(s.t, state); if (!seq || !seq.length) return null;
-    const n = seq.length, i = state === 'walk' ? Math.floor((now - (s.walkT0 || 0)) / (s.walkMs || ANIM_MS.walk)) % n : state === 'idle' ? Math.floor((now - (s.idleT0 || 0)) / ANIM_MS.idle + (s.idleT0 ? 0 : s.c * 3 + s.r * 5)) % n : Math.min(n - 1, Math.max(0, Math.floor((now - t0) / dur * n)));
+    const n = seq.length, i = state === 'walk' ? Math.floor((now - (s.walkT0 || 0)) / (s.walkMs || ANIM_MS.walk)) % n : state === 'idle' ? Math.floor((now - (s.idleT0 || 0)) / idleMs(s.t) + (s.idleT0 ? 0 : s.c * 3 + s.r * 5)) % n : Math.min(n - 1, Math.max(0, Math.floor((now - t0) / dur * n)));
     return Assets.get(seq[i]) || null;
   }
   // idle and walk frames are cross-faded: the next picture fades in over the whole length of the current one, so the creature flows from pose to pose instead of flipping between a few photos
   function frameBlend(s, state, now) {
     const seq = state === 'walk' ? (seqOf(s.t, 'walk') || seqOf(s.t, 'idle')) : seqOf(s.t, 'idle'); if (!seq || seq.length < 2) return null;
-    const n = seq.length, raw = state === 'walk' ? (now - (s.walkT0 || 0)) / (s.walkMs || ANIM_MS.walk) : (now - (s.idleT0 || 0)) / ANIM_MS.idle + (s.idleT0 ? 0 : s.c * 3 + s.r * 5);
+    const n = seq.length, raw = state === 'walk' ? (now - (s.walkT0 || 0)) / (s.walkMs || ANIM_MS.walk) : (now - (s.idleT0 || 0)) / idleMs(s.t) + (s.idleT0 ? 0 : s.c * 3 + s.r * 5);
     const i = Math.floor(raw), f = raw - i, nx = Assets.get(seq[(i + 1) % n]); if (!nx) return null;
     return { next: nx, k: f * f * (3 - 2 * f) };
   }
@@ -1453,7 +1514,11 @@ const Battle = (() => {
       if (walk) { ctx.fillStyle = 'rgba(255, 236, 150, .30)'; ctx.fill(); }
       ctx.strokeStyle = walk ? 'rgba(255, 224, 110, .95)' : B._board ? 'rgba(0,0,0,.16)' : 'rgba(0,0,0,.26)'; ctx.lineWidth = walk ? 2 : 1; ctx.stroke();
       if (B.obs.has(k)) { const oe = B.obs.get(k), ob = obstacleSprite(oe, c, r); if (ob) { const plant = oe === '🌲' || oe === '🌳' || oe === '🌿' || oe === '🌾', sw = plant && !reduced() ? Math.sin(performance.now() / (oe === '🌿' ? 700 : 1100) + c * 1.7 + r * 0.9) * (oe === '🌿' ? 0.03 : 0.018) : 0; if (sw) { ctx.save(); ctx.translate(p.x, p.y + 15 * OBK); ctx.transform(1, 0, sw, 1, 0, 0); ctx.drawImage(ob.cv, -ob.ox * OBK, -ob.oy * OBK - 15 * OBK, ob.w * OBK, ob.h * OBK); ctx.restore(); } else ctx.drawImage(ob.cv, p.x - ob.ox * OBK, p.y - ob.oy * OBK, ob.w * OBK, ob.h * OBK); } else { const oi = typeof Assets !== 'undefined' ? Assets.get(oe === '🌲' ? 'terrain/forest_overlay' : (oe === '🪨' || oe === '⛰️') ? 'terrain/mountain_overlay' : '') : null; if (oi) sprite(oi, p.x, p.y, oe === '🌲' ? 44 : 40); else { ctx.fillStyle = '#fff'; emoji(oe, p.x, p.y, 30); } } }
-      if (B.siege && B.moat.has(k) && (!B._board || B._bg)) { ctx.fillStyle = 'rgba(255,255,255,.5)'; emoji('≈', p.x, p.y, 20); }
+      if (B.siege && B.moat.has(k) && (!B._board || B._bg)) {      // the moat: slow ripples and glints
+        ctx.save(); hexPath(p.x, p.y, HR - 2); ctx.clip(); ctx.lineCap = 'round'; ctx.lineWidth = 1.4;
+        for (let q = 0; q < 3; q++) { const ph = now / 1400 + q * 0.33 + (c * 0.37 + r * 0.21), f = ph - Math.floor(ph), yy = p.y - 16 + q * 14 + Math.sin(ph * 6) * 2; ctx.strokeStyle = 'rgba(210,240,255,' + (0.4 * Math.sin(f * Math.PI)).toFixed(2) + ')'; ctx.beginPath(); ctx.moveTo(p.x - 16 + f * 8, yy); ctx.quadraticCurveTo(p.x - 6 + f * 8, yy - 3, p.x + 4 + f * 8, yy); ctx.quadraticCurveTo(p.x + 10 + f * 8, yy + 2, p.x + 16, yy); ctx.stroke(); }
+        ctx.restore();
+      }
       if (B.siege && B.mines && B.mines.has(k) && B.siege.dside === 0) { const mi = typeof Assets !== 'undefined' ? Assets.get('battle/mine_dormant') : null; if (mi) sprite(mi, p.x, p.y + 6, 34); else { ctx.fillStyle = '#fff'; emoji('💣', p.x, p.y + 2, 18); } }
       if (B.siege && c === B.cw && !structAt(c, r) && typeof Assets !== 'undefined') { const kk = SIEGE_LAYOUT[r], di = Assets.get(kk === 'gate' ? 'battle/gate_open' : kk === 'tower' ? 'battle/tower_damaged' : 'battle/wall_breached'); if (di) sprite(di, p.x, p.y, kk === 'tower' ? 52 : 70); }
       if (B.spell === '__mine' && freeMineHex(c, r)) { hexPath(p.x, p.y, HR - 4); ctx.strokeStyle = 'rgba(255,200,80,.8)'; ctx.lineWidth = 2; ctx.stroke(); }
@@ -1464,11 +1529,12 @@ const Battle = (() => {
         ctx.fillStyle = now - (st.flash || 0) < 220 ? '#ffcf7a' : '#8b8478'; ctx.fill();
         ctx.strokeStyle = '#2a2520'; ctx.lineWidth = 2; ctx.stroke();
         ctx.fillStyle = '#fff'; emoji(STRUCT[st.k].i, p.x, p.y - 2, st.k === 'wall' ? 24 : 28);
-        } else if (now - (st.flash || 0) < 220) { hexPath(p.x, p.y, HR - 1); ctx.fillStyle = 'rgba(255,210,120,.45)'; ctx.fill(); }
+        } else { if (now - (st.flash || 0) < 220) { hexPath(p.x, p.y, HR - 1); ctx.fillStyle = 'rgba(255,210,120,.45)'; ctx.fill(); } siegeDeco(st, p, now); }
         ctx.fillStyle = '#300'; ctx.fillRect(p.x - 16, p.y + 15, 32, 5);
         ctx.fillStyle = st.hp / st.max > 0.5 ? '#5c5' : st.hp / st.max > 0.25 ? '#ec4' : '#e55'; ctx.fillRect(p.x - 16, p.y + 15, 32 * Math.max(0, st.hp) / st.max, 5);
       }
     }
+    if (B.siege) drawCatapult(now);
     if (B.cur && !B.cur.dead) { const p = hexPx(B.cur.c, B.cur.r); hexGlow(p.x, p.y, '255,206,80', 0.2 + 0.07 * Math.sin(now / 300)); }
     if (hov) {
       const p = hexPx(hov.c, hov.r), t = stackAt(hov.c, hov.r);
@@ -1540,7 +1606,7 @@ const Battle = (() => {
       if (pose) {
         const wd = isWide(s), fit = fr ? animFit(s.t) : null, kk = fit ? fit.k * (wd ? 1.25 : 1) : Math.min(66 / pose.height, 72 / pose.width) * (wd ? 1.25 : 1), pw = pose.width * kk, ph = pose.height * kk, fy = p.y + 22;
         if (wd) p.x += (s.side === 0 ? -1 : 1) * HW * 0.5;
-        unitBase(p.x, fy, wd ? 36 : 21, wd ? 9 : 7.5, s.side, s === B.cur, flash, now);
+        { const hov = fr && pf.fly ? Math.max(0, -off.y) : 0; unitBase(p.x, pf.fly && fr ? fy - off.y : fy, (wd ? 36 : 21) * (1 - Math.min(0.35, hov / 60)), (wd ? 9 : 7.5) * (1 - Math.min(0.35, hov / 60)), s.side, s === B.cur, flash, now); }
         ctx.save(); ctx.translate(p.x, fy); ctx.rotate(off.rot * 0.4); ctx.scale(brx, bry); if (fsx !== 1) ctx.scale(fsx, 1); if (flash) ctx.globalAlpha = 0.88;
         if (flash && fa < 170 && !reduced() && 'filter' in ctx) ctx.filter = 'brightness(' + (1 + 1.15 * (1 - fa / 170)).toFixed(2) + ')';      // a quick white-hot flash on impact
         if (s._xf && fit) { const xk = (now - s._xf.t0) / 90; if (xk < 1) { ctx.save(); ctx.globalAlpha *= 1 - xk; ctx.drawImage(s._xf.img, -fit.cx * kk, -fit.by * kk, s._xf.img.width * kk, s._xf.img.height * kk); ctx.restore(); } else s._xf = null; }
@@ -1611,6 +1677,9 @@ const Battle = (() => {
     const pf = profOf(s.t), fly = pf.fly, style = isWide(s) ? 'rear' : pf.style, hasFr = !!seqOf(s.t, 'idle');
     // a creature with its own frames animates itself, so the code motion stays small for it
     let x = 0, y = hasFr ? 0 : Math.sin(now / (fly ? 260 : pf.spd * 0.77) + s.c * 3 + s.r) * (fly ? 2.6 : 1.2) - (fly ? 4 : 0), rot = 0, sx = 1, sy = 1;
+    if (fly && hasFr && !reduced()) {      // hovering: a slow rise and fall, a drifting side to side, a bank into the drift and an occasional strong beat
+      const ph = pf.ph + s.c * 2.1 + s.r * 1.3, gust = Math.pow(Math.max(0, Math.sin(now / 2300 + ph * 1.7)), 6);
+      y = -9 + Math.sin(now / (pf.spd * 0.95) + ph) * 3.4 - gust * 3.5; x = Math.sin(now / (pf.spd * 1.9) + ph * 0.6) * 2.4; rot = Math.cos(now / (pf.spd * 1.9) + ph * 0.6) * 0.05; sy *= 1 + gust * 0.02; }
     const a = s.anim, own = !!seqOf(s.t, 'attack');
     if (a) {
       const k = (now - a.t0) / a.dur;
@@ -1686,7 +1755,7 @@ const Battle = (() => {
         impactExtra(p, now);
         return false;
       }
-      const arc = { arrow: 26, twin: 26, glow: 26, javelin: 30, bolt: 14, rock: 38, venom: 20, gaze: 0, zap: 0 }[p.style] ?? 12;
+      const arc = p.arc !== undefined ? p.arc : ({ arrow: 26, twin: 26, glow: 26, javelin: 30, bolt: 14, rock: 38, venom: 20, gaze: 0, zap: 0 }[p.style] ?? 12);
       const x = p.ax + (p.bx - p.ax) * k, y = p.ay + (p.by - p.ay) * k - arc * Math.sin(Math.PI * k), vx = p.bx - p.ax, vy = p.by - p.ay - arc * Math.PI * Math.cos(Math.PI * k), ang = Math.atan2(vy, vx);
       ctx.save();
       if (p.style === 'arrow') {

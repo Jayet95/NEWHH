@@ -9,7 +9,7 @@ const Assets = (() => {
   const BASE = 'art/', stems = {}, files = {}, pending = {};
   let index = null; const packP = {};
   const stem = (f) => f.replace(/\.(png|webp|jpe?g|svg|gif)$/i, '');
-  const LATER = /^(poses|mounted|anim|buildings|heroes)\/|^battle\/(obs|mach|siege|proj)\/|^world\/|^ui\/(screens|castle_select|hero_select|adventure|town_)/;
+  const LATER = /^(poses|mounted|anim|buildings|heroes)\/|^battle\/(obs|mach|siege3?|proj)\/|^world\/|^ui\/(screens|castle_select|hero_select|adventure|town_)/;
   const IDLE = /^anim\/[^/]+\/idle_1$|^poses\/left\/idle\//;   // the battle art that stands for a creature in every picture
   const MIME = { webp: 'image/webp', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', svg: 'image/svg+xml', gif: 'image/gif' };
   const progress = (done, total) => { try { document.dispatchEvent(new CustomEvent('assets-progress', { detail: { done, total } })); } catch (e) { /* ignore */ } };

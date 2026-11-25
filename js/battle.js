@@ -1553,16 +1553,18 @@ const Battle = (() => {
   // siege v3 walls: one-row towers and gates (240x135 at 1/3 scale) and two-row wall sections (240x270), five damage stages, all registered on one axis
   const S3W = 112, S3 = { tower: 'tower_round', gate: 'gate_closed', wall: 'wall_straight' }, S3STAGE = ['s100', 's75', 's50', 's25', 'ruin'];
   const s3img = (k, stage) => { if (typeof Assets === 'undefined' || !B.siege) return null; const lv = Math.max(0, Math.min(3, B.siege.fort || 0)); return Assets.get('battle/siege3/' + S3[k] + '_' + stage + '_' + FORT_NAME[lv] + (lv >= 2 ? '_' + (FAC_ART[B.siege.fac] || 'kingdom') : '')); };
-  function s3draw(img, k, row, alpha) {
+  function s3draw(img, k, row, alpha, cr) {
     const p = hexPx(B.cw, row), ax = hexPx(B.cw, 0).x + HW / 4, h = img.height * 80 / img.width, top = p.y - 22.5;
     ctx.save(); if (alpha !== undefined) ctx.globalAlpha = alpha;
-    if (B.siege.dside === 0) { ctx.translate(ax, top); ctx.scale(-1, 1); ctx.drawImage(img, -S3W / 2, 0, S3W, h); } else ctx.drawImage(img, ax - S3W / 2, top, S3W, h);
+    const y0 = cr ? cr[0] * img.height : 0, sh = cr ? (cr[1] - cr[0]) * img.height : img.height;      // a wall that continues into its neighbour drops its parapet cap / base curve there, so the run reads as one wall
+    if (B.siege.dside === 0) { ctx.translate(ax, top); ctx.scale(-1, 1); ctx.drawImage(img, 0, y0, img.width, sh, -S3W / 2, 0, S3W, h); } else ctx.drawImage(img, 0, y0, img.width, sh, ax - S3W / 2, top, S3W, h);
     ctx.restore();
   }
   function s3Struct(st) {
     const fr = Math.max(0, st.hp / st.max), idx = Math.min(3.999, (1 - fr) * 4), i = Math.floor(idx), a = s3img(st.k, S3STAGE[i]); if (!a) return false;
     const b = s3img(st.k, S3STAGE[i + 1]), k = idx - i, row = st.rows[0];
-    s3draw(a, st.k, row); if (b && k > 0.4) s3draw(b, st.k, row, Math.min(1, (k - 0.4) / 0.5));   // the next stage dissolves in over the old one
+    const nb = (r) => { const o = B.walls.get(key(st.c, r)); return !!o && o.k === 'wall'; }, cr = st.k === 'wall' ? [nb(row - 1) ? 0.22 : 0, nb(st.rows[st.rows.length - 1] + 1) ? 0.83 : 1] : undefined;
+    s3draw(a, st.k, row, undefined, cr); if (b && k > 0.4) s3draw(b, st.k, row, Math.min(1, (k - 0.4) / 0.5), cr);   // the next stage dissolves in over the old one
     if (fr < 0.5 && !reduced() && Math.random() < (fr < 0.25 ? 0.22 : 0.1)) { const ax = hexPx(B.cw, 0).x + HW / 4, y = stP(st).y; emit({ x: ax + R(-8, 8), y: y - (st.k === 'tower' ? 26 : 8) + R(-4, 4), vx: R(-6, 6), vy: R(-30, -14), life: R(600, 1100) / spd(), size: R(3, 5), col: fr < 0.25 ? '#ff9a3a' : '#5a5650', kind: fr < 0.25 ? 'ember' : 'smoke', add: fr < 0.25, grow: 1.4, drag: 1.2 }); }
     return true;
   }

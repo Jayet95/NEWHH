@@ -1551,12 +1551,12 @@ const Battle = (() => {
     });
   }
   // siege v3 walls: one-row towers and gates (240x135 at 1/3 scale) and two-row wall sections (240x270), five damage stages, all registered on one axis
-  const S3 = { tower: 'tower_round', gate: 'gate_closed', wall: 'wall_straight' }, S3STAGE = ['s100', 's75', 's50', 's25', 'ruin'];
+  const S3W = 112, S3 = { tower: 'tower_round', gate: 'gate_closed', wall: 'wall_straight' }, S3STAGE = ['s100', 's75', 's50', 's25', 'ruin'];
   const s3img = (k, stage) => { if (typeof Assets === 'undefined' || !B.siege) return null; const lv = Math.max(0, Math.min(3, B.siege.fort || 0)); return Assets.get('battle/siege3/' + S3[k] + '_' + stage + '_' + FORT_NAME[lv] + (lv >= 2 ? '_' + (FAC_ART[B.siege.fac] || 'kingdom') : '')); };
   function s3draw(img, k, row, alpha) {
     const p = hexPx(B.cw, row), ax = hexPx(B.cw, 0).x + HW / 4, h = img.height * 80 / img.width, top = p.y - 22.5;
     ctx.save(); if (alpha !== undefined) ctx.globalAlpha = alpha;
-    if (B.siege.dside === 0) { ctx.translate(ax, top); ctx.scale(-1, 1); ctx.drawImage(img, -40, 0, 80, h); } else ctx.drawImage(img, ax - 40, top, 80, h);
+    if (B.siege.dside === 0) { ctx.translate(ax, top); ctx.scale(-1, 1); ctx.drawImage(img, -S3W / 2, 0, S3W, h); } else ctx.drawImage(img, ax - S3W / 2, top, S3W, h);
     ctx.restore();
   }
   function s3Struct(st) {
@@ -1613,13 +1613,13 @@ const Battle = (() => {
       if (B.siege && (!B._board || B._bg)) {
         const inside = B.siege.dside === 1 ? c > B.cw : c < B.cw;
         if (inside) { ctx.fillStyle = 'rgba(170,130,80,.30)'; ctx.fill(); }
-        if (B.moat.has(k) && !siegeImg('moat_water_frame1', '')) { ctx.fillStyle = 'rgba(40,120,200,.65)'; ctx.fill(); }
+        if (B.moat.has(k)) { ctx.fillStyle = 'rgba(50,120,190,.38)'; ctx.fill(); }
       }
       const walk = input && B.reach.has(k) && !B.spell && B.reach.get(k).d > 0;
       if (walk) { ctx.fillStyle = 'rgba(255, 236, 150, .30)'; ctx.fill(); }
       ctx.strokeStyle = walk ? 'rgba(255, 224, 110, .95)' : B._board ? 'rgba(0,0,0,.16)' : 'rgba(0,0,0,.26)'; ctx.lineWidth = walk ? 2 : 1; ctx.stroke();
       if (B.obs.has(k)) { const oe = B.obs.get(k), oa = obsArt(oe, c, r), ob = oa ? null : obstacleSprite(oe, c, r); if (oa) drawObsArt(oa, oe, p, c, r); else if (ob) { const plant = oe === '🌲' || oe === '🌳' || oe === '🌿' || oe === '🌾', sw = plant && !reduced() ? Math.sin(performance.now() / (oe === '🌿' ? 700 : 1100) + c * 1.7 + r * 0.9) * (oe === '🌿' ? 0.03 : 0.018) : 0; if (sw) { ctx.save(); ctx.translate(p.x, p.y + 15 * OBK); ctx.transform(1, 0, sw, 1, 0, 0); ctx.drawImage(ob.cv, -ob.ox * OBK, -ob.oy * OBK - 15 * OBK, ob.w * OBK, ob.h * OBK); ctx.restore(); } else ctx.drawImage(ob.cv, p.x - ob.ox * OBK, p.y - ob.oy * OBK, ob.w * OBK, ob.h * OBK); } else { const oi = typeof Assets !== 'undefined' ? Assets.get(oe === '🌲' ? 'terrain/forest_overlay' : (oe === '🪨' || oe === '⛰️') ? 'terrain/mountain_overlay' : '') : null; if (oi) sprite(oi, p.x, p.y, oe === '🌲' ? 44 : 40); else { ctx.fillStyle = '#fff'; emoji(oe, p.x, p.y, 30); } } }
-      if (B.siege && B.moat.has(k)) { const mf = siegeImg('moat_water_frame' + (1 + Math.floor(now / 320 + r * 0.5 + c) % 4), ''); if (mf) { ctx.save(); hexPath(p.x, p.y, HR - 0.5); ctx.clip(); siegeTile(mf, p); ctx.restore(); } }
+      if (false && B.siege && B.moat.has(k)) { const mf = siegeImg('moat_water_frame' + (1 + Math.floor(now / 320 + r * 0.5 + c) % 4), ''); if (mf) { ctx.save(); hexPath(p.x, p.y, HR - 0.5); ctx.clip(); siegeTile(mf, p); ctx.restore(); } }
       if (B.siege && B.moat.has(k) && (!B._board || B._bg) && !siegeImg('moat_water_frame1', '')) {      // the moat: slow ripples and glints
         ctx.save(); hexPath(p.x, p.y, HR - 2); ctx.clip(); ctx.lineCap = 'round'; ctx.lineWidth = 1.4;
         for (let q = 0; q < 3; q++) { const ph = now / 1400 + q * 0.33 + (c * 0.37 + r * 0.21), f = ph - Math.floor(ph), yy = p.y - 16 + q * 14 + Math.sin(ph * 6) * 2; ctx.strokeStyle = 'rgba(210,240,255,' + (0.4 * Math.sin(f * Math.PI)).toFixed(2) + ')'; ctx.beginPath(); ctx.moveTo(p.x - 16 + f * 8, yy); ctx.quadraticCurveTo(p.x - 6 + f * 8, yy - 3, p.x + 4 + f * 8, yy); ctx.quadraticCurveTo(p.x + 10 + f * 8, yy + 2, p.x + 16, yy); ctx.stroke(); }

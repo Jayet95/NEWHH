@@ -2048,7 +2048,7 @@ const Battle = (() => {
   // ------- setup / finish -------
   function finish(win, fled) {
     if (B.over) return;
-    B.over = true; if (win) { if (!(typeof Sfx !== 'undefined' && Sfx.victory && Sfx.victory())) sfx('win'); } else sfx(fled ? 'click' : 'lose'); if (typeof Sfx !== 'undefined') Sfx.mood('map');
+    B.over = true; if (win) { if (!(typeof Sfx !== 'undefined' && Sfx.victory && Sfx.victory())) sfx('win'); } else sfx(fled ? 'click' : 'lose'); if (typeof Sfx !== 'undefined') Sfx.mood('map'); if (typeof Music !== 'undefined') Music.ctx({ siege: null, boss: false });
     const surv = B.armyIn.map((a, i) => { if (!a) return null; const st = B.stacks.find(s => s.side === 0 && s.slot === i); return st && !st.dead ? st.n : 0; });
     const lost = B.armyIn.map((a, i) => a ? a.n - (surv[i] || 0) : 0).reduce((p, v) => p + v, 0);
     const res = { win, fled, survivors: surv, xp: win ? Math.floor(B.xp) : 0, mana: B.hero.mana };
@@ -2088,7 +2088,8 @@ const Battle = (() => {
     return run0(opts);
   }
   function run0(opts) {
-    cv = $('bat'); ctx = cv.getContext('2d'); bind(); if (typeof Sfx !== 'undefined') Sfx.mood('battle');
+    cv = $('bat'); ctx = cv.getContext('2d'); bind(); if (typeof Music !== 'undefined') { const big = (opts.enemy || []).some(s => C[s.t] && C[s.t].tier >= 7) || !!opts.boss; Music.ctx({ terrain: opts.terrain || 'grass', siege: opts.siege ? (opts.siege.dside === 0 ? 'defend' : 'attack') : null, boss: big, castle: null }); }
+    if (typeof Sfx !== 'undefined') Sfx.mood('battle');
     // sharp on dense screens: the canvas holds up to 2x the pixels while everything is still drawn in 960x640 units
     DPR = Math.max(1, Math.min(2, (typeof window !== 'undefined' && window.devicePixelRatio) || 1));
     if (cv.width !== Math.round(960 * DPR) || cv.height !== Math.round(640 * DPR)) { cv.width = Math.round(960 * DPR); cv.height = Math.round(640 * DPR); }

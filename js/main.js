@@ -1399,6 +1399,7 @@
     return tmp.filter(Boolean);
   }
   async function interact(o, h, eh) {
+    if (typeof Music !== 'undefined') Music.place(o.t);
     { const IS = { chest: 'chest', shrine: 'magic', stone: 'magic', tower: 'magic', obelisk: 'magic', seer: 'magic', mono: 'magic', gate: 'magic', keytent: 'magic', questgate: 'magic', prison: 'capture', mine: 'capture', resobj: 'coin', bank: 'coin', wreck: 'coin' }; if (IS[o.t] && h && !h.ai) sfx(IS[o.t]); }   // every kind of place answers with a sound
     if (o.owner !== null && o.owner !== undefined && o.owner !== 0 && allyOfPlayer(o.owner)) return toast(`${o.name || 'This place'} belongs to your ally — you are welcome to pass, but it is not yours to take.`);
     if (o.owner !== null && o.owner !== undefined && o.owner !== 0 && !atWar(0, o.owner) && !(await confirmWar(o.owner))) return;
@@ -2663,6 +2664,7 @@
   const ART_VAL = { 1: 1500, 2: 3500, 3: 7000, 4: 12000, 5: 20000 }, artVal = (id) => ART_VAL[ART[id].tier] || 3000;
   const heroArts = (h) => [...Object.entries(h.arts || {}).filter(([, v]) => v).map(([s, id]) => ({ id, where: 'slot', ref: s })), ...(h.pack || []).map((id, i) => ({ id, where: 'pack', ref: i }))];
   function openDiplomacy() {
+    if (typeof Music !== 'undefined') Music.sting('diplomacy', 120000);
     if (!G.dip) return toast('Diplomacy is off in this game: every rival is your enemy.');
     G.dipLog = G.dipLog || {};
     const word = (p) => p < 0.6 ? 'weaker than you' : p < 1.4 ? 'about your strength' : p < 2.5 ? 'stronger than you' : 'far stronger';
@@ -3028,6 +3030,7 @@
         if (s) s.n += MILITIA; else { const i = o.garrison.findIndex(a => !a); if (i >= 0) o.garrison[i] = { t: mil, n: MILITIA }; }
       }
       rollTavern();
+      if (typeof Music !== 'undefined') Music.sting('new_week');
       toast('A new week begins — dwellings replenish, forts raise militia, new heroes arrive at the tavern!');
     }
     if (!myTowns().length) {
@@ -3053,6 +3056,7 @@
   }
   // the game-over screen: a fallen castle at dusk, drifting smoke and embers, a burnt-paper panel in an iron frame (art/ui/realm-lost)
   function realmLost(why, day) {
+    if (typeof Music !== 'undefined') Music.sting('realmlost');
     return new Promise((res) => {
       const el = document.createElement('div'); el.id = 'realmlost';
       el.innerHTML = '<div class="rl-bg"></div><div class="rl-smoke s1"></div><div class="rl-smoke s2"></div><div class="rl-embers"></div><div class="rl-vig"></div>' +
@@ -3063,7 +3067,7 @@
     });
   }
   async function endGame(win, why) {
-    G.over = true; if (win) Ach.event('win', { diff: G.diff, size: G.size, day: G.day }); if (win) { if (!(typeof Sfx !== 'undefined' && Sfx.victory && Sfx.victory())) sfx('fanfare'); } else sfx('lose'); if (win && typeof Celebrate !== 'undefined') Celebrate.game();
+    G.over = true; if (win) Ach.event('win', { diff: G.diff, size: G.size, day: G.day }); if (win) { if (!(typeof Music !== 'undefined' && Music.sting('win_game')) && !(typeof Sfx !== 'undefined' && Sfx.victory && Sfx.victory())) sfx('fanfare'); } else sfx('lose'); if (win && typeof Celebrate !== 'undefined') Celebrate.game();
     try { localStorage.removeItem(SAVE); } catch (e) { /* ignore */ }
     if (win) { await victoryScreen(); $('title').classList.remove('hide'); refreshTitle(); return; }
     if (win) await showModal(`<h2>🏆 Victory!</h2><p>Every rival has lost its towns: you rule the realm on day ${G.day} (${DF().name}). Well fought!</p>`, ['Main menu']); else await realmLost(why || 'Your hero has fallen.', G.day);
@@ -3611,5 +3615,13 @@
   if (!/[?&]demo/.test(location.search) && Settings.resume && localStorage.getItem(SAVE)) Assets.ready.then(() => { if (!G && load()) $('title').classList.add('hide'); });
   if (/[?&]demo/.test(location.search)) Assets.ready.then(() => setTimeout(() => { try { newGame('castle', 'Orrin', 'normal', { size: 'medium', seed: 'demo', wrap: true, food: /[?&]food/.test(location.search) }); $('title').classList.add('hide'); demo(); } catch (e) { console.error('demo failed', e); } }, 400));
   window.__G = () => G;
+  // the music follows the ground under the active hero: biome and tile type, or the sea when sailing
+  setInterval(() => {
+    if (typeof Music === 'undefined' || !G || !G.hero || document.body.classList.contains('inbattle')) return;
+    const h = G.hero, t = G.tiles && G.tiles[h.y] && G.tiles[h.y][h.x], bm = (G.biome && G.biome[h.y] && G.biome[h.y][h.x]) || 0;
+    const bio = ['grass', 'sand', 'snow', 'swamp', 'lava'][bm] || 'grass';
+    const terrain = h.boat != null || t === T.WATER ? 'sea' : t === T.MOUNT ? 'mountain' : t === T.FOREST ? 'forest' : t === T.SAND && bio === 'grass' ? 'sand' : bio;
+    Music.ctx({ terrain, boat: h.boat != null, castle: G.faction });
+  }, 1500);
   window.__dbg = { endTurn, borderBlock, canCross, terrOwner, openDiplomacy, aiDiplomacy, declareWar, atWar, realmPower, demo, openBuildMenu, takeTown, negotiate, fightAiHero, centerOn, interact, renderAll, newGame, fight, gainXp, openTown, mis, openMissions, misEnsure, getG: () => G, loseTerrain: () => { terrain.width = terrain.width; draw(); }, rebuild: () => { buildTerrain(); renderAll(); }, realmLost, terrainLost, view: () => ({ Z, VW, VH, cam: { ...cam } }) };
 })();

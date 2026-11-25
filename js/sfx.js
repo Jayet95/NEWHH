@@ -198,6 +198,7 @@ const Sfx = (() => {
     qmul = 1;     // creature voices (the effects level is already lifted above the music)
     try { voice(VOICE[base] || 'grunt', kind, 0.86 + (h % 40) / 100); } finally { qmul = 1; }
   }
+  const STING = { level: 'levelup', day: 'new_day', ach: 'quest_done', lose: 'defeat' };   // effects that also have a recorded piece (audio/music/<slot>_<n>.mp3)
   const BUZZ = { hit: 14, crash: 40, win: [30, 40, 30], level: [20, 30, 20], build: 18, ach: [25, 40, 25] };
   // gentle generative tune: slow minor-pentatonic notes over a low drone; faster and edgier in battle
   const SCALE = { map: [220, 261.6, 293.7, 329.6, 392, 440, 523.3], battle: [196, 233.1, 261.6, 293.7, 349.2, 392, 466.2] };
@@ -226,6 +227,7 @@ const Sfx = (() => {
   let vic = null; const duck = () => (vic && !vic.paused && !vic.ended ? 0.15 : 1);
   const trackVol = (n) => Math.min(1, mv() * 1.3) * (String(n || wanted()).indexOf(':') > 0 ? CASTLE_VOL : 1) * duck();
   function victory() {
+    if (typeof Music !== 'undefined' && Music.sting('victory')) return true;
     if (!on || mv() <= 0.001 || !ctx()) return false;
     try {
       if (!vic) { vic = new Audio('audio/victory.mp3'); vic.preload = 'auto'; vic.addEventListener('ended', () => { for (const n in els) if (!els[n].paused) fadeTo(n, trackVol(n), 1400); }); vic.addEventListener('error', () => { vic = null; }); }
@@ -266,7 +268,7 @@ const Sfx = (() => {
   const townOpen = () => { const m = document.getElementById('modal'); return !!(m && !m.classList.contains('hide') && document.getElementById('tcv')); };
   function ambStop() {
     if (mood === 'town') { mood = prevMood; applyMood(false); }
-    if (!amb) return; const o = amb; amb = null; clearInterval(o.timer);
+    if (!amb) return; if (typeof Music !== 'undefined') Music.ctx({ mode: mood, castle: null }); const o = amb; amb = null; clearInterval(o.timer);
     try { const t = ac.currentTime; o.g.gain.cancelScheduledValues(t); o.g.gain.setTargetAtTime(0.0001, t, 0.5); o.src.stop(t + 2.5); } catch (e) { /* ignore */ }
   }
   function ambLevel() { if (amb && ac) amb.g.gain.setTargetAtTime(!on || mv() <= 0.001 ? 0.0001 : 0.02 * amb.def.bed[3] * ambK(), ac.currentTime, 0.4); }
@@ -279,17 +281,18 @@ const Sfx = (() => {
   function ambStart(f) {
     if (amb && amb.fac === f) return;
     ambStop(); if (!f || !on || mv() <= 0.001) return;
-    fac = f; if (TRACKS['town:' + f]) { prevMood = mood === 'town' ? 'map' : mood; mood = 'town'; applyMood(false); }
+    fac = f; if (typeof Music !== 'undefined') Music.ctx({ mode: 'town', castle: f });
+    if (TRACKS['town:' + f]) { prevMood = mood === 'town' ? 'map' : mood; mood = 'town'; applyMood(false); }
     const a = ctx(); if (!a) return;
     const def = AMBS[f] || AMBS.castle, src = a.createBufferSource(), flt = a.createBiquadFilter(), g = a.createGain();
     src.buffer = noiseBuf(a); src.loop = true; flt.type = def.bed[0]; flt.frequency.value = def.bed[1]; flt.Q.value = def.bed[2]; g.gain.value = 0.0001;
     src.connect(flt); flt.connect(g); g.connect(musicGain); src.start();
     amb = { fac: f, def, src, g, timer: setInterval(ambTick, 2300) }; ambLevel();
   }
-  function applyMood(fromStart) { if (vic && !vic.paused && mood === 'battle') vic.pause(); loadMusicIndex(); const w = wanted(); for (const n in TRACKS) if (n !== w) stopTrack(n); if (TRACKS[w]) playTrack(w, fromStart); }
+  function applyMood(fromStart) { if (vic && !vic.paused && mood === 'battle') vic.pause(); loadMusicIndex(); if (typeof Music !== 'undefined' && Music.owns()) { for (const n in TRACKS) stopTrack(n); return; } const w = wanted(); for (const n in TRACKS) if (n !== w) stopTrack(n); if (TRACKS[w]) playTrack(w, fromStart); }
   function startMusic() { if (musicTimer) return; musicTimer = setInterval(musicTick, 900); }
   return {
-    play(n) { try { if (S[n]) S[n](); if (BUZZ[n] && typeof Settings !== 'undefined') Settings.buzz(BUZZ[n]); } catch (e) { /* ignore */ } },
+    play(n) { try { if (typeof Music !== 'undefined' && STING[n]) Music.sting(STING[n], 4000); if (S[n]) S[n](); if (BUZZ[n] && typeof Settings !== 'undefined') Settings.buzz(BUZZ[n]); } catch (e) { /* ignore */ } },
     ambience(fac) { try { ambStart(fac); } catch (e) { /* ignore */ } },
     victory() { try { return victory(); } catch (e) { return false; } },
     setFaction(f) { if (f === fac) return; fac = f; applyMood(false); },
@@ -297,7 +300,7 @@ const Sfx = (() => {
     unlock() { gest = true; },
     toggle() { on = !on; if (!on) { for (const n in els) els[n].pause(); ambStop(); } else applyMood(false); try { localStorage.setItem('h3js_snd', on ? '1' : '0'); } catch (e) { /* ignore */ } return on; },
     get on() { return on; },
-    mood(m) { if (m === mood) return; mood = m; applyMood(m !== 'map'); },
+    mood(m) { if (typeof Music !== 'undefined' && m !== 'town') Music.ctx({ mode: m }); if (m === mood) return; mood = m; applyMood(m !== 'map'); },
     refresh() { ambLevel(); for (const n in els) { if (els[n].paused) continue; if (!on || mv() <= 0.001) els[n].pause(); else if (n === wanted()) els[n].volume = trackVol(n); } if (TRACKS[wanted()] && on && mv() > 0.001 && els[wanted()] && els[wanted()].paused) playTrack(wanted(), false); },
     resume() { applyMood(false); },
     startMusic,
